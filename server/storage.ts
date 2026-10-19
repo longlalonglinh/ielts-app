@@ -239,6 +239,8 @@ export function saveStoredExam(examData: any): any {
     writing_task1_image_url: cleanW1Img,
     writing_task1_imageUrl: cleanW1Img,
     writing_task2_prompt: cleanW2,
+    status: examData.status || (examData.is_draft ? 'draft' : 'published'),
+    is_draft: examData.status === 'draft' || Boolean(examData.is_draft),
     updated_at: new Date().toISOString()
   };
 

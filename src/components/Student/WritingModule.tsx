@@ -58,6 +58,7 @@ export const WritingModule: React.FC<WritingModuleProps> = ({
   examCode = 'IELTS01',
   candidateId = 'STUDENT',
   testMode = 'TEST',
+  durationMins = 60,
   onTimeExpire
 }) => {
   const hasTask1Explicit = Boolean(

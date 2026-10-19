@@ -379,8 +379,10 @@ TARGET SCHEMA:
       // Step 3: Run 6-Point Quality Verification & Auto-Repair Suite
       const verified = verifyAndOptimizeExam(targetExamData);
       const verifiedExam = verified.exam;
+      verifiedExam.status = 'draft';
+      verifiedExam.is_draft = true;
 
-      // Step 4: Persist directly into server_data/exams.json and in-memory cache
+      // Step 4: Persist directly into server_data/exams.json as draft
       try {
         saveStoredExam(verifiedExam);
       } catch (saveErr: any) {
@@ -597,8 +599,10 @@ Extract ALL questions found in the document verbatim. Return ONLY raw valid JSON
 
       // Step 4: Run 6-Point Quality Verification & Auto-Repair on the extracted exam
       const verified = verifyAndOptimizeExam(parsedExam);
+      verified.exam.status = 'draft';
+      verified.exam.is_draft = true;
 
-      // Persist to central server store
+      // Persist to central server store as draft
       try {
         saveStoredExam(verified.exam);
       } catch (saveErr: any) {
@@ -1305,14 +1309,26 @@ Trả về DUY NHẤT một JSON hợp lệ (không kèm text thừa) theo schem
 
   // Centralized Exams API
   app.get('/api/exams', (req, res) => {
-    const exams = getStoredExams();
+    const authHeader = req.headers['authorization'];
+    const adminToken = req.headers['x-admin-token'];
+    const isAdmin = adminToken === 'admin-secret' || (typeof authHeader === 'string' && authHeader.includes('Bearer admin')) || req.query.admin === 'true';
+
+    let exams = getStoredExams();
+    if (!isAdmin) {
+      exams = exams.filter((e: any) => e.status !== 'draft' && !e.is_draft);
+    }
+
     res.json({ 
       success: true, 
       exams: exams.map((e: any) => ({
         exam_code: e.exam_code,
         title: e.title,
+        status: e.status || (e.is_draft ? 'draft' : 'published'),
+        is_draft: e.status === 'draft' || Boolean(e.is_draft),
         duration_mins: e.duration_mins,
         test_type: e.test_type,
+        exam_type: e.exam_type || (e.skills?.length === 1 ? 'one_skill' : 'full_test'),
+        skills: e.skills || ['listening', 'reading', 'writing'],
         audio_url: e.audio_url,
         listening_questions_count: (e.listening_questions || []).length,
         reading_questions_count: (e.reading_questions || []).length,
@@ -1393,6 +1409,16 @@ Trả về DUY NHẤT một JSON hợp lệ (không kèm text thừa) theo schem
     }
 
     if (fullExam) {
+      // DRAFT ACCESS PROTECTION: Students cannot access drafts created by teachers
+      const isDraft = fullExam.status === 'draft' || fullExam.is_draft;
+      if (isDraft && !isAdmin) {
+        return res.status(403).json({
+          success: false,
+          is_draft: true,
+          error: `Đề thi [${code}] đang ở trạng thái bản nháp của giáo viên và chưa được công bố. Học sinh không thể truy cập.`
+        });
+      }
+
       // SECURITY GUARD: Always sanitize answers for candidates!
       const examToSend = isAdmin ? fullExam : sanitizeExamForStudent(fullExam);
       return res.json({ 

@@ -626,6 +626,15 @@ export default function App() {
       return;
     }
 
+    if (finalExamData.status === 'draft' || (finalExamData as any).is_draft) {
+      setIsLoadingExam(false);
+      const draftMsg = `Đề thi [${cleanCode}] đang ở trạng thái bản nháp của giáo viên và chưa được công bố. Học sinh không thể truy cập.`;
+      setLoginErrorMessage(draftMsg);
+      setSkillNotice(`⚠️ ${draftMsg}`);
+      setTimeout(() => setSkillNotice(null), 7000);
+      return;
+    }
+
     setLoginErrorMessage(null);
     handleSetExamData(finalExamData);
     setIsLoadingExam(false);
@@ -855,6 +864,13 @@ export default function App() {
     setIsSubmitting(false);
     setIsForcedSubmitting(false);
     clearCurrentAnswersFromIndexedDB(examCode, sbd).catch(() => {});
+
+    // Disconnect all proctoring & security locks on submission (candidates can freely copy, review, exit fullscreen)
+    isBypassingBeforeUnloadRef.current = true;
+    if (typeof document !== 'undefined' && document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+
     setCurrentModule('results');
   };
 
@@ -1601,15 +1617,17 @@ function doPost(e) {
             ) : (
               <div className="space-y-6">
                 
-                {/* Proctoring Monitor for Test Mode */}
-                <ProctoringMonitor
-                  submissionId={submissionId}
-                  sbd={sbd}
-                  examCode={examCode}
-                  testMode={testMode}
-                  onViolationCountChange={(count) => setViolationCount(count)}
-                  onProctoringMetricsChange={(m) => setProctoringMetrics(m)}
-                />
+                {/* Proctoring Monitor for Test Mode - Disconnected when candidate submits */}
+                {currentModule !== 'results' && (
+                  <ProctoringMonitor
+                    submissionId={submissionId}
+                    sbd={sbd}
+                    examCode={examCode}
+                    testMode={testMode}
+                    onViolationCountChange={(count) => setViolationCount(count)}
+                    onProctoringMetricsChange={(m) => setProctoringMetrics(m)}
+                  />
+                )}
 
                 {/* Skill Lock / Notice Banner */}
                 {skillNotice && (

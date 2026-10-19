@@ -38,7 +38,7 @@ import { IELTSQuestionCard } from '../Student/IELTSQuestionCard';
 export const questionZodSchema = z.object({
   question_id: z.string().optional().default(''),
   section: z.enum(['listening', 'reading']).optional().default('reading'),
-  passage_index: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  passage_index: z.number().min(1).max(10).optional(),
   part: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
   question_text: z.string().optional().default(''),
   question_type: z.string().optional().default('multiple_choice'),
@@ -57,7 +57,7 @@ export const questionZodSchema = z.object({
 });
 
 export const passageZodSchema = z.object({
-  passage_index: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  passage_index: z.number().min(1).max(10).optional().default(1),
   title: z.string().optional().default('Reading Passage'),
   text: z.string().optional().default(''),
   questions: z.array(questionZodSchema).optional().default([])
@@ -79,7 +79,9 @@ export const examZodSchema = z.object({
   listening_questions: z.array(questionZodSchema).optional().default([]),
   writing_task1_prompt: z.string().optional().default(''),
   writing_task1_image: z.string().optional().default(''),
-  writing_task2_prompt: z.string().optional().default('')
+  writing_task2_prompt: z.string().optional().default(''),
+  status: z.enum(['draft', 'published']).optional().default('draft'),
+  is_draft: z.boolean().optional().default(true)
 });
 
 export type ExamFormValues = z.infer<typeof examZodSchema>;
@@ -96,50 +98,86 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
   isSaving = false
 }) => {
   const [activeSection, setActiveSection] = useState<'reading' | 'listening' | 'writing' | 'settings'>('reading');
-  const [selectedPassageIdx, setSelectedPassageIdx] = useState<0 | 1 | 2>(0);
+  const [selectedPassageIdx, setSelectedPassageIdx] = useState<number>(0);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [splitScreenPreview, setSplitScreenPreview] = useState(false);
   const [tokenizerToast, setTokenizerToast] = useState<string | null>(null);
   const [previewAnswers, setPreviewAnswers] = useState<Record<string, string>>({});
   const passageTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Helper to format initial passages with embedded questions
+  // Auto-Save Draft States
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string>('');
+  const isAutoSavingRef = useRef(false);
+
+  // Helper to format initial passages with embedded questions without hardcoding 3 passages
   const formatInitialData = (data: ExamData): ExamFormValues => {
     const rawPassages = data.passages || [];
     const allReadingQs = data.reading_questions || (data.questions || []).filter(q => q.section === 'reading');
     const allListeningQs = data.listening_questions || (data.questions || []).filter(q => q.section === 'listening');
 
-    const formattedPassages = [1, 2, 3].map((pNum, idx) => {
-      const existingP = rawPassages.find(p => p.passage_index === pNum) || rawPassages[idx];
-      const pQs = (existingP?.questions && existingP.questions.length > 0) 
-        ? existingP.questions 
-        : allReadingQs.filter(q => q.passage_index === pNum || (!q.passage_index && idx === 0));
+    let formattedPassages: any[] = [];
+    if (rawPassages.length > 0) {
+      formattedPassages = rawPassages.map((p, idx) => {
+        const pNum = p.passage_index || (idx + 1);
+        const pQs = (p.questions && p.questions.length > 0)
+          ? p.questions
+          : allReadingQs.filter(q => q.passage_index === pNum || (!q.passage_index && idx === 0));
 
-      return {
-        passage_index: pNum as 1 | 2 | 3,
-        title: existingP?.title || `Reading Passage ${pNum}`,
-        text: existingP?.text || (pNum === 1 ? (data.passage_text || '') : ''),
-        questions: pQs.map(q => ({
-          question_id: q.question_id,
-          section: 'reading' as const,
-          passage_index: pNum as 1 | 2 | 3,
-          question_text: q.question_text || '',
-          question_type: q.question_type || 'multiple_choice',
-          options: q.options || [],
-          correct_answer: Array.isArray(q.correct_answer) ? q.correct_answer.join('|') : (q.correct_answer || ''),
-          explanation: q.explanation || '',
-          max_score: q.max_score || 1,
-          instruction: q.instruction || '',
-          word_limit: q.word_limit || '',
-          table_data: q.table_data,
-          flowchart_steps: q.flowchart_steps,
-          word_bank: q.word_bank,
-          matching_options: q.matching_options,
-          nb_condition: q.nb_condition,
-          multi_select_count: q.multi_select_count || 2
-        }))
-      };
-    });
+        return {
+          passage_index: pNum,
+          title: p.title || `Reading Passage ${pNum}`,
+          text: p.text || (idx === 0 ? (data.passage_text || '') : ''),
+          questions: pQs.map((q, qIdx) => ({
+            question_id: q.question_id || `R${pNum}_Q${qIdx + 1}`,
+            section: 'reading' as const,
+            passage_index: pNum,
+            question_text: q.question_text || '',
+            question_type: q.question_type || 'multiple_choice',
+            options: q.options || [],
+            correct_answer: Array.isArray(q.correct_answer) ? q.correct_answer.join('|') : (q.correct_answer || ''),
+            explanation: q.explanation || '',
+            max_score: q.max_score || 1,
+            instruction: q.instruction || '',
+            word_limit: q.word_limit || '',
+            table_data: q.table_data,
+            flowchart_steps: q.flowchart_steps,
+            word_bank: q.word_bank,
+            matching_options: q.matching_options,
+            nb_condition: q.nb_condition,
+            multi_select_count: q.multi_select_count || 2
+          }))
+        };
+      });
+    } else {
+      // Default to 1 passage for fresh/single-passage exams
+      formattedPassages = [
+        {
+          passage_index: 1,
+          title: data.passage_title || 'Reading Passage 1',
+          text: data.passage_text || '',
+          questions: allReadingQs.map((q, qIdx) => ({
+            question_id: q.question_id || `R1_Q${qIdx + 1}`,
+            section: 'reading' as const,
+            passage_index: 1,
+            question_text: q.question_text || '',
+            question_type: q.question_type || 'multiple_choice',
+            options: q.options || [],
+            correct_answer: Array.isArray(q.correct_answer) ? q.correct_answer.join('|') : (q.correct_answer || ''),
+            explanation: q.explanation || '',
+            max_score: q.max_score || 1,
+            instruction: q.instruction || '',
+            word_limit: q.word_limit || '',
+            table_data: q.table_data,
+            flowchart_steps: q.flowchart_steps,
+            word_bank: q.word_bank,
+            matching_options: q.matching_options,
+            nb_condition: q.nb_condition,
+            multi_select_count: q.multi_select_count || 2
+          }))
+        }
+      ];
+    }
 
     const writingSection = data.sections?.find(s => s.skill === 'writing');
     const task1Obj = writingSection?.tasks?.find(t => t.task_number === 1) || writingSection?.tasks?.[0];
@@ -158,7 +196,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     const initialTask2Prompt = data.writing_task2_prompt || task2Obj?.prompt || '';
 
     const hasL = allListeningQs.length > 0;
-    const hasR = allReadingQs.length > 0;
+    const hasR = allReadingQs.length > 0 || (rawPassages.length > 0 && rawPassages.some(p => Boolean(p.text?.trim())));
     const hasW = Boolean(initialTask1Prompt || initialTask2Prompt || initialTask1Image);
     let detectedSkills: SkillType[] = data.skills || [];
     if (detectedSkills.length === 0) {
@@ -185,7 +223,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       test_type: data.test_type || 'TEST',
       exam_type: detectedExamType,
       skills: detectedSkills,
-      duration_mins: data.duration_mins || 150,
+      duration_mins: data.duration_mins || (detectedExamType === 'one_skill' ? 60 : 150),
       listening_duration_mins: data.listening_duration_mins || 35,
       reading_duration_mins: data.reading_duration_mins || 60,
       writing_duration_mins: data.writing_duration_mins || 60,
@@ -213,7 +251,9 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       })),
       writing_task1_prompt: allowWriting ? initialTask1Prompt : '',
       writing_task1_image: allowWriting ? initialTask1Image : '',
-      writing_task2_prompt: allowWriting ? initialTask2Prompt : ''
+      writing_task2_prompt: allowWriting ? initialTask2Prompt : '',
+      status: (data.status as any) || (data.is_draft ? 'draft' : 'published'),
+      is_draft: data.status === 'draft' || Boolean(data.is_draft)
     };
   };
 
@@ -224,6 +264,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     watch,
     setValue,
     reset,
+    getValues,
     formState: { errors }
   } = useForm<ExamFormValues>({
     resolver: zodResolver(examZodSchema) as any,
@@ -243,9 +284,45 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     name: 'listening_questions'
   });
 
-  const watchedPassages = watch('passages');
+  const watchedPassages = watch('passages') || [];
   const watchedExamCode = watch('exam_code');
   const watchedTask1Image = watch('writing_task1_image');
+
+  // Bound selectedPassageIdx to valid length
+  useEffect(() => {
+    if (watchedPassages.length > 0 && selectedPassageIdx >= watchedPassages.length) {
+      setSelectedPassageIdx(watchedPassages.length - 1);
+    }
+  }, [watchedPassages.length, selectedPassageIdx]);
+
+  // Passage management helpers (Allow 1, 2, or 3+ passages without forcing 3!)
+  const handleAddPassage = () => {
+    const current = getValues('passages') || [];
+    const nextIdx = current.length + 1;
+    const newPassages = [
+      ...current,
+      {
+        passage_index: nextIdx,
+        title: `Reading Passage ${nextIdx}`,
+        text: '',
+        questions: []
+      }
+    ];
+    setValue('passages', newPassages as any, { shouldDirty: true });
+    setSelectedPassageIdx(current.length);
+  };
+
+  const handleRemoveCurrentPassage = () => {
+    const current = getValues('passages') || [];
+    if (current.length <= 1) return;
+    const filtered = current.filter((_, idx) => idx !== selectedPassageIdx).map((p, idx) => ({
+      ...p,
+      passage_index: idx + 1,
+      title: p.title || `Reading Passage ${idx + 1}`
+    }));
+    setValue('passages', filtered as any, { shouldDirty: true });
+    setSelectedPassageIdx(Math.max(0, selectedPassageIdx - 1));
+  };
 
   // History stack for Undo / Redo (Heuristic #3: User Control & Freedom)
   const [history, setHistory] = useState<ExamFormValues[]>([]);
@@ -388,20 +465,20 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
   const passingAudits = activeAudits.filter(i => i.status === 'pass').length;
   const readinessPercent = activeAudits.length > 0 ? Math.round((passingAudits / activeAudits.length) * 100) : 100;
 
-  const onValidSubmit = async (formData: ExamFormValues) => {
-    // Sanitize reading questions and passages (allow empty or partial passages)
+  // Core Helper: Standardize ExamData object from form values with explicit draft/published status
+  const buildExamFromForm = (formData: ExamFormValues, status: 'draft' | 'published' = 'draft'): ExamData => {
     const flatReadingQuestions: Question[] = [];
     const rawPassages = formData.passages || [];
 
     const standardizedPassages: ReadingPassageItem[] = rawPassages.map((p, pIdx) => {
-      const pNumber = ((p.passage_index || pIdx + 1) as 1 | 2 | 3);
+      const pNumber = p.passage_index || (pIdx + 1);
       const validQs = (p.questions || [])
         .filter(q => q && (q.question_text?.trim() || q.correct_answer?.trim()))
         .map((q, qIdx) => ({
           ...q,
           question_id: q.question_id?.trim() || `R${pNumber}_Q${qIdx + 1}`,
           section: 'reading' as const,
-          passage_index: pNumber,
+          passage_index: pNumber as any,
           question_type: (q.question_type || 'multiple_choice') as QuestionType,
           correct_answer: q.correct_answer?.trim() || '',
           max_score: q.max_score || 1
@@ -410,14 +487,13 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       validQs.forEach(q => flatReadingQuestions.push(q));
 
       return {
-        passage_index: pNumber,
+        passage_index: pNumber as any,
         title: p.title?.trim() || `Reading Passage ${pNumber}`,
         text: p.text || '',
         questions: validQs
       };
     });
 
-    // Sanitize listening questions
     const flatListeningQuestions: Question[] = (formData.listening_questions || [])
       .filter(q => q && (q.question_text?.trim() || q.correct_answer?.trim()))
       .map((q, qIdx) => ({
@@ -433,23 +509,17 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     const hasListening = flatListeningQuestions.length > 0 || Boolean(formData.audio_url?.trim());
     const hasWriting = Boolean(formData.writing_task1_prompt?.trim() || formData.writing_task2_prompt?.trim() || formData.writing_task1_image?.trim());
 
-    if (!hasReading && !hasListening && !hasWriting) {
-      alert('Please add content for at least one skill (Reading, Listening, or Writing) to save this exam!');
-      return;
-    }
-
     const detectedSkills: SkillType[] = [];
     if (hasListening) detectedSkills.push('listening');
     if (hasReading) detectedSkills.push('reading');
     if (hasWriting) detectedSkills.push('writing');
 
-    // Determine target skills with strict adherence to form selection and one_skill discipline
     let targetSkills: SkillType[] = formData.skills && formData.skills.length > 0 ? [...formData.skills] : [];
     if (targetSkills.length === 0) {
       if (hasReading && !hasListening && !hasWriting) targetSkills = ['reading'];
       else if (hasListening && !hasReading && !hasWriting) targetSkills = ['listening'];
       else if (hasWriting && !hasReading && !hasListening) targetSkills = ['writing'];
-      else targetSkills = detectedSkills;
+      else targetSkills = detectedSkills.length > 0 ? detectedSkills : ['reading'];
     }
 
     const isOneSkillExam = formData.exam_type === 'one_skill' || targetSkills.length === 1;
@@ -469,7 +539,6 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     const finalTask1Img = allowWriting ? rawTask1Img : '';
     const finalTask2Prompt = allowWriting ? (formData.writing_task2_prompt?.trim() || '') : '';
 
-    // Standardize sections array for dynamic modular multi-skill engine
     const sections: any[] = [];
     if (allowListening && (finalListeningQuestions.length > 0 || finalAudioUrl)) {
       sections.push({
@@ -490,44 +559,48 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       });
     }
     if (allowWriting && (finalTask1Prompt || finalTask2Prompt || finalTask1Img)) {
+      const tasks: any[] = [];
+      if (finalTask1Prompt || finalTask1Img) {
+        tasks.push({
+          id: 'task-1',
+          task_number: 1,
+          title: 'Writing Task 1 (Report)',
+          prompt: finalTask1Prompt,
+          image_url: finalTask1Img,
+          imageUrl: finalTask1Img,
+          min_words: 150,
+          suggested_time_minutes: 20
+        });
+      }
+      if (finalTask2Prompt) {
+        tasks.push({
+          id: 'task-2',
+          task_number: 2,
+          title: 'Writing Task 2 (Essay)',
+          prompt: finalTask2Prompt,
+          min_words: 250,
+          suggested_time_minutes: 40
+        });
+      }
       sections.push({
         skill: 'writing',
         title: 'IELTS Writing Section',
         durationMinutes: formData.writing_duration_mins || 60,
-        tasks: [
-          {
-            id: 'task-1',
-            task_number: 1,
-            title: 'Writing Task 1 (Report)',
-            prompt: finalTask1Prompt,
-            image_url: finalTask1Img,
-            imageUrl: finalTask1Img,
-            min_words: 150,
-            suggested_time_minutes: 20
-          },
-          {
-            id: 'task-2',
-            task_number: 2,
-            title: 'Writing Task 2 (Essay)',
-            prompt: finalTask2Prompt,
-            min_words: 250,
-            suggested_time_minutes: 40
-          }
-        ]
+        tasks
       });
     }
 
     const unverifiedExam: ExamData = {
-      exam_code: formData.exam_code.trim().toUpperCase(),
-      title: formData.title,
-      test_type: formData.test_type,
+      exam_code: (formData.exam_code || 'NEW_EXAM').trim().toUpperCase(),
+      title: formData.title || 'IELTS Mock Test',
+      test_type: formData.test_type || 'TEST',
       exam_type: finalExamType,
       skills: targetSkills,
       sections,
-      duration_mins: formData.duration_mins,
-      listening_duration_mins: formData.listening_duration_mins,
-      reading_duration_mins: formData.reading_duration_mins,
-      writing_duration_mins: formData.writing_duration_mins,
+      duration_mins: formData.duration_mins || (finalExamType === 'one_skill' ? 60 : 150),
+      listening_duration_mins: formData.listening_duration_mins || 35,
+      reading_duration_mins: formData.reading_duration_mins || 60,
+      writing_duration_mins: formData.writing_duration_mins || 60,
       audio_url: finalAudioUrl,
       audio_title: finalAudioTitle,
       passages: finalPassages,
@@ -539,15 +612,93 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       writing_task1_image_url: finalTask1Img,
       writing_task1_imageUrl: finalTask1Img,
       writing_task2_prompt: finalTask2Prompt,
-      created_at: new Date().toISOString()
+      status: status,
+      is_draft: status === 'draft',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
-    const completeExam = sanitizeExamForSkills(unverifiedExam);
+    return sanitizeExamForSkills(unverifiedExam);
+  };
+
+  // Explicit Save Draft handler (or automated debounced auto-save)
+  const handleSaveDraft = async (isSilent: boolean = false) => {
+    const formData = getValues();
+    const cleanCode = (formData.exam_code || '').trim().toUpperCase();
+    if (!cleanCode || cleanCode.length < 2) return;
+
+    if (isAutoSavingRef.current) return;
+    isAutoSavingRef.current = true;
+    setAutoSaveStatus('saving');
+
+    try {
+      const draftExam = buildExamFromForm(formData, 'draft');
+
+      // 1. Dual save to IndexedDB
+      await saveExamToIndexedDB(draftExam);
+
+      // 2. Save to Server DB with draft flag (Students are blocked via 403 API)
+      await saveExamToServerDb(draftExam).catch(() => {});
+
+      // 3. Dual save to localStorage safely
+      try {
+        const existingRaw = localStorage.getItem('ielts_saved_exams');
+        let existingList: ExamData[] = existingRaw ? JSON.parse(existingRaw) : [];
+        if (!Array.isArray(existingList)) existingList = [];
+        const idx = existingList.findIndex(e => e.exam_code === draftExam.exam_code);
+        if (idx >= 0) existingList[idx] = draftExam;
+        else existingList.push(draftExam);
+        localStorage.setItem('ielts_saved_exams', JSON.stringify(existingList));
+        localStorage.setItem('ielts_current_exam', JSON.stringify(draftExam));
+      } catch (e) {}
+
+      const timeStr = new Date().toLocaleTimeString();
+      setLastAutoSaveTime(timeStr);
+      setAutoSaveStatus('saved');
+
+      if (!isSilent) {
+        setSaveSuccessMessage(`✓ Đã lưu bản nháp đề thi [${draftExam.exam_code}]! Học sinh chưa thể truy cập.`);
+        setTimeout(() => setSaveSuccessMessage(null), 4000);
+      }
+    } catch (err: any) {
+      console.warn('Draft auto-save warning:', err);
+      setAutoSaveStatus('idle');
+    } finally {
+      isAutoSavingRef.current = false;
+    }
+  };
+
+  // Debounced Auto-Save Draft Trigger (runs 2.5s after teacher stops typing)
+  useEffect(() => {
+    const formData = getValues();
+    if (!formData.exam_code || formData.exam_code.trim().length < 2) return;
+
+    const timer = setTimeout(() => {
+      handleSaveDraft(true);
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [
+    watchedPassages,
+    watchedExamCode,
+    watchedTask1Image,
+    watch('audio_url'),
+    watch('skills'),
+    watch('title'),
+    watch('duration_mins'),
+    watch('writing_task1_prompt'),
+    watch('writing_task2_prompt'),
+    watch('listening_questions')
+  ]);
+
+  // Main Publish Form Submission (Published for students)
+  const onValidSubmit = async (formData: ExamFormValues) => {
+    const completeExam = buildExamFromForm(formData, 'published');
 
     // 1. Dual save to IndexedDB
     await saveExamToIndexedDB(completeExam);
 
-    // 2. Save directly to Central Server DB so all other devices can fetch it immediately
+    // 2. Save directly to Central Server DB
     try {
       await saveExamToServerDb(completeExam);
     } catch (serverErr) {
@@ -571,12 +722,12 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       console.warn('LocalStorage save warning:', e);
     }
 
-    // 3. Callback to parent
+    // Callback to parent
     onSaveExam(completeExam);
 
     const skillsLabel = completeExam.skills?.join(' + ') || 'IELTS Test';
-    setSaveSuccessMessage(`Successfully saved exam ${completeExam.exam_code} [${skillsLabel}]!`);
-    setTimeout(() => setSaveSuccessMessage(null), 4500);
+    setSaveSuccessMessage(`🎉 Đã xuất bản đề thi ${completeExam.exam_code} [${skillsLabel}]! Học sinh có thể vào phòng thi làm bài.`);
+    setTimeout(() => setSaveSuccessMessage(null), 5000);
   };
 
   // WYSIWYG Tokenizer ("Bôi đen tạo câu hỏi"): Highlight text -> click "Tạo ô trống" -> inserts [blank_X] and appends question
@@ -717,7 +868,9 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     listening_questions: [],
     writing_task1_prompt: '',
     writing_task1_image: '',
-    writing_task2_prompt: ''
+    writing_task2_prompt: '',
+    status: 'draft',
+    is_draft: true
   });
 
   const [showResetModal, setShowResetModal] = useState(false);
@@ -776,12 +929,28 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       {/* HEADER CONTROLS */}
       <div className="bg-white rounded-3xl p-4 sm:p-6 border border-purple-100 shadow-xl shadow-purple-950/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="px-3 py-1 rounded-full text-xs font-black bg-[#6B51A5] text-white">
               Visual Exam Builder
             </span>
-            <span className="text-xs font-bold text-[#7C68A5]">
-              Validated with Zod &amp; React Hook Form
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-xl flex items-center gap-1.5 border transition ${
+              autoSaveStatus === 'saving'
+                ? 'bg-amber-50 text-amber-900 border-amber-300 animate-pulse'
+                : lastAutoSaveTime
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                : 'bg-purple-50 text-[#503A7A] border-purple-200'
+            }`} title="Bản nháp tự động lưu liên tục sau khi chỉnh sửa">
+              <Save className={`w-3.5 h-3.5 ${autoSaveStatus === 'saving' ? 'animate-spin text-amber-600' : 'text-emerald-600'}`} />
+              <span>
+                {autoSaveStatus === 'saving'
+                  ? 'Đang lưu bản nháp...'
+                  : lastAutoSaveTime
+                  ? `✓ Đã tự động lưu nháp (${lastAutoSaveTime})`
+                  : 'Tự động lưu nháp'}
+              </span>
+            </span>
+            <span className="text-[10px] bg-amber-100 text-amber-950 font-black px-2.5 py-0.5 rounded-full border border-amber-300 flex items-center gap-1">
+              <span>🔒 Bản nháp (Học sinh chưa thể truy cập)</span>
             </span>
           </div>
           <h2 className="text-xl font-black text-[#3C2A63] mt-2">
@@ -815,7 +984,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
             </button>
           </div>
 
-          {/* Split-Screen Preview Toggle (User Request 2) */}
+          {/* Split-Screen Preview Toggle */}
           <button
             type="button"
             onClick={() => setSplitScreenPreview(!splitScreenPreview)}
@@ -840,13 +1009,27 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
             <span>Reset (Blank)</span>
           </button>
 
+          {/* Explicit Save Draft Button */}
+          <button
+            type="button"
+            onClick={() => handleSaveDraft(false)}
+            disabled={autoSaveStatus === 'saving'}
+            className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-2xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Lưu bản nháp đề thi (Học sinh chưa thể truy cập)"
+          >
+            <Save className="w-3.5 h-3.5 text-amber-700" />
+            <span>Lưu bản nháp</span>
+          </button>
+
+          {/* Publish Exam Button */}
           <button
             type="submit"
             disabled={isSaving}
-            className="px-5 py-2.5 bg-[#6B51A5] hover:bg-[#583F8F] text-white rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-lg shadow-purple-950/10 disabled:opacity-50"
+            className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-950/10 disabled:opacity-50"
+            title="Xuất bản đề thi chính thức để học sinh có thể vào thi"
           >
-            <Save className="w-4 h-4" />
-            <span>{isSaving ? 'Saving...' : 'Validate & Save Exam'}</span>
+            <CheckCircle2 className="w-4 h-4" />
+            <span>{isSaving ? 'Đang xuất bản...' : 'Xuất bản đề thi'}</span>
           </button>
         </div>
       </div>
@@ -1144,44 +1327,70 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
           
           {/* Left Column: Visual Builder */}
           <div className="space-y-6">
-            {/* Passage 1, 2, 3 Selector */}
-          <div className="flex items-center gap-2">
-            {[0, 1, 2].map((idx) => {
-              const pNum = idx + 1;
-              const pCount = watchedPassages[idx]?.questions?.length || 0;
-              const isSel = selectedPassageIdx === idx;
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setSelectedPassageIdx(idx as 0 | 1 | 2)}
-                  className={`px-4 py-2 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
-                    isSel
-                      ? 'bg-[#3C2A63] text-white shadow-md'
-                      : 'bg-[#F5F2F9] text-[#503A7A] hover:bg-[#E2DDEC] border border-purple-100'
-                  }`}
-                >
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>Passage {pNum}</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20">
-                    {pCount} questions
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+            {/* Dynamic Passage Selector Tabs (Supports 1, 2, 3+ Passages for One Skill or Full Exams) */}
+            <div className="flex flex-wrap items-center gap-2">
+              {watchedPassages.map((p, idx) => {
+                const pNum = p.passage_index || (idx + 1);
+                const pCount = p?.questions?.length || 0;
+                const isSel = selectedPassageIdx === idx;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedPassageIdx(idx)}
+                    className={`px-3.5 py-2 rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer ${
+                      isSel
+                        ? 'bg-[#3C2A63] text-white shadow-md'
+                        : 'bg-[#F5F2F9] text-[#503A7A] hover:bg-[#E2DDEC] border border-purple-100'
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Passage {pNum}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20">
+                      {pCount} questions
+                    </span>
+                  </button>
+                );
+              })}
 
-          {/* Current Passage Details */}
-          <div className="bg-white rounded-3xl p-6 border border-purple-100 shadow-xl shadow-purple-950/5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black text-[#3C2A63] uppercase tracking-wider flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-[#6B51A5]" />
-                <span>Passage {selectedPassageIdx + 1} Content</span>
-              </h3>
-              <span className="text-xs text-[#7C68A5] font-semibold">
-                Passage Index: {selectedPassageIdx + 1}
-              </span>
+              {watchedPassages.length < 5 && (
+                <button
+                  type="button"
+                  onClick={handleAddPassage}
+                  className="px-3.5 py-2 rounded-2xl text-xs font-bold bg-purple-50 hover:bg-purple-100 text-[#6B51A5] border border-dashed border-purple-300 transition flex items-center gap-1.5 cursor-pointer"
+                  title="Thêm một bài đọc mới vào đề thi"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Thêm bài đọc</span>
+                </button>
+              )}
             </div>
+
+            {/* Current Passage Details */}
+            <div className="bg-white rounded-3xl p-6 border border-purple-100 shadow-xl shadow-purple-950/5 space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black text-[#3C2A63] uppercase tracking-wider flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-[#6B51A5]" />
+                    <span>Passage {selectedPassageIdx + 1} Content</span>
+                  </h3>
+                  <span className="text-[11px] text-[#7C68A5] font-semibold bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-100">
+                    Bài đọc {selectedPassageIdx + 1} / {watchedPassages.length}
+                  </span>
+                </div>
+
+                {watchedPassages.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveCurrentPassage}
+                    className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-xl border border-rose-200 transition flex items-center gap-1.5 cursor-pointer font-bold"
+                    title={`Xóa bài đọc ${selectedPassageIdx + 1} khỏi đề thi`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Xóa bài đọc {selectedPassageIdx + 1}</span>
+                  </button>
+                )}
+              </div>
 
             {/* Passage Title */}
             <div>

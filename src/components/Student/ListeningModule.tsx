@@ -107,7 +107,7 @@ export const ListeningModule: React.FC<ListeningModuleProps> = ({
   // Auto-switch to the first part that actually contains questions (supports single-part tests)
   useEffect(() => {
     if (questionsWithPart.length > 0) {
-      const partsWithQuestions = Array.from(new Set(questionsWithPart.map(q => q.computedPart))).sort((a, b) => a - b);
+      const partsWithQuestions = Array.from(new Set(questionsWithPart.map(q => q.computedPart))).sort((a, b) => Number(a) - Number(b));
       if (partsWithQuestions.length > 0 && !partsWithQuestions.includes(activePart)) {
         setActivePart(partsWithQuestions[0]);
       }

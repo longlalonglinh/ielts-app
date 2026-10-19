@@ -194,7 +194,7 @@ export interface Question {
   question_number?: number;
   section: 'listening' | 'reading';
   part?: 1 | 2 | 3 | 4; // Listening Part 1, 2, 3, 4 (10 questions each)
-  passage_index?: 1 | 2 | 3; // Reading Passage 1, 2, 3
+  passage_index?: number; // Reading Passage 1, 2, 3+
   question_text: string;
   question_type: QuestionType;
   instruction?: string; // e.g. "Write NO MORE THAN TWO WORDS AND/OR A NUMBER"
@@ -263,6 +263,9 @@ export interface ExamData {
   writing_task1_image_url?: string;
   writing_task1_imageUrl?: string;
   writing_task2_prompt?: string;
+  status?: 'draft' | 'published';
+  is_draft?: boolean;
+  updated_at?: string;
   created_at?: string;
 }
 

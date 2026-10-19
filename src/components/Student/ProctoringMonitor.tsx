@@ -135,7 +135,7 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
     }
   }, [violationCount]);
 
-  // Clean up lock and blur timers on unmount
+  // Clean up lock, blur timers, and release fullscreen on unmount (e.g. when submitted)
   useEffect(() => {
     return () => {
       if (lockTimerRef.current) {
@@ -143,6 +143,9 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
       }
       if (blurGraceTimerRef.current) {
         clearTimeout(blurGraceTimerRef.current);
+      }
+      if (typeof document !== 'undefined' && document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
       }
     };
   }, []);

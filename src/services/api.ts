@@ -1514,6 +1514,13 @@ export async function fetchExam(
   // Clients fetch exclusively via Server API, preventing any exposure of Google Sheet IDs or answer keys in Network tab!
   try {
     const serverRes = await fetch(`/api/exams/${encodeURIComponent(cleanCode)}`);
+    if (serverRes.status === 403) {
+      const errJson = await serverRes.json().catch(() => ({}));
+      return {
+        success: false,
+        error: errJson.error || `Đề thi [${cleanCode}] đang ở trạng thái bản nháp của giáo viên và chưa được công bố. Học sinh không thể truy cập.`
+      };
+    }
     if (serverRes.ok) {
       const serverJson = await serverRes.json();
       if (serverJson && serverJson.success && serverJson.exam) {

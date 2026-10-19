@@ -19,16 +19,22 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   XCircle,
-  Save as SaveIcon
+  Save as SaveIcon,
+  Play,
+  Lock,
+  ArrowRight
 } from 'lucide-react';
 import { VisualExamBuilder } from './VisualExamBuilder';
+import { ReadingModule } from '../Student/ReadingModule';
+import { ListeningModule } from '../Student/ListeningModule';
+import { WritingModule } from '../Student/WritingModule';
 import { saveExamToIndexedDB } from '../../services/indexedDb';
 import { saveExamToServerDb, saveServerConfig, fetchServerConfig } from '../../services/api';
 import { 
   getStoredSpreadsheetId, 
   setStoredSpreadsheetId, 
   extractSpreadsheetId, 
-  testGvizConnection,
+  testGvizConnection, 
   fetchExamViaGviz 
 } from '../../services/gvizService';
 import { sanitizeExamForSkills } from '../../utils/examUtils';
@@ -58,9 +64,15 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
 }) => {
   const currentInitial = initialExamData || BLANK_TEMPLATE;
   const [exam, setExam] = useState<ExamData>(currentInitial);
-  const [activeTab, setActiveTab] = useState<'builder' | 'preview'>('builder');
+  const [activeTab, setActiveTab] = useState<'builder' | 'cbt_preview' | 'preview'>('builder');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [copied, setCopied] = useState(false);
+
+  // Live CBT Preview States
+  const [previewSkillTab, setPreviewSkillTab] = useState<'reading' | 'listening' | 'writing'>('reading');
+  const [previewUserAnswers, setPreviewUserAnswers] = useState<Record<string, string>>({});
+  const [previewTask1, setPreviewTask1] = useState<string>('');
+  const [previewTask2, setPreviewTask2] = useState<string>('');
 
   // GViz Speed Test State
   const [spreadsheetIdInput, setSpreadsheetIdInput] = useState<string>('');
@@ -239,8 +251,9 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
 
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Tabs: Visual Builder Form vs Preview */}
-          <div className="bg-[#E2DDEC] p-1 rounded-2xl flex items-center">
+          <div className="bg-[#E2DDEC] p-1 rounded-2xl flex items-center gap-1">
             <button
+              type="button"
               onClick={() => setActiveTab('builder')}
               className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'builder'
@@ -253,6 +266,20 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
             </button>
 
             <button
+              type="button"
+              onClick={() => setActiveTab('cbt_preview')}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'cbt_preview'
+                  ? 'bg-[#6B51A5] text-white shadow-md'
+                  : 'text-[#3C2A63] hover:text-[#503A7A]'
+              }`}
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span>Xem trước CBT Thí sinh</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab('preview')}
               className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'preview'
@@ -261,9 +288,43 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
               }`}
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>Overview &amp; Audit</span>
+              <span>Tổng quan &amp; Audit JSON</span>
             </button>
           </div>
+
+          {/* Quick Publish / Unpublish Toggle */}
+          <button
+            type="button"
+            onClick={async () => {
+              const isCurrentlyDraft = exam.status === 'draft' || exam.is_draft;
+              const newStatus: 'draft' | 'published' = isCurrentlyDraft ? 'published' : 'draft';
+              const updatedExam: ExamData = {
+                ...exam,
+                status: newStatus,
+                is_draft: newStatus === 'draft',
+                updated_at: new Date().toISOString()
+              };
+              await handleSaveExam(updatedExam);
+            }}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
+              exam.status === 'draft' || exam.is_draft
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 text-white shadow-emerald-950/10'
+                : 'bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300'
+            }`}
+            title={exam.status === 'draft' || exam.is_draft ? "Xuất bản đề thi để học sinh có thể vào phòng thi" : "Chuyển về trạng thái bản nháp"}
+          >
+            {exam.status === 'draft' || exam.is_draft ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Xuất bản cho học sinh</span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-3.5 h-3.5 text-amber-700" />
+                <span>Chuyển về Bản nháp</span>
+              </>
+            )}
+          </button>
 
           <button
             onClick={handleDownloadJson}
@@ -276,13 +337,123 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
         </div>
       </div>
 
-      {/* ACTIVE TAB 1: VISUAL EXAM BUILDER (Replaces raw JSON textarea entirely) */}
+      {/* ACTIVE TAB 1: VISUAL EXAM BUILDER */}
       {activeTab === 'builder' && (
         <VisualExamBuilder
           initialExamData={exam}
           onSaveExam={handleSaveExam}
           isSaving={saveStatus === 'saving'}
         />
+      )}
+
+      {/* ACTIVE TAB 2: LIVE CBT STUDENT PREVIEW (User Request: hoàn thiện exam preview and builder) */}
+      {activeTab === 'cbt_preview' && (
+        <div className="space-y-4">
+          {/* Skill Selector Navigation Bar for Preview */}
+          <div className="bg-white border border-purple-100 rounded-3xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-[#3C2A63] flex items-center gap-1.5">
+                <Play className="w-4 h-4 text-[#6B51A5]" />
+                <span>Mô phỏng phòng thi CBT:</span>
+              </span>
+              <span className="text-[11px] font-bold text-[#7C68A5]">
+                {exam.exam_code} - {exam.title}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {(!exam.skills || exam.skills.includes('reading')) && (
+                <button
+                  type="button"
+                  onClick={() => setPreviewSkillTab('reading')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    previewSkillTab === 'reading'
+                      ? 'bg-[#6B51A5] text-white shadow-xs'
+                      : 'bg-[#F5F2F9] text-[#503A7A] hover:bg-[#E2DDEC]'
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Reading ({totalReadingQuestions} Qs)</span>
+                </button>
+              )}
+
+              {(!exam.skills || exam.skills.includes('listening')) && (
+                <button
+                  type="button"
+                  onClick={() => setPreviewSkillTab('listening')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    previewSkillTab === 'listening'
+                      ? 'bg-[#6B51A5] text-white shadow-xs'
+                      : 'bg-[#F5F2F9] text-[#503A7A] hover:bg-[#E2DDEC]'
+                  }`}
+                >
+                  <Headphones className="w-3.5 h-3.5" />
+                  <span>Listening ({totalListeningQuestions} Qs)</span>
+                </button>
+              )}
+
+              {(!exam.skills || exam.skills.includes('writing')) && (
+                <button
+                  type="button"
+                  onClick={() => setPreviewSkillTab('writing')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    previewSkillTab === 'writing'
+                      ? 'bg-[#6B51A5] text-white shadow-xs'
+                      : 'bg-[#F5F2F9] text-[#503A7A] hover:bg-[#E2DDEC]'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Writing (Task 1 &amp; 2)</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Module Canvas Rendering */}
+          <div className="rounded-3xl overflow-hidden border border-purple-200/80 shadow-md">
+            {previewSkillTab === 'reading' && (
+              <ReadingModule
+                passages={exam.passages}
+                passageText={exam.passage_text || exam.reading_passage}
+                passageTitle={exam.passage_title || exam.reading_passage_title}
+                questions={exam.reading_questions || (exam.questions || []).filter(q => q.section === 'reading')}
+                userAnswers={previewUserAnswers}
+                onAnswerChange={(qId, val) => setPreviewUserAnswers(prev => ({ ...prev, [qId]: val }))}
+                examCode={exam.exam_code}
+                candidateId="TEACHER_PREVIEW"
+                isPreview={true}
+              />
+            )}
+
+            {previewSkillTab === 'listening' && (
+              <ListeningModule
+                audioUrl={exam.audio_url || ''}
+                audioTitle={exam.audio_title || exam.title}
+                questions={exam.listening_questions || (exam.questions || []).filter(q => q.section === 'listening')}
+                userAnswers={previewUserAnswers}
+                onAnswerChange={(qId, val) => setPreviewUserAnswers(prev => ({ ...prev, [qId]: val }))}
+                examCode={exam.exam_code}
+                candidateId="TEACHER_PREVIEW"
+                isPreview={true}
+              />
+            )}
+
+            {previewSkillTab === 'writing' && (
+              <WritingModule
+                writingTask1Prompt={exam.writing_task1_prompt}
+                writingTask1Image={exam.writing_task1_image}
+                writingTask2Prompt={exam.writing_task2_prompt}
+                userTask1Answer={previewTask1}
+                userTask2Answer={previewTask2}
+                onTask1Change={setPreviewTask1}
+                onTask2Change={setPreviewTask2}
+                examCode={exam.exam_code}
+                candidateId="TEACHER_PREVIEW"
+                isPreview={true}
+              />
+            )}
+          </div>
+        </div>
       )}
 
       {/* ACTIVE TAB 2: OVERVIEW & AUDIT */}

@@ -126,6 +126,8 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [base64Data, setBase64Data] = useState<string | null>(null);
   const [rawTextSyllabus, setRawTextSyllabus] = useState('');
+  const [docSkillTarget, setDocSkillTarget] = useState<'all' | 'reading' | 'listening' | 'writing'>('all');
+  const [docPassageCount, setDocPassageCount] = useState<'auto' | '1' | '2' | '3'>('auto');
 
   // Process & Verification Execution States
   const [loading, setLoading] = useState(false);
@@ -268,12 +270,35 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
         report = verifyResult.report;
       }
 
-      const sanitized = sanitizeExamForSkills(candidateExam);
+      let workingExam = { ...candidateExam };
+
+      // Apply Skill Target preference (One-Skill support)
+      if (docSkillTarget !== 'all') {
+        workingExam.skills = [docSkillTarget];
+        workingExam.exam_type = 'one_skill';
+      }
+
+      // Apply Passage Limit preference (1, 2, or 3 passages for Reading)
+      if (docSkillTarget === 'reading' && docPassageCount !== 'auto' && workingExam.passages) {
+        const pLimit = parseInt(docPassageCount, 10);
+        if (workingExam.passages.length > pLimit) {
+          workingExam.passages = workingExam.passages.slice(0, pLimit);
+        }
+      }
+
+      // Mark extracted exam as DRAFT by default so students cannot access it prematurely
+      const sanitized = sanitizeExamForSkills({
+        ...workingExam,
+        status: 'draft',
+        is_draft: true,
+        updated_at: new Date().toISOString()
+      });
+
       setGeneratedExam(sanitized);
       setTestReport(report);
       setRawJsonOutput(JSON.stringify(sanitized, null, 2));
 
-      // Auto-save to IndexedDB first so it is available locally immediately
+      // Auto-save draft to IndexedDB first
       await saveExamToIndexedDB(sanitized);
 
       onParsedData(sanitized);
@@ -282,9 +307,9 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
       const totalQs = (sanitized.reading_questions?.length || 0) + (sanitized.listening_questions?.length || 0) + (sanitized.questions?.length || 0);
       const isWritingOnly = Boolean((sanitized.writing_task1_prompt || sanitized.writing_task2_prompt) && totalQs <= 2);
       if (isWritingOnly && (sanitized.writing_task1_prompt || sanitized.writing_task2_prompt)) {
-        setSaveSuccessMsg(`Trích xuất thành công Đề thi IELTS Writing "${sanitized.title}" (Task 1 & Task 2). Đã lưu vào Central DB và IndexedDB.`);
+        setSaveSuccessMsg(`Trích xuất thành công Đề thi IELTS Writing "${sanitized.title}" (Task 1 & Task 2). Đã tự động lưu bản nháp (học sinh chưa thể truy cập).`);
       } else {
-        setSaveSuccessMsg(`Trích xuất thành công ${totalQs} câu hỏi từ tài liệu "${sanitized.title}". Đã kiểm tra cấu trúc và nạp vào cơ sở dữ liệu.`);
+        setSaveSuccessMsg(`Trích xuất thành công ${totalQs} câu hỏi từ tài liệu "${sanitized.title}". Đã tự động lưu bản nháp an toàn.`);
       }
     } catch (err: any) {
       console.error('Error parsing document:', err);
@@ -295,18 +320,49 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
     }
   };
 
-  // Direct actions
-  const handleSaveToDatabase = async () => {
+  // Direct actions: Publish for Students
+  const handlePublishToDatabase = async () => {
     if (!generatedExam) return;
     setLoading(true);
     try {
-      const sanitized = sanitizeExamForSkills(generatedExam);
-      await saveExamToServerDb(sanitized);
-      await saveExamToIndexedDB(sanitized);
-      setSaveSuccessMsg(`Exam ${sanitized.exam_code} published to Central Database for all student candidates.`);
+      const published = sanitizeExamForSkills({
+        ...generatedExam,
+        status: 'published',
+        is_draft: false,
+        updated_at: new Date().toISOString()
+      });
+      await saveExamToServerDb(published);
+      await saveExamToIndexedDB(published);
+      setGeneratedExam(published);
+      onParsedData(published);
+      setSaveSuccessMsg(`🎉 Đề thi [${published.exam_code}] đã được xuất bản! Học sinh có thể vào phòng thi làm bài.`);
+      setTimeout(() => setSaveSuccessMsg(null), 5000);
+    } catch (e: any) {
+      setErrorMsg('Failed to publish to server database: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Direct actions: Save Draft
+  const handleSaveDraft = async () => {
+    if (!generatedExam) return;
+    setLoading(true);
+    try {
+      const draft = sanitizeExamForSkills({
+        ...generatedExam,
+        status: 'draft',
+        is_draft: true,
+        updated_at: new Date().toISOString()
+      });
+      await saveExamToServerDb(draft);
+      await saveExamToIndexedDB(draft);
+      setGeneratedExam(draft);
+      onParsedData(draft);
+      setSaveSuccessMsg(`✓ Đã lưu bản nháp [${draft.exam_code}]! Học sinh chưa thể truy cập.`);
       setTimeout(() => setSaveSuccessMsg(null), 4000);
     } catch (e: any) {
-      setErrorMsg('Failed to save to server database: ' + e.message);
+      setErrorMsg('Failed to save draft: ' + e.message);
     } finally {
       setLoading(false);
     }
@@ -637,9 +693,46 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                   value={rawTextSyllabus}
                   onChange={(e) => setRawTextSyllabus(e.target.value)}
                   placeholder="Paste exam text, passage paragraphs, or question prompts here..."
-                  rows={6}
+                  rows={4}
                   className="w-full px-4 py-2.5 bg-[#F8F6FC] border border-purple-200/80 rounded-2xl text-xs text-[#3C2A63] font-mono leading-relaxed placeholder-[#7C68A5] focus:outline-none focus:ring-2 focus:ring-[#6B51A5]"
                 />
+              </div>
+
+              {/* Extraction Target & Scope Controls (User Request: cho phép đề lẻ 1 skill 1-2 bài đọc) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#F8F6FC] p-3.5 rounded-2xl border border-purple-100">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-black text-[#3C2A63] block">
+                    Kỹ năng trích xuất:
+                  </label>
+                  <select
+                    value={docSkillTarget}
+                    onChange={(e) => setDocSkillTarget(e.target.value as any)}
+                    className="w-full px-2.5 py-1.5 bg-white border border-purple-200 rounded-xl text-xs font-bold text-[#3C2A63] focus:outline-none focus:ring-2 focus:ring-[#6B51A5]"
+                  >
+                    <option value="all">✨ Tự động phát hiện (Auto)</option>
+                    <option value="reading">📖 Chỉ Đọc (Reading Only)</option>
+                    <option value="listening">🎧 Chỉ Nghe (Listening Only)</option>
+                    <option value="writing">✍️ Chỉ Viết (Writing Only)</option>
+                  </select>
+                </div>
+
+                {docSkillTarget === 'reading' && (
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-black text-[#3C2A63] block">
+                      Số lượng bài đọc:
+                    </label>
+                    <select
+                      value={docPassageCount}
+                      onChange={(e) => setDocPassageCount(e.target.value as any)}
+                      className="w-full px-2.5 py-1.5 bg-white border border-purple-200 rounded-xl text-xs font-bold text-[#3C2A63] focus:outline-none focus:ring-2 focus:ring-[#6B51A5]"
+                    >
+                      <option value="auto">Tất cả bài đọc trong PDF</option>
+                      <option value="1">Chỉ 1 bài đọc (Passage 1)</option>
+                      <option value="2">2 bài đọc (Passage 1 &amp; 2)</option>
+                      <option value="3">3 bài đọc (Full Test)</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <button
@@ -1017,15 +1110,15 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
               </div>
 
               {/* Action Toolbar */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-2">
                 {onNavigateToPreview && (
                   <button
                     type="button"
                     onClick={onNavigateToPreview}
-                    className="py-3 px-4 bg-[#6B51A5] hover:bg-[#583F8F] text-white font-extrabold text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-purple-950/10 flex items-center justify-center gap-2 transition cursor-pointer"
+                    className="py-2.5 px-3 bg-[#6B51A5] hover:bg-[#583F8F] text-white font-bold text-xs rounded-2xl shadow-sm flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
-                    <span>Edit in Visual Builder</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <span>Sửa trong Builder</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 )}
 
@@ -1033,31 +1126,42 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                   <button
                     type="button"
                     onClick={() => onTakeExamNow(generatedExam)}
-                    className="py-3 px-4 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-emerald-950/10 flex items-center justify-center gap-2 transition cursor-pointer"
+                    className="py-2.5 px-3 bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs rounded-2xl shadow-sm flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    title="Vào thi thử CBT trực tiếp"
                   >
-                    <Play className="w-4 h-4" />
-                    <span>Take Exam Now</span>
+                    <Play className="w-3.5 h-3.5" />
+                    <span>Làm bài ngay</span>
                   </button>
                 )}
 
-                <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handlePublishToDatabase}
+                  className="py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 text-white font-bold text-xs rounded-2xl shadow-sm flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  title="Xuất bản đề thi để học sinh có thể vào phòng thi"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Xuất bản</span>
+                </button>
+
+                <div className="flex gap-1.5">
                   <button
                     type="button"
-                    onClick={handleSaveToDatabase}
-                    className="flex-1 py-3 px-3 bg-purple-100 hover:bg-purple-200 text-[#3C2A63] font-bold text-xs rounded-2xl border border-purple-200 flex items-center justify-center gap-1.5 transition cursor-pointer"
-                    title="Publish to Centralized Database"
+                    onClick={handleSaveDraft}
+                    className="flex-1 py-2.5 px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-2xl flex items-center justify-center gap-1 transition cursor-pointer"
+                    title="Lưu bản nháp (Học sinh chưa thể truy cập)"
                   >
-                    <Save className="w-4 h-4 text-[#6B51A5]" />
-                    <span>Publish</span>
+                    <Save className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Lưu nháp</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleDownloadJson}
-                    className="py-3 px-3 bg-purple-50 hover:bg-purple-100 text-[#3C2A63] font-bold text-xs rounded-2xl border border-purple-200 flex items-center justify-center gap-1.5 transition cursor-pointer"
-                    title="Download Exam JSON file"
+                    className="py-2.5 px-2.5 bg-purple-50 hover:bg-purple-100 text-[#3C2A63] font-bold text-xs rounded-2xl border border-purple-200 flex items-center justify-center transition cursor-pointer"
+                    title="Tải file JSON đề thi"
                   >
-                    <Download className="w-4 h-4 text-[#6B51A5]" />
+                    <Download className="w-3.5 h-3.5 text-[#6B51A5]" />
                   </button>
                 </div>
               </div>
