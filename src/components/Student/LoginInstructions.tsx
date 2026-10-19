@@ -38,7 +38,7 @@ export const LoginInstructions: React.FC<LoginInstructionsProps> = ({
   onClearLoginError
 }) => {
   const [sbd, setSbd] = useState('');
-  const [examCode, setExamCode] = useState('IELTS01');
+  const [examCode, setExamCode] = useState('');
   const [selectedMode, setSelectedMode] = useState<'TEST' | 'PRACTICE'>('TEST');
   const [reviewPrevious, setReviewPrevious] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -152,28 +152,6 @@ export const LoginInstructions: React.FC<LoginInstructionsProps> = ({
         
         {/* Authentication Card */}
         <div className="bg-white border border-purple-100 rounded-[28px] p-6 sm:p-8 shadow-sm space-y-5">
-            {/* Role Navigation Toggle (Student vs Teacher) */}
-            <div className="flex items-center gap-1.5 p-1 bg-[#F5F2F9] rounded-2xl border border-purple-100">
-              <button
-                type="button"
-                className="flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-[#6B51A5] text-white shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                <span>Thí sinh vào thi</span>
-              </button>
-              {onSwitchToAdmin && (
-                <button
-                  type="button"
-                  onClick={onSwitchToAdmin}
-                  className="flex-1 py-2 px-3 rounded-xl text-xs font-bold text-[#503A7A] hover:bg-white/80 transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  title="Chuyển sang giao diện Giáo viên & Quản trị đề thi"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-                  <span>Giáo viên / Quản trị</span>
-                </button>
-              )}
-            </div>
-
             <div className="border-b border-purple-100 pb-3 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-[#3C2A63] flex items-center gap-2">
@@ -331,39 +309,6 @@ export const LoginInstructions: React.FC<LoginInstructionsProps> = ({
                     ? 'Enter the official 60-minute test paper code provided by your proctor.' 
                     : 'Enter a Writing task code (e.g. WT1003), vocabulary deck, or skill drill.'}
                 </span>
-
-                {/* Quick Exam Code Chips */}
-                <div className="pt-1 space-y-1.5">
-                  <span className="text-[11px] font-bold text-[#503A7A] block">
-                    Đề thi có sẵn (Nhấp để chọn nhanh):
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { code: 'TEST01', label: 'Full 3 Kỹ Năng', badge: '150m' },
-                      { code: 'IELTS01', label: 'Academic Mock', badge: 'Full' },
-                      { code: 'WT1004', label: 'Writing One-Skill', badge: '60m' },
-                      { code: 'RW2001', label: 'Reading & Writing', badge: '120m' },
-                    ].map((item) => (
-                      <button
-                        key={item.code}
-                        type="button"
-                        onClick={() => {
-                          setExamCode(item.code);
-                          if (errorMsg) setErrorMsg('');
-                          if (onClearLoginError) onClearLoginError();
-                        }}
-                        className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer border ${
-                          activeCode === item.code
-                            ? 'bg-[#6B51A5] text-white border-[#6B51A5] shadow-xs'
-                            : 'bg-white hover:bg-purple-50 text-[#3C2A63] border-purple-200'
-                        }`}
-                      >
-                        <span className="font-mono">{item.code}</span>
-                        <span className="opacity-75 text-[10px]">({item.label})</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
 
               {/* WT Prefix Mismatch Helper (Shows when in Official Test mode with a Writing Practice Task code) */}

@@ -65,26 +65,26 @@ export const SubmissionProgressModal: React.FC<SubmissionProgressModalProps> = (
   const steps = [
     {
       id: 1,
-      title: 'Đóng gói dữ liệu bài thi',
-      desc: 'Tổng hợp toàn bộ đáp án Nghe, Đọc và bài luận Viết (Task 1 & Task 2)',
+      title: 'Packaging Exam Data',
+      desc: 'Consolidating all Listening, Reading, and Writing responses (Task 1 & Task 2)',
       icon: FileCheck2
     },
     {
       id: 2,
-      title: 'Tạo mã niêm phong số & Checksum',
-      desc: 'Khởi tạo chữ ký số chống chỉnh sửa và mã hóa lưu trữ IndexedDB an toàn',
+      title: 'Digital Seal & Checksum Verification',
+      desc: 'Generating tamper-proof cryptographic signature and securing offline IndexedDB vault',
       icon: Lock
     },
     {
       id: 3,
-      title: 'Gửi & Chấm điểm chuẩn hóa',
-      desc: 'Chuyển bài thi đến máy chủ trung tâm để chấm điểm IELTS và quy đổi Band',
+      title: 'Submitting & Standardized Scoring',
+      desc: 'Transmitting responses to server for IELTS algorithmic scoring and Band conversion',
       icon: Server
     },
     {
       id: 4,
-      title: 'Lưu trữ & Xuất biên nhận',
-      desc: 'Ghi nhận bài làm vào Database và xuất mã biên nhận chính thức',
+      title: 'Storing & Generating Exam Receipt',
+      desc: 'Recording submission to database and issuing official verifiable digital receipt',
       icon: Database
     }
   ];
@@ -111,17 +111,17 @@ export const SubmissionProgressModal: React.FC<SubmissionProgressModalProps> = (
             </div>
 
             <h3 id="submission-progress-title" className="text-xl font-black tracking-tight text-white">
-              {isForcedTimeout ? 'Hết giờ làm bài - Đang nộp bài tự động' : 'Đang xử lý & Niêm phong bài thi'}
+              {isForcedTimeout ? 'Time Expired - Auto-submitting Exam' : 'Processing & Sealing Exam Submission'}
             </h3>
 
             <p className="text-xs text-purple-200 mt-1 font-medium">
-              Thí sinh: <strong className="text-white font-bold">{sbd}</strong> | Mã đề: <strong className="text-white font-bold">{examCode}</strong>
+              Candidate: <strong className="text-white font-bold">{sbd}</strong> | Test Code: <strong className="text-white font-bold">{examCode}</strong>
             </p>
 
             {isForcedTimeout && (
               <div className="mt-2.5 px-3 py-1 bg-amber-400 text-amber-950 rounded-full text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
                 <Clock className="w-3.5 h-3.5" />
-                <span>Bảo toàn 100% câu trả lời đã làm trước khi hết giờ</span>
+                <span>100% of recorded responses safely preserved</span>
               </div>
             )}
           </div>
@@ -171,12 +171,12 @@ export const SubmissionProgressModal: React.FC<SubmissionProgressModalProps> = (
                       </h4>
                       {isCurrent && (
                         <span className="text-[10px] font-black text-[#6B51A5] uppercase tracking-wider animate-pulse">
-                          Đang thực hiện...
+                          Processing...
                         </span>
                       )}
                       {isCompleted && (
                         <span className="text-[10px] font-extrabold text-emerald-600 uppercase tracking-wider flex items-center gap-0.5">
-                          ✓ Hoàn tất
+                          ✓ Completed
                         </span>
                       )}
                     </div>
@@ -193,7 +193,7 @@ export const SubmissionProgressModal: React.FC<SubmissionProgressModalProps> = (
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3 text-xs text-slate-600">
             <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
             <p className="text-[11px] leading-relaxed">
-              <strong>Cơ chế bảo vệ kép (Dual Vault):</strong> Nếu kết nối mạng chập chờn, bài thi được niêm phong an toàn ngay lập tức trên máy tính và tự động gửi tới giáo viên khi có mạng.
+              <strong>Dual Vault Security:</strong> If your network connection drops, your exam is sealed instantly on your local device and submitted automatically once reconnected.
             </p>
           </div>
         </div>

@@ -197,11 +197,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                         ? 'bg-purple-900 text-purple-100 border-purple-700 shadow-inner'
                         : 'bg-[#E2DDEC] hover:bg-[#D9D3E4] text-[#3C2A63] border-purple-200'
                     }`}
-                    title={isFocusFlowMode ? 'Thoát chế độ tập trung (Exit Flow Mode)' : 'Chế độ tập trung (Flow Mode: Giảm thiểu xao nhãng)'}
-                    aria-label="Chế độ tập trung"
+                    title={isFocusFlowMode ? 'Exit Flow Mode' : 'Flow Mode: Minimize distractions'}
+                    aria-label="Focus mode"
                   >
                     <Sparkles className={`w-3.5 h-3.5 ${isFocusFlowMode ? 'text-amber-400 animate-pulse' : 'text-purple-600'}`} />
-                    <span className="hidden sm:inline">{isFocusFlowMode ? 'Flow: BẬT' : 'Tập trung'}</span>
+                    <span className="hidden sm:inline">{isFocusFlowMode ? 'Flow: ON' : 'Focus'}</span>
                   </button>
                 )}
 
@@ -210,11 +210,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                     type="button"
                     onClick={onTriggerExit}
                     className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200/80 hover:border-rose-200"
-                    title="Rời khỏi bài thi (Bảo vệ tiến trình & Xác nhận an toàn)"
-                    aria-label="Rời bài thi"
+                    title="Exit Exam (Progress preserved safely)"
+                    aria-label="Exit exam"
                   >
                     <LogOut className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Rời bài thi</span>
+                    <span className="hidden sm:inline">Exit Exam</span>
                   </button>
                 )}
               </>
@@ -225,8 +225,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={onTriggerReload}
                 className="p-2 rounded-xl bg-[#E2DDEC] hover:bg-[#D9D3E4] text-[#3C2A63] transition-all cursor-pointer"
-                title="Tải lại trang (Reload Page)"
-                aria-label="Tải lại trang"
+                title="Reload Page"
+                aria-label="Reload Page"
               >
                 <RotateCcw className="w-4 h-4" />
               </button>

@@ -628,7 +628,7 @@ export default function App() {
 
     if (finalExamData.status === 'draft' || (finalExamData as any).is_draft) {
       setIsLoadingExam(false);
-      const draftMsg = `Đề thi [${cleanCode}] đang ở trạng thái bản nháp của giáo viên và chưa được công bố. Học sinh không thể truy cập.`;
+      const draftMsg = `Exam [${cleanCode}] is currently in teacher draft mode and has not been published yet. Student access is not permitted.`;
       setLoginErrorMessage(draftMsg);
       setSkillNotice(`⚠️ ${draftMsg}`);
       setTimeout(() => setSkillNotice(null), 7000);
@@ -775,10 +775,10 @@ export default function App() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      setSkillNotice('💾 Đã tải bản sao lưu bài thi (.json) về máy tính an toàn!');
+      setSkillNotice('💾 Exam backup (.json) saved successfully!');
       setTimeout(() => setSkillNotice(null), 4000);
     } catch (e: any) {
-      setSkillNotice('⚠️ Không thể xuất bản sao lưu: ' + (e?.message || 'Lỗi'));
+      setSkillNotice('⚠️ Unable to export backup: ' + (e?.message || 'Error'));
     }
   };
 
@@ -1729,12 +1729,12 @@ function doPost(e) {
                       <button
                         type="button"
                         onClick={handleExportDraftBackup}
-                        title="Tải bản sao lưu bài làm đang làm (.json) về máy tính"
+                        title="Download backup file of current responses (.json) to computer"
                         className="px-3 sm:px-4 py-2.5 sm:py-3 bg-white hover:bg-purple-50 text-[#3C2A63] border border-purple-200/90 font-bold text-[11px] sm:text-xs rounded-xl sm:rounded-2xl shadow-xs flex items-center justify-center gap-1.5 transition cursor-pointer shrink-0 active:scale-95"
                       >
                         <Download className="w-3.5 h-3.5 text-[#6B51A5]" />
-                        <span className="hidden sm:inline">Lưu bản sao (.json)</span>
-                        <span className="sm:hidden">Lưu</span>
+                        <span className="hidden sm:inline">Save Backup (.json)</span>
+                        <span className="sm:hidden">Save</span>
                       </button>
 
                       {/* SUBMIT BUTTON: Distinct visual hierarchy separating final submission from navigation tabs */}
@@ -1746,7 +1746,7 @@ function doPost(e) {
                         {isSubmitting ? (
                           <>
                             <RefreshCw className="w-4 h-4 animate-spin" />
-                            <span>Đang nộp...</span>
+                            <span>Submitting...</span>
                           </>
                         ) : (
                           <>
@@ -2040,14 +2040,14 @@ function doPost(e) {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-extrabold text-amber-300 text-xs uppercase tracking-wide">
-                      Đang chạy chế độ GitHub Pages (Static Mode)
+                      Running on GitHub Pages (Static Mode)
                     </span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-200 border border-amber-500/40">
                       Pure Static SPA
                     </span>
                   </div>
                   <p className="text-amber-200/90 text-[11px] mt-0.5">
-                    Yêu cầu Google Sheet phải bật quyền <strong>&quot;Anyone with the link can view&quot;</strong> để GViz có thể nạp câu hỏi siêu tốc mà không cần máy chủ trung gian.
+                    Requires Google Sheet to have <strong>&quot;Anyone with the link can view&quot;</strong> permission enabled so GViz can load questions directly without backend servers.
                   </p>
                 </div>
               </div>
@@ -2056,7 +2056,7 @@ function doPost(e) {
                 onClick={() => setIsDiagnosticsOpen(true)}
                 className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-[11px] transition shrink-0 cursor-pointer shadow-md"
               >
-                Cấu hình Sheet &amp; GViz
+                Configure Sheet &amp; GViz
               </button>
             </div>
 

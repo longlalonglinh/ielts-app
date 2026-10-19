@@ -533,9 +533,9 @@ export const ListeningModule: React.FC<ListeningModuleProps> = ({
             isSaving 
               ? 'bg-amber-50 text-amber-900 border-amber-300 animate-pulse' 
               : 'bg-emerald-50 text-emerald-800 border-emerald-300'
-          }`} title="Tiến trình làm bài thi được tự động lưu liên tục vào IndexedDB offline">
+          }`} title="Exam progress is continuously auto-saved to offline IndexedDB">
             <Save className={`w-3.5 h-3.5 ${isSaving ? 'animate-spin text-amber-600' : 'text-emerald-600'}`} />
-            <span>{isSaving ? 'Đang lưu...' : autoSaveTime ? `✓ Đã tự động lưu (${autoSaveTime})` : '✓ Đã bảo vệ dữ liệu'}</span>
+            <span>{isSaving ? 'Saving...' : autoSaveTime ? `✓ Auto-saved (${autoSaveTime})` : '✓ Data Secured'}</span>
           </span>
 
           <div className="text-xs text-[#7C68A5] font-medium flex items-center gap-2">
@@ -712,19 +712,19 @@ export const ListeningModule: React.FC<ListeningModuleProps> = ({
             <div className="hidden lg:flex items-center gap-2.5 text-[10px] text-[#7C68A5] font-semibold border-l border-purple-100 pl-3">
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-slate-100 border border-slate-300 inline-block" />
-                <span>Chưa làm</span>
+                <span>Unattempted</span>
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-purple-100 border-2 border-[#6B51A5] inline-block" />
-                <span>Phần hiện tại</span>
+                <span>Current Part</span>
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-emerald-600 inline-block" />
-                <span>Đã trả lời</span>
+                <span>Answered</span>
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-amber-400 border border-amber-500 inline-block" />
-                <span>Đánh dấu</span>
+                <span>Flagged</span>
               </span>
             </div>
           </div>
@@ -766,8 +766,8 @@ export const ListeningModule: React.FC<ListeningModuleProps> = ({
                       }, 50);
                     }}
                     className={`w-7 h-7 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center justify-center relative ${stateClasses}`}
-                    title={`Câu ${q.globalNumber} (Part ${q.computedPart}) - ${isFlagged ? 'Đã đánh dấu xem lại' : isAnswered ? 'Đã trả lời' : 'Chưa làm'}`}
-                    aria-label={`Câu ${q.globalNumber} - ${isFlagged ? 'Đã đánh dấu' : isAnswered ? 'Đã trả lời' : 'Chưa làm'}`}
+                    title={`Question ${q.globalNumber} (Part ${q.computedPart}) - ${isFlagged ? 'Flagged for review' : isAnswered ? 'Answered' : 'Unattempted'}`}
+                    aria-label={`Question ${q.globalNumber} - ${isFlagged ? 'Flagged' : isAnswered ? 'Answered' : 'Unattempted'}`}
                   >
                     <span>{q.globalNumber}</span>
                     {isFlagged && (

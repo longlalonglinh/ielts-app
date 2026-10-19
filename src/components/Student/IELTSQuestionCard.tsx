@@ -255,12 +255,12 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
           {isSavingLocal ? (
             <span className="flex items-center gap-1.5 text-[10px] font-extrabold text-amber-800 bg-amber-100/90 border border-amber-300 px-2.5 py-0.5 rounded-full animate-pulse shadow-2xs">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-ping" />
-              <span>Đang lưu...</span>
+              <span>Saving...</span>
             </span>
           ) : justSaved ? (
             <span className="flex items-center gap-1.5 text-[10px] font-extrabold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2.5 py-0.5 rounded-full animate-fadeIn shadow-2xs">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>✓ Đã tự động lưu</span>
+              <span>✓ Auto-saved</span>
             </span>
           ) : null}
         </div>

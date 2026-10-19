@@ -1415,7 +1415,7 @@ Trả về DUY NHẤT một JSON hợp lệ (không kèm text thừa) theo schem
         return res.status(403).json({
           success: false,
           is_draft: true,
-          error: `Đề thi [${code}] đang ở trạng thái bản nháp của giáo viên và chưa được công bố. Học sinh không thể truy cập.`
+          error: `Exam [${code}] is currently in draft mode and unpublished. Student access is not permitted.`
         });
       }
 

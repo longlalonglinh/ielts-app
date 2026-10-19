@@ -369,7 +369,7 @@ export async function saveWritingScore(
       return {
         success: false,
         conflict: true,
-        message: conflictData.message || 'DỮ LIỆU ĐÃ ĐƯỢC CẬP NHẬT BỞI NGƯỜI KHÁC. VUI LÒNG TẢI LẠI TRANG'
+        message: conflictData.message || 'DATA WAS UPDATED BY ANOTHER USER. PLEASE RELOAD THE PAGE.'
       };
     }
   } catch (e) {
@@ -1518,7 +1518,7 @@ export async function fetchExam(
       const errJson = await serverRes.json().catch(() => ({}));
       return {
         success: false,
-        error: errJson.error || `Đề thi [${cleanCode}] đang ở trạng thái bản nháp của giáo viên và chưa được công bố. Học sinh không thể truy cập.`
+        error: errJson.error || `Exam [${cleanCode}] is in draft mode and unpublished. Student access is not permitted.`
       };
     }
     if (serverRes.ok) {

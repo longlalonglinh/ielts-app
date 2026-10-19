@@ -125,7 +125,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
       setGvizSpeedResult({
         success: false,
         latencyMs: 0,
-        message: 'Vui lòng nhập Google Spreadsheet ID hoặc link bảng tính hợp lệ.',
+        message: 'Please enter a valid Google Spreadsheet ID or URL.',
         examsFound: 0
       });
       return;
@@ -143,7 +143,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
         success: connResult.success,
         latencyMs: latency,
         message: connResult.success 
-          ? `GViz phản hồi trong ${latency}ms (<200ms Edge CDN). ${connResult.examsFound} đề thi có sẵn trong sheet.`
+          ? `GViz responded in ${latency}ms (<200ms Edge CDN). ${connResult.examsFound} exams available in sheet.`
           : connResult.message,
         examsFound: connResult.examsFound
       });
@@ -151,7 +151,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
       setGvizSpeedResult({
         success: false,
         latencyMs: 0,
-        message: `Lỗi kết nối GViz: ${err.message}`,
+        message: `GViz connection error: ${err.message}`,
         examsFound: 0
       });
     } finally {
@@ -275,7 +275,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
               }`}
             >
               <Play className="w-3.5 h-3.5" />
-              <span>Xem trước CBT Thí sinh</span>
+              <span>Student CBT Preview</span>
             </button>
 
             <button
@@ -288,7 +288,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
               }`}
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>Tổng quan &amp; Audit JSON</span>
+              <span>Overview &amp; Audit JSON</span>
             </button>
           </div>
 
@@ -311,17 +311,17 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
                 ? 'bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 text-white shadow-emerald-950/10'
                 : 'bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300'
             }`}
-            title={exam.status === 'draft' || exam.is_draft ? "Xuất bản đề thi để học sinh có thể vào phòng thi" : "Chuyển về trạng thái bản nháp"}
+            title={exam.status === 'draft' || exam.is_draft ? "Publish exam so students can enter the test room" : "Revert exam to draft mode"}
           >
             {exam.status === 'draft' || exam.is_draft ? (
               <>
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Xuất bản cho học sinh</span>
+                <span>Publish for Students</span>
               </>
             ) : (
               <>
                 <Lock className="w-3.5 h-3.5 text-amber-700" />
-                <span>Chuyển về Bản nháp</span>
+                <span>Revert to Draft</span>
               </>
             )}
           </button>
@@ -346,7 +346,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
         />
       )}
 
-      {/* ACTIVE TAB 2: LIVE CBT STUDENT PREVIEW (User Request: hoàn thiện exam preview and builder) */}
+      {/* ACTIVE TAB 2: LIVE CBT STUDENT PREVIEW */}
       {activeTab === 'cbt_preview' && (
         <div className="space-y-4">
           {/* Skill Selector Navigation Bar for Preview */}
@@ -354,7 +354,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
             <div className="flex items-center gap-2">
               <span className="text-xs font-black text-[#3C2A63] flex items-center gap-1.5">
                 <Play className="w-4 h-4 text-[#6B51A5]" />
-                <span>Mô phỏng phòng thi CBT:</span>
+                <span>Student CBT Exam Simulation:</span>
               </span>
               <span className="text-[11px] font-bold text-[#7C68A5]">
                 {exam.exam_code} - {exam.title}
@@ -518,7 +518,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
                     </span>
                   </h3>
                   <p className="text-[11px] text-[#7C68A5]">
-                    Trích xuất trực tiếp từ Google Sheets, bypass hoàn toàn Apps Script runtime
+                    Direct extraction from Google Sheets, completely bypassing Apps Script runtime limits
                   </p>
                 </div>
               </div>
@@ -534,7 +534,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
                     type="text"
                     value={spreadsheetIdInput}
                     onChange={(e) => setSpreadsheetIdInput(e.target.value)}
-                    placeholder="https://docs.google.com/spreadsheets/d/.../edit hoặc Spreadsheet ID"
+                    placeholder="https://docs.google.com/spreadsheets/d/.../edit or Spreadsheet ID"
                     className="w-full px-3.5 py-2.5 bg-[#F8F6FC] border border-purple-200 rounded-xl text-xs font-mono text-[#3C2A63] placeholder-[#7C68A5] focus:outline-none focus:ring-2 focus:ring-[#6B51A5]"
                   />
                   <FileSpreadsheet className="w-4 h-4 text-[#7C68A5] absolute right-3.5 top-3" />
@@ -549,7 +549,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
                   className="flex-1 py-2.5 px-3 bg-[#E2DDEC] hover:bg-[#D5CEE4] text-[#3C2A63] font-bold text-xs rounded-xl border border-purple-200 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <SaveIcon className="w-3.5 h-3.5 text-[#6B51A5]" />
-                  <span>{gvizSaveSuccess ? 'Đã lưu!' : 'Lưu ID'}</span>
+                  <span>{gvizSaveSuccess ? 'Saved!' : 'Save ID'}</span>
                 </button>
 
                 <button
@@ -559,7 +559,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
                   className="flex-1 py-2.5 px-3 bg-[#6B51A5] hover:bg-[#583F8F] disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isTestingGviz ? 'animate-spin' : ''}`} />
-                  <span>{isTestingGviz ? 'Đang test...' : 'Speed Test'}</span>
+                  <span>{isTestingGviz ? 'Testing...' : 'Speed Test'}</span>
                 </button>
               </div>
             </div>
@@ -586,7 +586,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
                 )}
                 <div className="space-y-0.5">
                   <div className="font-black flex items-center gap-2">
-                    <span>{gvizSpeedResult.success ? 'GViz Kết Nối Thành Công' : 'Lỗi Kết Nối GViz'}</span>
+                    <span>{gvizSpeedResult.success ? 'GViz Connected Successfully' : 'GViz Connection Failed'}</span>
                     {gvizSpeedResult.latencyMs > 0 && (
                       <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-black border ${
                         gvizSpeedResult.latencyMs <= 200

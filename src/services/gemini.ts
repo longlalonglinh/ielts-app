@@ -33,11 +33,11 @@ async function parseResponseSafely(response: Response, endpointDesc: string): Pr
     // If response was HTML or non-JSON
     if (rawText.trim().toLowerCase().startsWith('<!doctype') || rawText.includes('<html')) {
       if (!response.ok) {
-        throw new Error(`Máy chủ phản hồi với mã lỗi ${response.status}. Vui lòng thử lại hoặc dùng tab "Trích xuất đề từ PDF/Văn bản".`);
+        throw new Error(`Server responded with error status ${response.status}. Please try again or use the "Extract Exam from PDF/Text" feature.`);
       }
-      throw new Error(`Phản hồi từ ${endpointDesc} trả về trang HTML thay vì dữ liệu JSON. Vui lòng kiểm tra lại dịch vụ backend.`);
+      throw new Error(`Response from ${endpointDesc} returned HTML instead of JSON. Please check backend services.`);
     }
-    throw new Error(`Phản hồi từ máy chủ không hợp lệ (${rawText.slice(0, 100)}).`);
+    throw new Error(`Invalid response received from server (${rawText.slice(0, 100)}).`);
   }
 
   if (!response.ok) {
@@ -94,7 +94,7 @@ export async function generateExamWithAI(options: GenerateExamOptions): Promise<
     };
   } catch (err: any) {
     console.error('AI Exam Generation Error:', err.message);
-    throw new Error(err.message || 'Không thể tạo đề thi bằng AI. Vui lòng kiểm tra lại kết nối mạng hoặc sử dụng tính năng trích xuất đề từ file PDF / văn bản.');
+    throw new Error(err.message || 'Unable to generate exam via AI. Please check network connection or use the PDF / Text extraction feature.');
   }
 }
 
