@@ -1,0 +1,1608 @@
+[
+  {
+    "submission_id": "TEST_CONCURRENT_1792070314188",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-15T13:18:34.189Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-15T13:18:34.190Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "SUB_TEST_02",
+    "sbd": "TS1002",
+    "student_name": "Tran Thi B",
+    "exam_code": "IELTS01",
+    "test_mode": "TEST",
+    "listening_raw_score": 28,
+    "listening_band": 6.5,
+    "reading_raw_score": 30,
+    "reading_band": 7,
+    "overall_band": 6.5,
+    "writing_status": "PENDING_TEACHER",
+    "submitted_at": "2026-10-15T13:18:35.158Z",
+    "received_at": "2026-10-15T13:18:35.158Z"
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1792070184528",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-15T13:16:24.529Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-15T13:16:24.530Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1792068820412",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-15T12:53:40.413Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-15T12:53:40.414Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791993574646",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-14T15:59:34.647Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-14T15:59:34.648Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791993321530",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-14T15:55:21.531Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-14T15:55:21.532Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791992531854",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-14T15:42:11.855Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-14T15:42:11.856Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791992411780",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-14T15:40:11.781Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-14T15:40:11.782Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791992273588",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-14T15:37:53.589Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-14T15:37:53.590Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791990816854",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-14T15:13:36.855Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-14T15:13:36.856Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791990715358",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-14T15:11:55.359Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-14T15:11:55.360Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791908460159",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T16:21:00.160Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T16:21:00.161Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791907759770",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T16:09:19.771Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T16:09:19.772Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791906604065",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T15:50:04.066Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T15:50:04.068Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791906554800",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T15:49:14.801Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T15:49:14.802Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791906071297",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T15:41:11.298Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T15:41:11.300Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791905388556",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T15:29:48.557Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T15:29:48.558Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791905366383",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T15:29:26.384Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T15:29:26.385Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791905116655",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T15:25:16.656Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T15:25:16.657Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791897762378",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T13:22:42.379Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T13:22:42.380Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791897588676",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T13:19:48.677Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T13:19:48.678Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791897519157",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T13:18:39.158Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T13:18:39.159Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791897472530",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T13:17:52.531Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T13:17:52.532Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791895908594",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T12:51:48.595Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T12:51:48.596Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791895691835",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-13T12:48:11.836Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-13T12:48:11.837Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791808828891",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-12T12:40:28.892Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-12T12:40:28.893Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "SUB_CONFLICT_01",
+    "sbd": "CAND_05",
+    "exam_code": "IELTS09",
+    "writing_status": "PENDING_TEACHER",
+    "grading_version": 2,
+    "received_at": "2026-10-15T13:18:33.514Z"
+  },
+  {
+    "submission_id": "SUB_WRITING_TEST_01",
+    "sbd": "CANDIDATE_02",
+    "student_name": "Nguyen Van A",
+    "exam_code": "IELTS09",
+    "listening_band": 7,
+    "reading_band": 7.5,
+    "writing_status": "GRADED",
+    "writing_band": 7,
+    "overall_band": 7,
+    "grading_version": 2,
+    "received_at": "2026-10-15T13:18:32.980Z",
+    "writing_scores": {
+      "task1": {
+        "ta": 7,
+        "cc": 6.5,
+        "lr": 7,
+        "gra": 6.5,
+        "band": 6.75
+      },
+      "task2": {
+        "tr": 7.5,
+        "cc": 7,
+        "lr": 7.5,
+        "gra": 7,
+        "band": 7.25
+      }
+    },
+    "writing_feedback": "Good coherence and lexical variety. Minor grammatical slips.",
+    "graded_by": "EXAMINER_01",
+    "graded_at": "2026-10-15T13:18:32.980Z"
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791808421140",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-12T12:33:41.141Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-12T12:33:41.142Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791742132398",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-11T18:08:52.399Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-11T18:08:52.400Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791741591374",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-11T17:59:51.375Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-11T17:59:51.376Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791741311286",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-11T17:55:11.287Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-11T17:55:11.288Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791741107793",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-11T17:51:47.794Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-11T17:51:47.795Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_STUDENT_01_TEST01_1791732356746",
+    "sbd": "TEST_STUDENT_01",
+    "student_name": "Nguyen Van A",
+    "exam_code": "TEST01",
+    "test_mode": "TEST",
+    "retakeMode": false,
+    "retake_mode": false,
+    "submission_type": "STANDARD",
+    "answers": {
+      "L01": "A",
+      "L02": "B",
+      "R01": "TRUE"
+    },
+    "listening_answers": {
+      "L01": "A",
+      "L02": "B",
+      "R01": "TRUE"
+    },
+    "reading_answers": {
+      "L01": "A",
+      "L02": "B",
+      "R01": "TRUE"
+    },
+    "writing_task1_text": "",
+    "writing_task2_text": "",
+    "writing_task1_response": "",
+    "writing_task2_response": "",
+    "listening_raw_score": 0,
+    "listening_max_score": 40,
+    "listening_band": 0,
+    "reading_raw_score": 0,
+    "reading_max_score": 40,
+    "reading_band": 0,
+    "overall_band": 0,
+    "detailed_results": {
+      "L1": {
+        "question_id": "L1",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "L2": {
+        "question_id": "L2",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "12"
+        ]
+      },
+      "L3": {
+        "question_id": "L3",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "L4": {
+        "question_id": "L4",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "15"
+        ]
+      },
+      "L5": {
+        "question_id": "L5",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "WILKINSON"
+        ]
+      },
+      "L6": {
+        "question_id": "L6",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "KITCHEN"
+        ]
+      },
+      "L7": {
+        "question_id": "L7",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "VICTORIA"
+        ]
+      },
+      "L8": {
+        "question_id": "L8",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "4"
+        ]
+      },
+      "L9": {
+        "question_id": "L9",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "NUT"
+        ]
+      },
+      "L10": {
+        "question_id": "L10",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "3"
+        ]
+      },
+      "L11": {
+        "question_id": "L11",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "B"
+        ]
+      },
+      "L12": {
+        "question_id": "L12",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "E"
+        ]
+      },
+      "L13": {
+        "question_id": "L13",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "C"
+        ]
+      },
+      "L14": {
+        "question_id": "L14",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "L15": {
+        "question_id": "L15",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "C"
+        ]
+      },
+      "L16": {
+        "question_id": "L16",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "B"
+        ]
+      },
+      "L17": {
+        "question_id": "L17",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "L18": {
+        "question_id": "L18",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "5"
+        ]
+      },
+      "L19": {
+        "question_id": "L19",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "3"
+        ]
+      },
+      "L20": {
+        "question_id": "L20",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "24"
+        ]
+      },
+      "L21": {
+        "question_id": "L21",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "L22": {
+        "question_id": "L22",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A, D"
+        ]
+      },
+      "L23": {
+        "question_id": "L23",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "SIEVE"
+        ]
+      },
+      "L24": {
+        "question_id": "L24",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "SALT"
+        ]
+      },
+      "L25": {
+        "question_id": "L25",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "INFRARED"
+        ]
+      },
+      "L26": {
+        "question_id": "L26",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "L27": {
+        "question_id": "L27",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "FRIDAY"
+        ]
+      },
+      "L28": {
+        "question_id": "L28",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "L29": {
+        "question_id": "L29",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "B"
+        ]
+      },
+      "L30": {
+        "question_id": "L30",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "C"
+        ]
+      },
+      "L31": {
+        "question_id": "L31",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "ALBEDO"
+        ]
+      },
+      "L32": {
+        "question_id": "L32",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "EVAPORATIVE"
+        ]
+      },
+      "L33": {
+        "question_id": "L33",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "AQUIFERS"
+        ]
+      },
+      "L34": {
+        "question_id": "L34",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "2.5"
+        ]
+      },
+      "L35": {
+        "question_id": "L35",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "EMISSIONS"
+        ]
+      },
+      "L36": {
+        "question_id": "L36",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "DIOXIDE"
+        ]
+      },
+      "L37": {
+        "question_id": "L37",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "100"
+        ]
+      },
+      "L38": {
+        "question_id": "L38",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "HEALTH"
+        ]
+      },
+      "L39": {
+        "question_id": "L39",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "DEMAND"
+        ]
+      },
+      "L40": {
+        "question_id": "L40",
+        "section": "listening",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "MAINTENANCE"
+        ]
+      },
+      "R1": {
+        "question_id": "R1",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "B"
+        ]
+      },
+      "R2": {
+        "question_id": "R2",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "TRUE"
+        ]
+      },
+      "R3": {
+        "question_id": "R3",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "LITHIUM-ION BATTERY"
+        ]
+      },
+      "R4": {
+        "question_id": "R4",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "TRUE"
+        ]
+      },
+      "R5": {
+        "question_id": "R5",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "TRUE"
+        ]
+      },
+      "R6": {
+        "question_id": "R6",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "FALSE"
+        ]
+      },
+      "R7": {
+        "question_id": "R7",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "FALSE"
+        ]
+      },
+      "R8": {
+        "question_id": "R8",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "DENMARK"
+        ]
+      },
+      "R9": {
+        "question_id": "R9",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "BESS"
+        ]
+      },
+      "R10": {
+        "question_id": "R10",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "WATER"
+        ]
+      },
+      "R11": {
+        "question_id": "R11",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "LABS"
+        ]
+      },
+      "R12": {
+        "question_id": "R12",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "C"
+        ]
+      },
+      "R13": {
+        "question_id": "R13",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "R14": {
+        "question_id": "R14",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "i"
+        ]
+      },
+      "R15": {
+        "question_id": "R15",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "ii"
+        ]
+      },
+      "R16": {
+        "question_id": "R16",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "iii"
+        ]
+      },
+      "R17": {
+        "question_id": "R17",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "iv"
+        ]
+      },
+      "R18": {
+        "question_id": "R18",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "SALINITY"
+        ]
+      },
+      "R19": {
+        "question_id": "R19",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "MESOPELAGIC"
+        ]
+      },
+      "R20": {
+        "question_id": "R20",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "BIOMIXING"
+        ]
+      },
+      "R21": {
+        "question_id": "R21",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "60"
+        ]
+      },
+      "R22": {
+        "question_id": "R22",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "MPAS"
+        ]
+      },
+      "R23": {
+        "question_id": "R23",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "R24": {
+        "question_id": "R24",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "R25": {
+        "question_id": "R25",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "FALSE"
+        ]
+      },
+      "R26": {
+        "question_id": "R26",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "TRUE"
+        ]
+      },
+      "R27": {
+        "question_id": "R27",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "NO"
+        ]
+      },
+      "R28": {
+        "question_id": "R28",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "YES"
+        ]
+      },
+      "R29": {
+        "question_id": "R29",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "NOT GIVEN"
+        ]
+      },
+      "R30": {
+        "question_id": "R30",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "YES"
+        ]
+      },
+      "R31": {
+        "question_id": "R31",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "2 TO 5 PERCENT"
+        ]
+      },
+      "R32": {
+        "question_id": "R32",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "XAI"
+        ]
+      },
+      "R33": {
+        "question_id": "R33",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "AVERSION"
+        ]
+      },
+      "R34": {
+        "question_id": "R34",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "OWNERSHIP"
+        ]
+      },
+      "R35": {
+        "question_id": "R35",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "PROFESSIONALS"
+        ]
+      },
+      "R36": {
+        "question_id": "R36",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "R37": {
+        "question_id": "R37",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "R38": {
+        "question_id": "R38",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "R39": {
+        "question_id": "R39",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      },
+      "R40": {
+        "question_id": "R40",
+        "section": "reading",
+        "user_answer": "",
+        "is_correct": false,
+        "score_awarded": 0,
+        "acceptable_answers": [
+          "A"
+        ]
+      }
+    },
+    "writing_status": "PENDING_TEACHER",
+    "submitted_at": "2026-10-11T15:25:56.746Z",
+    "violations_count": 0,
+    "cheat_count": 0,
+    "cumulative_off_screen_seconds": 0,
+    "switch_count": 0,
+    "sealed_token": "",
+    "offline_receipt_code": "",
+    "server_authoritative": true,
+    "received_at": "2026-10-11T15:25:56.746Z"
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791732320836",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-11T15:25:20.837Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-11T15:25:20.838Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791480916394",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-08T17:35:16.395Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-08T17:35:16.396Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791479705444",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-08T17:15:05.445Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-08T17:15:05.446Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791170857547",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-05T03:27:37.548Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-05T03:27:37.548Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791170489135",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-05T03:21:29.136Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-05T03:21:29.136Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791170146818",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-05T03:15:46.818Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-05T03:15:46.819Z",
+    "overall_band": 6.5
+  },
+  {
+    "submission_id": "TEST_CONCURRENT_1791050964656",
+    "sbd": "SBD_CONCUR_01",
+    "exam_code": "WT1004",
+    "grading_version": 2,
+    "writing_status": "GRADED",
+    "received_at": "2026-10-03T18:09:24.656Z",
+    "writing_band": 6.5,
+    "writing_scores": {
+      "TR": 6.5,
+      "CC": 6.5,
+      "LR": 6.5,
+      "GRA": 6.5
+    },
+    "writing_feedback": "Good response",
+    "graded_by": "Examiner_A",
+    "graded_at": "2026-10-03T18:09:24.657Z",
+    "overall_band": 6.5
+  }
+]

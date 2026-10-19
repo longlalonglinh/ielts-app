@@ -1,0 +1,17 @@
+--- src/App.tsx
++++ src/App.tsx
+@@ -282,2 +282,15 @@
+ 
++        const sanitizeQs = (qs: any[], prefix: string) => {
++          const seen = new Set<string>();
++          return qs.map((q, idx) => {
++            let qid = q.question_id || `${prefix}${idx + 1}`;
++            if (seen.has(qid)) {
++              qid = `${qid}_dup_${idx}`;
++            }
++            seen.add(qid);
++            return { ...q, question_id: qid };
++          });
++        };
++
+         // Try get_exam action first
