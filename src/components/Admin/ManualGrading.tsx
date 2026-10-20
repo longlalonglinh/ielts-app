@@ -133,7 +133,7 @@ export const ManualGrading: React.FC<ManualGradingProps> = ({ apiUrl, gasUrl }) 
         loadSubmissions();
       } else {
         if (res.conflict) {
-          alert(`⚠️ DỮ LIỆU ĐÃ ĐƯỢC CẬP NHẬT BỞI NGƯỜI KHÁC. VUI LÒNG TẢI LẠI TRANG.\n\n(Another examiner has submitted grades for candidate ${selectedSub.sbd}. The latest data will now be reloaded.)`);
+          alert(`⚠️ DATA HAS BEEN UPDATED BY ANOTHER EXAMINER. PLEASE RELOAD THE PAGE.\n\n(Another examiner has submitted grades for candidate ${selectedSub.sbd}. The latest data will now be reloaded.)`);
           loadSubmissions();
         } else {
           alert(`❌ Failed to save score: ${res.message}`);

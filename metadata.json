@@ -1,6 +1,6 @@
 {
   "name": "ielts",
-  "description": "Hệ thống thi thử và luyện tập IELTS trực tuyến tích hợp Google Apps Script REST API, Listening, Reading split-screen, Writing auto-save, Proctoring và Admin Dashboard.",
+  "description": "Online IELTS examination and practice platform featuring Google Apps Script REST API integration, Listening with locked controls, Reading split-screen with multi-color highlighter, Writing with auto-save, live proctoring, and comprehensive Admin dashboard.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

@@ -230,7 +230,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
   // Document/PDF Extraction with Native Multimodal Pipeline & Pre-flight Testing
   const handleProcessDocument = async () => {
     if (!selectedFile && !base64Data && !rawTextSyllabus.trim()) {
-      setErrorMsg('Vui lòng chọn file PDF đề thi hoặc dán nội dung văn bản đề thi.');
+      setErrorMsg('Please select an IELTS exam PDF file or paste text content.');
       return;
     }
 
@@ -243,7 +243,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
       let report: ExamTestReport | null = null;
 
       if (selectedFile) {
-        setCurrentStep('Đang tải và xử lý file PDF bằng Native Multimodal Pipeline trên backend...');
+        setCurrentStep('Uploading and processing PDF via Native Multimodal Pipeline on backend...');
         const parsedExam = await uploadAndParseIeltsPdf(selectedFile);
         if (parsedExam && parsedExam.passages && parsedExam.passages[0]?.question_groups) {
           candidateExam = transpileFromCbtEngineSchema(parsedExam);
@@ -254,13 +254,13 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
           report = parsedExam._testReport;
         }
       } else {
-        setCurrentStep('Đang đọc và phân tích cấu trúc bài đọc, câu hỏi và đáp án từ tài liệu...');
+        setCurrentStep('Analyzing document structure, passages, questions, and answer keys...');
         const res = await parsePdfWithServerGemini(base64Data || '', rawTextSyllabus.trim() || undefined);
         candidateExam = res.exam;
         report = res.testReport;
       }
 
-      setCurrentStep('Chạy kiểm tra tự động 6 điểm định dạng & mô phỏng chấm điểm...');
+      setCurrentStep('Running 6-Point automated format verification & scoring simulation...');
       await new Promise(r => setTimeout(r, 300));
 
       // Guarantee 6-Point verification report exists
@@ -307,13 +307,13 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
       const totalQs = (sanitized.reading_questions?.length || 0) + (sanitized.listening_questions?.length || 0) + (sanitized.questions?.length || 0);
       const isWritingOnly = Boolean((sanitized.writing_task1_prompt || sanitized.writing_task2_prompt) && totalQs <= 2);
       if (isWritingOnly && (sanitized.writing_task1_prompt || sanitized.writing_task2_prompt)) {
-        setSaveSuccessMsg(`Trích xuất thành công Đề thi IELTS Writing "${sanitized.title}" (Task 1 & Task 2). Đã tự động lưu bản nháp (học sinh chưa thể truy cập).`);
+        setSaveSuccessMsg(`Successfully extracted IELTS Writing Exam "${sanitized.title}" (Task 1 & Task 2). Auto-saved to draft (student access restricted).`);
       } else {
-        setSaveSuccessMsg(`Trích xuất thành công ${totalQs} câu hỏi từ tài liệu "${sanitized.title}". Đã tự động lưu bản nháp an toàn.`);
+        setSaveSuccessMsg(`Successfully extracted ${totalQs} questions from document "${sanitized.title}". Auto-saved to secure draft.`);
       }
     } catch (err: any) {
       console.error('Error parsing document:', err);
-      setErrorMsg(err.message || 'Không thể trích xuất đề thi. Vui lòng kiểm tra lại file PDF hoặc copy/paste trực tiếp văn bản.');
+      setErrorMsg(err.message || 'Unable to extract exam. Please check your PDF file or paste text directly.');
     } finally {
       setLoading(false);
       setCurrentStep('');
@@ -335,7 +335,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
       await saveExamToIndexedDB(published);
       setGeneratedExam(published);
       onParsedData(published);
-      setSaveSuccessMsg(`🎉 Đề thi [${published.exam_code}] đã được xuất bản! Học sinh có thể vào phòng thi làm bài.`);
+      setSaveSuccessMsg(`🎉 Exam [${published.exam_code}] published! Students can now enter the exam room.`);
       setTimeout(() => setSaveSuccessMsg(null), 5000);
     } catch (e: any) {
       setErrorMsg('Failed to publish to server database: ' + e.message);
@@ -359,7 +359,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
       await saveExamToIndexedDB(draft);
       setGeneratedExam(draft);
       onParsedData(draft);
-      setSaveSuccessMsg(`✓ Đã lưu bản nháp [${draft.exam_code}]! Học sinh chưa thể truy cập.`);
+      setSaveSuccessMsg(`✓ Saved draft [${draft.exam_code}]! Student access is restricted.`);
       setTimeout(() => setSaveSuccessMsg(null), 4000);
     } catch (e: any) {
       setErrorMsg('Failed to save draft: ' + e.message);
@@ -698,38 +698,38 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                 />
               </div>
 
-              {/* Extraction Target & Scope Controls (User Request: cho phép đề lẻ 1 skill 1-2 bài đọc) */}
+              {/* Extraction Target & Scope Controls */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#F8F6FC] p-3.5 rounded-2xl border border-purple-100">
                 <div className="space-y-1">
                   <label className="text-[11px] font-black text-[#3C2A63] block">
-                    Kỹ năng trích xuất:
+                    Target Skill:
                   </label>
                   <select
                     value={docSkillTarget}
                     onChange={(e) => setDocSkillTarget(e.target.value as any)}
                     className="w-full px-2.5 py-1.5 bg-white border border-purple-200 rounded-xl text-xs font-bold text-[#3C2A63] focus:outline-none focus:ring-2 focus:ring-[#6B51A5]"
                   >
-                    <option value="all">✨ Tự động phát hiện (Auto)</option>
-                    <option value="reading">📖 Chỉ Đọc (Reading Only)</option>
-                    <option value="listening">🎧 Chỉ Nghe (Listening Only)</option>
-                    <option value="writing">✍️ Chỉ Viết (Writing Only)</option>
+                    <option value="all">✨ Auto Detect (All Skills)</option>
+                    <option value="reading">📖 Reading Only</option>
+                    <option value="listening">🎧 Listening Only</option>
+                    <option value="writing">✍️ Writing Only</option>
                   </select>
                 </div>
 
                 {docSkillTarget === 'reading' && (
                   <div className="space-y-1">
                     <label className="text-[11px] font-black text-[#3C2A63] block">
-                      Số lượng bài đọc:
+                      Passage Count:
                     </label>
                     <select
                       value={docPassageCount}
                       onChange={(e) => setDocPassageCount(e.target.value as any)}
                       className="w-full px-2.5 py-1.5 bg-white border border-purple-200 rounded-xl text-xs font-bold text-[#3C2A63] focus:outline-none focus:ring-2 focus:ring-[#6B51A5]"
                     >
-                      <option value="auto">Tất cả bài đọc trong PDF</option>
-                      <option value="1">Chỉ 1 bài đọc (Passage 1)</option>
-                      <option value="2">2 bài đọc (Passage 1 &amp; 2)</option>
-                      <option value="3">3 bài đọc (Full Test)</option>
+                      <option value="auto">All Passages in Document</option>
+                      <option value="1">1 Passage Only (Passage 1)</option>
+                      <option value="2">2 Passages (Passage 1 &amp; 2)</option>
+                      <option value="3">3 Passages (Full Test)</option>
                     </select>
                   </div>
                 )}
@@ -809,10 +809,10 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                         type="button"
                         onClick={() => onTakeExamNow(generatedExam)}
                         className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition cursor-pointer"
-                        title="Vào thẳng phòng thi CBT cho học sinh"
+                        title="Enter live student CBT test room directly"
                       >
                         <Play className="w-3.5 h-3.5" />
-                        <span>Làm bài ngay</span>
+                        <span>Take Exam Now</span>
                       </button>
                     )}
                   </div>
@@ -867,7 +867,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                     previewTab === 'report' ? 'bg-[#6B51A5] text-white' : 'text-[#7C68A5] hover:bg-purple-50'
                   }`}
                 >
-                  Kiểm định ({testReport.checks.length})
+                  Verification ({testReport.checks.length})
                 </button>
 
                 <button
@@ -877,7 +877,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                     previewTab === 'passage' ? 'bg-[#6B51A5] text-white' : 'text-[#7C68A5] hover:bg-purple-50'
                   }`}
                 >
-                  Bài Đọc Reading
+                  Reading Passages
                 </button>
 
                 <button
@@ -887,7 +887,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                     previewTab === 'questions' ? 'bg-[#6B51A5] text-white' : 'text-[#7C68A5] hover:bg-purple-50'
                   }`}
                 >
-                  Câu hỏi ({testReport.metrics.totalQuestions})
+                  Questions ({testReport.metrics.totalQuestions})
                 </button>
 
                 {(generatedExam.writing_task1_prompt || generatedExam.writing_task2_prompt) && (
@@ -898,7 +898,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                       previewTab === 'writing' ? 'bg-[#6B51A5] text-white' : 'text-[#7C68A5] hover:bg-purple-50'
                     }`}
                   >
-                    Bài Viết Writing
+                    Writing Prompts
                   </button>
                 )}
 
@@ -910,7 +910,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                       previewTab === 'listening' ? 'bg-[#6B51A5] text-white' : 'text-[#7C68A5] hover:bg-purple-50'
                     }`}
                   >
-                    Bài Nghe Audio
+                    Listening Audio
                   </button>
                 )}
 
@@ -921,7 +921,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                     previewTab === 'json' ? 'bg-[#6B51A5] text-white' : 'text-[#7C68A5] hover:bg-purple-50'
                   }`}
                 >
-                  Mã JSON
+                  JSON Source
                 </button>
               </div>
 

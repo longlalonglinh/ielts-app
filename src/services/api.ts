@@ -56,7 +56,8 @@ export const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbySNk5fo
  * Google Apps Script webhooks (GAS integration) and NEVER for Express API routes (/api/*).
  */
 export const API_BASE_URL: string = (() => {
-  const envUrl = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_BASE_URL) || '';
+  const metaEnv = typeof import.meta !== 'undefined' ? (import.meta as any).env : null;
+  const envUrl = (metaEnv?.VITE_API_URL || metaEnv?.VITE_API_BASE_URL || '') as string;
   const trimmed = envUrl.trim().replace(/\/+$/, '');
   if (trimmed.includes('script.google.com')) {
     return '';

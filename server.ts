@@ -156,7 +156,21 @@ async function extractTextFromPdfBuffer(pdfBuffer: Buffer): Promise<string> {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
+
+  // Support reverse proxies (Nginx, Cloudflare, VPS, Cloud Run)
+  app.set('trust proxy', 1);
+
+  // Cross-Origin Resource Sharing (CORS) support for custom domain & split deployments
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
 
   app.use(express.json({ limit: '50mb' }));
 

@@ -168,29 +168,29 @@ export const QuestionEditorItem: React.FC<QuestionEditorItemProps> = ({
             {...register(`${prefix}.question_type`)}
             className="px-3 py-1.5 bg-white rounded-xl border border-purple-200 text-xs font-bold text-[#3C2A63] focus:outline-none focus:ring-2 focus:ring-[#6B51A5] cursor-pointer"
           >
-            <optgroup label="1. Trắc nghiệm (Multiple Choice)">
+            <optgroup label="1. Multiple Choice">
               <option value={IELTSQuestionType.MULTIPLE_CHOICE}>Multiple Choice (Single Choice)</option>
               <option value={IELTSQuestionType.MULTIPLE_CHOICE_MULTIPLE_ANSWERS}>Multiple Choice (Choose 2 or 3)</option>
             </optgroup>
-            <optgroup label="2. Đúng / Sai / Không đề cập">
+            <optgroup label="2. Identification (True/False/Not Given)">
               <option value={IELTSQuestionType.TRUE_FALSE_NOT_GIVEN}>True / False / Not Given</option>
               <option value={IELTSQuestionType.YES_NO_NOT_GIVEN}>Yes / No / Not Given</option>
             </optgroup>
-            <optgroup label="3. Dạng bài Nối (Matching)">
-              <option value={IELTSQuestionType.MATCHING_HEADINGS}>Matching Headings (Tiêu đề đoạn văn)</option>
-              <option value={IELTSQuestionType.MATCHING_INFORMATION}>Matching Information (Đoạn chứa thông tin - có NB)</option>
-              <option value={IELTSQuestionType.MATCHING_FEATURES}>Matching Features (Nối đối tượng / Nhà khoa học)</option>
-              <option value={IELTSQuestionType.MATCHING_SENTENCE_ENDINGS}>Matching Sentence Endings (Nửa đầu - nửa cuối câu)</option>
+            <optgroup label="3. Matching Tasks">
+              <option value={IELTSQuestionType.MATCHING_HEADINGS}>Matching Headings (Paragraph Headings)</option>
+              <option value={IELTSQuestionType.MATCHING_INFORMATION}>Matching Information (Locating Information)</option>
+              <option value={IELTSQuestionType.MATCHING_FEATURES}>Matching Features (People / Theories)</option>
+              <option value={IELTSQuestionType.MATCHING_SENTENCE_ENDINGS}>Matching Sentence Endings</option>
             </optgroup>
-            <optgroup label="4. Dạng bài Điền từ & Hoàn thành (Completion)">
+            <optgroup label="4. Completion Tasks">
               <option value={IELTSQuestionType.FILL_IN_THE_BLANK}>Fill in the Blank (Sentence / Note Completion)</option>
-              <option value={IELTSQuestionType.SUMMARY_COMPLETION_TEXT}>Summary Completion (Lấy từ bài đọc)</option>
-              <option value={IELTSQuestionType.SUMMARY_COMPLETION_BOX}>Summary Completion (Chọn từ hộp từ vựng A–I)</option>
-              <option value={IELTSQuestionType.TABLE_COMPLETION}>Table Completion (Bảng biểu dữ liệu)</option>
-              <option value={IELTSQuestionType.FLOW_CHART_COMPLETION}>Flow-Chart Completion (Sơ đồ quy trình)</option>
-              <option value={IELTSQuestionType.DIAGRAM_LABEL_COMPLETION}>Diagram Label Completion (Gán nhãn sơ đồ)</option>
+              <option value={IELTSQuestionType.SUMMARY_COMPLETION_TEXT}>Summary Completion (From Passage)</option>
+              <option value={IELTSQuestionType.SUMMARY_COMPLETION_BOX}>Summary Completion (Word Box A–I)</option>
+              <option value={IELTSQuestionType.TABLE_COMPLETION}>Table Completion</option>
+              <option value={IELTSQuestionType.FLOW_CHART_COMPLETION}>Flow-Chart Completion</option>
+              <option value={IELTSQuestionType.DIAGRAM_LABEL_COMPLETION}>Diagram Label Completion</option>
             </optgroup>
-            <optgroup label="5. Câu trả lời ngắn">
+            <optgroup label="5. Short Answer">
               <option value={IELTSQuestionType.SHORT_ANSWER}>Short Answer Questions</option>
             </optgroup>
           </select>
