@@ -2775,9 +2775,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "The graph shows the proportion of the population aged 65 and over between 1940 and 2040 in three different countries. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.",
-    "last_synced_at": "2026-10-19T14:59:11.437Z",
+    "last_synced_at": "2026-10-22T15:31:05.547Z",
     "reading_passage_title": "",
-    "updated_at": "2026-10-19T14:59:11.437Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.547Z"
   },
   {
     "exam_code": "WT1003",
@@ -2802,9 +2804,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "The table shows weekly food consumption by one European country in 1992, 2002 and 2012. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.",
-    "last_synced_at": "2026-10-19T14:59:11.461Z",
+    "last_synced_at": "2026-10-22T15:31:05.588Z",
     "reading_passage_title": "",
-    "updated_at": "2026-10-19T14:59:11.461Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.588Z"
   },
   {
     "exam_code": "WT1001",
@@ -2829,9 +2833,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "The graph shows the proportion of the population aged 65 and over between 1940 and 2040 in three different countries. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.",
-    "last_synced_at": "2026-10-19T14:59:11.449Z",
+    "last_synced_at": "2026-10-22T15:31:05.572Z",
     "reading_passage_title": "",
-    "updated_at": "2026-10-19T14:59:11.449Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.573Z"
   },
   {
     "exam_code": "RW2001",
@@ -4790,9 +4796,11 @@
     "writing_task1_image_url": "BLANK",
     "writing_task1_imageUrl": "BLANK",
     "writing_task2_prompt": "The charts below show the number of Japanese tourists travelling abroad between 1985 and 1995 and Australia's share of the Japanese tourist market.\n\nSummarise the information by selecting and reporting the main features, and make comparisons where relevant.\n\nWrite at least 150 words.",
-    "last_synced_at": "2026-10-19T14:59:11.492Z",
+    "last_synced_at": "2026-10-22T15:31:05.621Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.492Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.621Z"
   },
   {
     "exam_code": "WT1010",
@@ -6694,9 +6702,11 @@
     "writing_task1_image_url": "Some people believe that government funding should be devoted exclusively to renewable energy development, while others argue that fossil fuels should continue to receive subsidies to maintain low energy prices for low-income households. Discuss both views and give your own opinion. (Write at least 250 words)",
     "writing_task1_imageUrl": "Some people believe that government funding should be devoted exclusively to renewable energy development, while others argue that fossil fuels should continue to receive subsidies to maintain low energy prices for low-income households. Discuss both views and give your own opinion. (Write at least 250 words)",
     "writing_task2_prompt": "The charts below show the number of Japanese tourists travelling abroad between 1985 and 1995 and Australia's share of the Japanese tourist market.   \n\nSummarise the information by selecting and reporting the main features, and make comparisons where relevant.   \n\nWrite at least 150 words.",
-    "last_synced_at": "2026-10-19T14:59:11.531Z",
+    "last_synced_at": "2026-10-22T15:31:05.664Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.531Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.664Z"
   },
   {
     "exam_code": "TEST_IELTS_01",
@@ -6780,9 +6790,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "",
-    "last_synced_at": "2026-10-19T14:59:11.065Z",
+    "last_synced_at": "2026-10-22T15:31:05.104Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.065Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.105Z"
   },
   {
     "exam_code": "PRAC_IELTS_01",
@@ -6807,9 +6819,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "",
-    "last_synced_at": "2026-10-19T14:59:11.079Z",
+    "last_synced_at": "2026-10-22T15:31:05.123Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.079Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.123Z"
   },
   {
     "exam_code": "TEST_IELTS_11",
@@ -6893,9 +6907,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "",
-    "last_synced_at": "2026-10-19T14:59:11.093Z",
+    "last_synced_at": "2026-10-22T15:31:05.139Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.093Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.139Z"
   },
   {
     "exam_code": "IELTS_RND_01",
@@ -7143,9 +7159,11 @@
     "writing_task1_image_url": "Some people believe that artificial intelligence will completely replace human educators in higher education, while others argue that teachers remain indispensable. Discuss both views and give your own opinion. Write at least 250 words.",
     "writing_task1_imageUrl": "Some people believe that artificial intelligence will completely replace human educators in higher education, while others argue that teachers remain indispensable. Discuss both views and give your own opinion. Write at least 250 words.",
     "writing_task2_prompt": "The bar chart illustrates the percentage of renewable electricity generated by five nations between 2015 and 2025. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. Write at least 150 words.",
-    "last_synced_at": "2026-10-19T14:59:11.106Z",
+    "last_synced_at": "2026-10-22T15:31:05.154Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.107Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.154Z"
   },
   {
     "exam_code": "IELTS_ACADEMIC_TEST_01",
@@ -7170,9 +7188,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "",
-    "last_synced_at": "2026-10-19T14:59:11.123Z",
+    "last_synced_at": "2026-10-22T15:31:05.170Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.123Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.170Z"
   },
   {
     "exam_code": "IELTS_TEST_01",
@@ -9117,9 +9137,11 @@
     "writing_task1_image_url": "Some people believe that the development of digital communication has diminished the value of written language. To what extent do you agree or disagree? (Write at least 250 words)",
     "writing_task1_imageUrl": "Some people believe that the development of digital communication has diminished the value of written language. To what extent do you agree or disagree? (Write at least 250 words)",
     "writing_task2_prompt": "The chart below shows information about the global development of early written systems. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. (Write at least 150 words)",
-    "last_synced_at": "2026-10-19T14:59:11.172Z",
+    "last_synced_at": "2026-10-22T15:31:05.249Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.172Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.249Z"
   },
   {
     "exam_code": "DEMO",
@@ -11064,9 +11086,11 @@
     "writing_task1_image_url": "Some people believe that the development of digital communication has diminished the value of written language. To what extent do you agree or disagree? (Write at least 250 words)",
     "writing_task1_imageUrl": "Some people believe that the development of digital communication has diminished the value of written language. To what extent do you agree or disagree? (Write at least 250 words)",
     "writing_task2_prompt": "The chart below shows information about the global development of early written systems. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. (Write at least 150 words)",
-    "last_synced_at": "2026-10-19T14:59:11.187Z",
+    "last_synced_at": "2026-10-22T15:31:05.265Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.187Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.266Z"
   },
   {
     "exam_code": "DEMO DEMO DEMO",
@@ -12340,9 +12364,11 @@
     "writing_task1_image_url": "DEMO DEMO DEMO",
     "writing_task1_imageUrl": "DEMO DEMO DEMO",
     "writing_task2_prompt": "DEMO DEMO DEMO",
-    "last_synced_at": "2026-10-19T14:59:11.200Z",
+    "last_synced_at": "2026-10-22T15:31:05.289Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.200Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.289Z"
   },
   {
     "exam_code": "PRAC2",
@@ -13616,9 +13642,11 @@
     "writing_task1_image_url": "Some people believe that the development of digital communication has diminished the value of written language. To what extent do you agree or disagree? (Write at least 250 words)",
     "writing_task1_imageUrl": "Some people believe that the development of digital communication has diminished the value of written language. To what extent do you agree or disagree? (Write at least 250 words)",
     "writing_task2_prompt": "The chart below shows information about the global development of early written systems. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. (Write at least 150 words)",
-    "last_synced_at": "2026-10-19T14:59:11.213Z",
+    "last_synced_at": "2026-10-22T15:31:05.304Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.213Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.304Z"
   },
   {
     "exam_code": "1",
@@ -19566,9 +19594,11 @@
     "writing_task1_image_url": "You should spend about 40 minutes on this task.\n\nWrite about the following topic:\n\nThe personal information of many individuals is held by large internet companies and organisations.\n\nDo you think the advantages of this outweigh the disadvantages?\n\nGive reasons for your answer and include any relevant examples from your knowledge or experience.\n\nWrite at least 250 words.",
     "writing_task1_imageUrl": "You should spend about 40 minutes on this task.\n\nWrite about the following topic:\n\nThe personal information of many individuals is held by large internet companies and organisations.\n\nDo you think the advantages of this outweigh the disadvantages?\n\nGive reasons for your answer and include any relevant examples from your knowledge or experience.\n\nWrite at least 250 words.",
     "writing_task2_prompt": "You should spend about 20 minutes on this task.\n\nThe table below shows the proportion of women in the labor force and women in management in five countries.\n\nSummarise the information by selecting and reporting the main features and making comparisons where relevant.\n\nWrite at least 150 words.",
-    "last_synced_at": "2026-10-19T14:59:11.296Z",
+    "last_synced_at": "2026-10-22T15:31:05.384Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.296Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.385Z"
   },
   {
     "exam_code": "2",
@@ -28471,9 +28501,11 @@
     "writing_task1_image_url": "You should spend about 40 minutes on this task.\n\nWrite about the following topic:\n\nThe personal information of many individuals is held by large internet companies and organisations.\n\nDo you think the advantages of this outweigh the disadvantages?\n\nGive reasons for your answer and include any relevant examples from your knowledge or experience.\n\nWrite at least 250 words.",
     "writing_task1_imageUrl": "You should spend about 40 minutes on this task.\n\nWrite about the following topic:\n\nThe personal information of many individuals is held by large internet companies and organisations.\n\nDo you think the advantages of this outweigh the disadvantages?\n\nGive reasons for your answer and include any relevant examples from your knowledge or experience.\n\nWrite at least 250 words.",
     "writing_task2_prompt": "You should spend about 20 minutes on this task.\n\nThe table below shows the proportion of women in the labor force and women in management in five countries.\n\nSummarise the information by selecting and reporting the main features and making comparisons where relevant.\n\nWrite at least 150 words.",
-    "last_synced_at": "2026-10-19T14:59:11.284Z",
+    "last_synced_at": "2026-10-22T15:31:05.368Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.284Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.368Z"
   },
   {
     "exam_code": "R01",
@@ -28963,9 +28995,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "",
-    "last_synced_at": "2026-10-19T14:59:11.308Z",
+    "last_synced_at": "2026-10-22T15:31:05.399Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.308Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.399Z"
   },
   {
     "exam_code": "R04",
@@ -29584,9 +29618,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "",
-    "last_synced_at": "2026-10-19T14:59:11.383Z",
+    "last_synced_at": "2026-10-22T15:31:05.487Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.383Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.487Z"
   },
   {
     "exam_code": "R03",
@@ -29611,9 +29647,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "",
-    "last_synced_at": "2026-10-19T14:59:11.345Z",
+    "last_synced_at": "2026-10-22T15:31:05.442Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.345Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.442Z"
   },
   {
     "exam_code": "R06",
@@ -29638,9 +29676,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "",
-    "last_synced_at": "2026-10-19T14:59:11.399Z",
+    "last_synced_at": "2026-10-22T15:31:05.500Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.399Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.500Z"
   },
   {
     "exam_code": "R08",
@@ -30169,9 +30209,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "",
-    "last_synced_at": "2026-10-19T14:59:11.412Z",
+    "last_synced_at": "2026-10-22T15:31:05.518Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.412Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.518Z"
   },
   {
     "exam_code": "WT1005",
@@ -30196,9 +30238,11 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "The table below shows the percentage of adults in urban and rural areas who took part in four free time activities in 1990 and 2010. Summarise the information by selecting and reporting the key features, and make comparisons where relevant.",
-    "last_synced_at": "2026-10-19T14:59:11.475Z",
+    "last_synced_at": "2026-10-22T15:31:05.606Z",
     "reading_passage_title": "",
-    "updated_at": "2026-10-19T14:59:11.475Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.606Z"
   },
   {
     "exam_code": "WT1006",
@@ -32100,9 +32144,11 @@
     "writing_task1_image_url": "Some people believe that government funding should be devoted exclusively to renewable energy development, while others argue that fossil fuels should continue to receive subsidies to maintain low energy prices for low-income households. Discuss both views and give your own opinion. (Write at least 250 words)",
     "writing_task1_imageUrl": "Some people believe that government funding should be devoted exclusively to renewable energy development, while others argue that fossil fuels should continue to receive subsidies to maintain low energy prices for low-income households. Discuss both views and give your own opinion. (Write at least 250 words)",
     "writing_task2_prompt": "The charts below show the number of Japanese tourists travelling abroad between 1985 and 1995 and Australia's share of the Japanese tourist market.   \n\nSummarise the information by selecting and reporting the main features, and make comparisons where relevant.   \n\nWrite at least 150 words.",
-    "last_synced_at": "2026-10-19T14:59:11.504Z",
+    "last_synced_at": "2026-10-22T15:31:05.635Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.504Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.635Z"
   },
   {
     "exam_code": "WT1008",
@@ -34004,9 +34050,11 @@
     "writing_task1_image_url": "Some people believe that government funding should be devoted exclusively to renewable energy development, while others argue that fossil fuels should continue to receive subsidies to maintain low energy prices for low-income households. Discuss both views and give your own opinion. (Write at least 250 words)",
     "writing_task1_imageUrl": "Some people believe that government funding should be devoted exclusively to renewable energy development, while others argue that fossil fuels should continue to receive subsidies to maintain low energy prices for low-income households. Discuss both views and give your own opinion. (Write at least 250 words)",
     "writing_task2_prompt": "The charts below show the number of Japanese tourists travelling abroad between 1985 and 1995 and Australia's share of the Japanese tourist market.   \n\nSummarise the information by selecting and reporting the main features, and make comparisons where relevant.   \n\nWrite at least 150 words.",
-    "last_synced_at": "2026-10-19T14:59:11.517Z",
+    "last_synced_at": "2026-10-22T15:31:05.649Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.517Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.649Z"
   },
   {
     "exam_code": "WT1011",
@@ -37780,9 +37828,11 @@
     "writing_task1_image_url": "Some people believe that government funding should be devoted exclusively to renewable energy development, while others argue that fossil fuels should continue to receive subsidies to maintain low energy prices for low-income households. Discuss both views and give your own opinion. (Write at least 250 words)",
     "writing_task1_imageUrl": "Some people believe that government funding should be devoted exclusively to renewable energy development, while others argue that fossil fuels should continue to receive subsidies to maintain low energy prices for low-income households. Discuss both views and give your own opinion. (Write at least 250 words)",
     "writing_task2_prompt": "The charts below show the number of Japanese tourists travelling abroad between 1985 and 1995 and Australia's share of the Japanese tourist market.   \n\nSummarise the information by selecting and reporting the main features, and make comparisons where relevant.   \n\nWrite at least 150 words.",
-    "last_synced_at": "2026-10-19T14:59:11.555Z",
+    "last_synced_at": "2026-10-22T15:31:05.699Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.555Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.699Z"
   },
   {
     "exam_code": "IELTS09",
@@ -41556,9 +41606,11 @@
     "writing_task1_image_url": "Some people believe that government funding should be devoted exclusively to renewable energy development, while others argue that fossil fuels should continue to receive subsidies to maintain low energy prices for low-income households. Discuss both views and give your own opinion. (Write at least 250 words)",
     "writing_task1_imageUrl": "Some people believe that government funding should be devoted exclusively to renewable energy development, while others argue that fossil fuels should continue to receive subsidies to maintain low energy prices for low-income households. Discuss both views and give your own opinion. (Write at least 250 words)",
     "writing_task2_prompt": "The chart below shows the total global renewable energy investment (in billion USD) and capacity addition between 2010 and 2024. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. (Write at least 150 words)",
-    "last_synced_at": "2026-10-19T14:59:11.579Z",
+    "last_synced_at": "2026-10-22T15:31:05.728Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.579Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.728Z"
   },
   {
     "exam_code": "IELTS_EXTRACTED_006017",
@@ -44218,8 +44270,10 @@
     "writing_task1_image_url": "",
     "writing_task1_imageUrl": "",
     "writing_task2_prompt": "",
-    "last_synced_at": "2026-10-19T14:59:11.592Z",
+    "last_synced_at": "2026-10-22T15:31:05.767Z",
     "reading_passage_title": "Reading Passage 1",
-    "updated_at": "2026-10-19T14:59:11.592Z"
+    "status": "published",
+    "is_draft": false,
+    "updated_at": "2026-10-22T15:31:05.767Z"
   }
 ]

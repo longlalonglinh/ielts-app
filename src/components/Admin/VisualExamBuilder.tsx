@@ -657,7 +657,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       setAutoSaveStatus('saved');
 
       if (!isSilent) {
-        setSaveSuccessMessage(`✓ Đã lưu bản nháp đề thi [${draftExam.exam_code}]! Học sinh chưa thể truy cập.`);
+        setSaveSuccessMessage(`✓ Draft exam [${draftExam.exam_code}] saved! Candidates cannot access yet.`);
         setTimeout(() => setSaveSuccessMessage(null), 4000);
       }
     } catch (err: any) {
@@ -726,11 +726,11 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     onSaveExam(completeExam);
 
     const skillsLabel = completeExam.skills?.join(' + ') || 'IELTS Test';
-    setSaveSuccessMessage(`🎉 Đã xuất bản đề thi ${completeExam.exam_code} [${skillsLabel}]! Học sinh có thể vào phòng thi làm bài.`);
+    setSaveSuccessMessage(`🎉 Published exam ${completeExam.exam_code} [${skillsLabel}]! Candidates can now enter the exam room.`);
     setTimeout(() => setSaveSuccessMessage(null), 5000);
   };
 
-  // WYSIWYG Tokenizer ("Bôi đen tạo câu hỏi"): Highlight text -> click "Tạo ô trống" -> inserts [blank_X] and appends question
+  // WYSIWYG Tokenizer ("Highlight to create question"): Highlight text -> click "Tokenize [blank_X]" -> inserts [blank_X] and appends question
   const handleTokenizeSelection = () => {
     const textarea = passageTextareaRef.current;
     if (!textarea) return;
@@ -740,7 +740,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     const selected = textarea.value.substring(start, end).trim();
 
     if (!selected) {
-      setTokenizerToast('⚠️ Vui lòng bôi đen từ hoặc cụm từ trong khung văn bản bài đọc trước khi bấm "Tạo ô trống" (ví dụ: bôi đen từ "pesticides").');
+      setTokenizerToast('⚠️ Please highlight a word or phrase in the passage text before clicking "Tokenize [blank_X]" (e.g. highlight "pesticides").');
       setTimeout(() => setTokenizerToast(null), 4000);
       return;
     }
@@ -780,7 +780,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       multi_select_count: 2
     });
 
-    setTokenizerToast(`✅ Đã bôi đen "${selected}": Tự động thay bằng ${token} và tạo câu hỏi R${nextQNum} có đáp án "${selected}"!`);
+    setTokenizerToast(`✅ Highlighted "${selected}": Replaced with ${token} and created question R${nextQNum} with key "${selected}"!`);
     setTimeout(() => setTokenizerToast(null), 4500);
   };
 
@@ -939,18 +939,18 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
                 : lastAutoSaveTime
                 ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                 : 'bg-purple-50 text-[#503A7A] border-purple-200'
-            }`} title="Bản nháp tự động lưu liên tục sau khi chỉnh sửa">
+            }`} title="Drafts auto-save continuously as you edit">
               <Save className={`w-3.5 h-3.5 ${autoSaveStatus === 'saving' ? 'animate-spin text-amber-600' : 'text-emerald-600'}`} />
               <span>
                 {autoSaveStatus === 'saving'
-                  ? 'Đang lưu bản nháp...'
+                  ? 'Saving draft...'
                   : lastAutoSaveTime
-                  ? `✓ Đã tự động lưu nháp (${lastAutoSaveTime})`
-                  : 'Tự động lưu nháp'}
+                  ? `✓ Draft auto-saved (${lastAutoSaveTime})`
+                  : 'Draft Auto-save'}
               </span>
             </span>
             <span className="text-[10px] bg-amber-100 text-amber-950 font-black px-2.5 py-0.5 rounded-full border border-amber-300 flex items-center gap-1">
-              <span>🔒 Bản nháp (Học sinh chưa thể truy cập)</span>
+              <span>🔒 Draft (Candidates cannot access)</span>
             </span>
           </div>
           <h2 className="text-xl font-black text-[#3C2A63] mt-2">
@@ -988,7 +988,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
           <button
             type="button"
             onClick={() => setSplitScreenPreview(!splitScreenPreview)}
-            title="Bật/Tắt chế độ chia đôi màn hình xem trước giao diện học sinh trong thời gian thực"
+            title="Toggle split-screen real-time candidate view preview"
             className={`px-3.5 py-2 rounded-2xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer border ${
               splitScreenPreview
                 ? 'bg-[#503A7A] text-white border-[#3C2A63] shadow-md'
@@ -1015,10 +1015,10 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
             onClick={() => handleSaveDraft(false)}
             disabled={autoSaveStatus === 'saving'}
             className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-2xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="Lưu bản nháp đề thi (Học sinh chưa thể truy cập)"
+            title="Save draft exam (Candidates cannot access yet)"
           >
             <Save className="w-3.5 h-3.5 text-amber-700" />
-            <span>Lưu bản nháp</span>
+            <span>Save Draft</span>
           </button>
 
           {/* Publish Exam Button */}
@@ -1026,15 +1026,15 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
             type="submit"
             disabled={isSaving}
             className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-2xl text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-950/10 disabled:opacity-50"
-            title="Xuất bản đề thi chính thức để học sinh có thể vào thi"
+            title="Publish official exam for candidates to take"
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>{isSaving ? 'Đang xuất bản...' : 'Xuất bản đề thi'}</span>
+            <span>{isSaving ? 'Publishing...' : 'Publish Exam'}</span>
           </button>
         </div>
       </div>
 
-      {/* PRE-PUBLISH READINESS CHECKLIST (Thanh tiến độ kiểm tra hợp lệ) */}
+      {/* PRE-PUBLISH READINESS CHECKLIST (Validation Progress Bar) */}
       <div className="bg-white rounded-3xl p-4 sm:p-5 border border-purple-100 shadow-md shadow-purple-950/5 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -1209,7 +1209,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
               }}
               className="px-2.5 py-1 text-[11px] font-bold bg-indigo-50 text-indigo-900 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition cursor-pointer shadow-2xs"
             >
-              🎧+📖 Nghe &amp; Đọc (95m)
+              🎧+📖 Listening &amp; Reading (95m)
             </button>
             <button
               type="button"
@@ -1224,7 +1224,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
               }}
               className="px-2.5 py-1 text-[11px] font-bold bg-indigo-50 text-indigo-900 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition cursor-pointer shadow-2xs"
             >
-              📖+✍️ Đọc &amp; Viết (120m)
+              📖+✍️ Reading &amp; Writing (120m)
             </button>
             <button
               type="button"
@@ -1237,7 +1237,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
               }}
               className="px-2.5 py-1 text-[11px] font-bold bg-indigo-50 text-indigo-900 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition cursor-pointer shadow-2xs"
             >
-              🎧+✍️ Nghe &amp; Viết (95m)
+              🎧+✍️ Listening &amp; Writing (95m)
             </button>
 
             <span className="text-[10px] font-black text-purple-900 uppercase ml-2 mr-1">Full:</span>
@@ -1251,12 +1251,12 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
               }}
               className="px-2.5 py-1 text-[11px] font-bold bg-purple-100 text-[#3C2A63] hover:bg-purple-200 rounded-lg border border-purple-300 transition cursor-pointer shadow-2xs"
             >
-              ✨ Full 3 Kỹ Năng (155m)
+              ✨ Full 3 Skills (155m)
             </button>
           </div>
         </div>
         <p className="text-[11px] text-[#6E5B8E] font-medium leading-relaxed">
-          💡 Hệ thống hỗ trợ bài thi linh hoạt: <strong>One Skill</strong> (chỉ Nghe, Đọc hoặc Viết), <strong>Two Skills</strong> (combo 2 kỹ năng chuyển tiếp có 60s nghỉ), hoặc <strong>Full Test</strong> (cả 3 kỹ năng chuẩn).
+          💡 Flexible exam architectures supported: <strong>One Skill</strong> (Listening, Reading, or Writing only), <strong>Two Skills</strong> (2-skill combo with a 60s transition pause), or <strong>Full Test</strong> (standard 3 skills).
         </p>
       </div>
 
@@ -1358,10 +1358,10 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
                   type="button"
                   onClick={handleAddPassage}
                   className="px-3.5 py-2 rounded-2xl text-xs font-bold bg-purple-50 hover:bg-purple-100 text-[#6B51A5] border border-dashed border-purple-300 transition flex items-center gap-1.5 cursor-pointer"
-                  title="Thêm một bài đọc mới vào đề thi"
+                  title="Add a new reading passage to this exam"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Thêm bài đọc</span>
+                  <span>+ Add Passage</span>
                 </button>
               )}
             </div>
@@ -1375,7 +1375,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
                     <span>Passage {selectedPassageIdx + 1} Content</span>
                   </h3>
                   <span className="text-[11px] text-[#7C68A5] font-semibold bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-100">
-                    Bài đọc {selectedPassageIdx + 1} / {watchedPassages.length}
+                    Passage {selectedPassageIdx + 1} / {watchedPassages.length}
                   </span>
                 </div>
 
@@ -1384,10 +1384,10 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
                     type="button"
                     onClick={handleRemoveCurrentPassage}
                     className="px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-xl border border-rose-200 transition flex items-center gap-1.5 cursor-pointer font-bold"
-                    title={`Xóa bài đọc ${selectedPassageIdx + 1} khỏi đề thi`}
+                    title={`Delete passage ${selectedPassageIdx + 1} from exam`}
                   >
                     <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Xóa bài đọc {selectedPassageIdx + 1}</span>
+                    <span>Delete Passage {selectedPassageIdx + 1}</span>
                   </button>
                 )}
               </div>
@@ -1423,10 +1423,10 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
                     type="button"
                     onClick={handleTokenizeSelection}
                     className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 transition cursor-pointer"
-                    title="Bôi đen một từ/cụm từ trong khung dưới đây rồi bấm nút này để tự động tạo ô trống [blank_X] và câu hỏi điền từ"
+                    title="Highlight a word or phrase in the text below, then click here to auto-create [blank_X] token and question"
                   >
                     <Scissors className="w-3.5 h-3.5 text-purple-200" />
-                    <span>Tạo ô trống [blank_X] từ từ bôi đen</span>
+                    <span>Tokenize [blank_X] from selection</span>
                   </button>
                 </div>
               </div>
@@ -1450,7 +1450,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
                       formRef(el);
                       passageTextareaRef.current = el;
                     }}
-                    placeholder="Dán hoặc nhập toàn bộ nội dung bài đọc tại đây. Để tạo câu hỏi điền từ nhanh, hãy bôi đen bất kỳ từ nào (ví dụ: 'pesticides') rồi bấm nút 'Tạo ô trống' phía trên..."
+                    placeholder="Paste or write the entire passage text here. To create fill-in-the-blank questions quickly, highlight any keyword (e.g. 'pesticides') and click 'Tokenize [blank_X]' above..."
                     className="w-full p-4 bg-[#F8F6FC] rounded-2xl border border-purple-100 text-xs font-serif leading-relaxed text-[#3C2A63] focus:outline-none focus:ring-2 focus:ring-[#6B51A5]"
                   />
                 );
@@ -1523,7 +1523,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
                       Student CBT Live Simulation
                     </h4>
                     <p className="text-[10px] text-[#7C68A5]">
-                      Mô phỏng thời gian thực giao diện học sinh (Passage {selectedPassageIdx + 1})
+                      Real-time candidate view simulation (Passage {selectedPassageIdx + 1})
                     </p>
                   </div>
                 </div>
@@ -1532,9 +1532,9 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
                   type="button"
                   onClick={() => setPreviewAnswers({})}
                   className="px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 transition cursor-pointer"
-                  title="Xóa câu trả lời đang test thử"
+                  title="Clear test candidate answers"
                 >
-                  Xóa đáp án thử
+                  Clear Test Answers
                 </button>
               </div>
 
@@ -1544,7 +1544,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
                   {watchedPassages[selectedPassageIdx]?.title || `Reading Passage ${selectedPassageIdx + 1}`}
                 </h5>
                 <div className="text-xs font-serif leading-relaxed text-[#3C2A63] whitespace-pre-wrap max-h-56 overflow-y-auto p-2.5 bg-white rounded-xl border border-purple-50">
-                  {watchedPassages[selectedPassageIdx]?.text || 'Chưa có nội dung đoạn văn bài đọc...'}
+                  {watchedPassages[selectedPassageIdx]?.text || 'No passage text entered yet...'}
                 </div>
               </div>
 
@@ -1552,7 +1552,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
               <div className="space-y-3 pt-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-black text-[#3C2A63]">
-                    Câu hỏi ({watchedPassages[selectedPassageIdx]?.questions?.length || 0})
+                    Questions ({watchedPassages[selectedPassageIdx]?.questions?.length || 0})
                   </span>
                   <span className="text-[10px] text-[#7C68A5] font-semibold">
                     Interactive CBT Mode
@@ -1561,7 +1561,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
 
                 {(!watchedPassages[selectedPassageIdx]?.questions || watchedPassages[selectedPassageIdx]?.questions?.length === 0) ? (
                   <div className="p-6 text-center text-xs text-[#7C68A5] bg-purple-50/50 rounded-2xl border border-dashed border-purple-200">
-                    Chưa có câu hỏi nào. Dùng tính năng bôi đen để tạo ô trống hoặc bấm &quot;Add Question&quot;.
+                    No questions yet. Highlight text in the passage to tokenize a blank or click &quot;Add Question&quot;.
                   </div>
                 ) : (
                   watchedPassages[selectedPassageIdx]?.questions?.map((q, qIdx) => {

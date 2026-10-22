@@ -978,7 +978,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                             {q.question_id}: [{q.section.toUpperCase()}] ({q.question_type})
                           </span>
                           <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                            Đáp án: {Array.isArray(q.correct_answer) ? q.correct_answer.join(', ') : q.correct_answer}
+                            Key: {Array.isArray(q.correct_answer) ? q.correct_answer.join(', ') : q.correct_answer}
                           </span>
                         </div>
                         <p className="text-xs text-[#3C2A63] font-medium">{q.question_text}</p>
@@ -1067,7 +1067,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                           className="w-full h-9 rounded-lg"
                           src={generatedExam.audio_url}
                         >
-                          Trình duyệt không hỗ trợ thẻ audio.
+                          Browser does not support audio element.
                         </audio>
                       )}
                     </div>
@@ -1091,7 +1091,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                         {copiedJson ? (
                           <>
                             <Check className="w-3 h-3 text-emerald-600" />
-                            <span>Đã copy!</span>
+                            <span>Copied!</span>
                           </>
                         ) : (
                           <>
@@ -1117,7 +1117,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                     onClick={onNavigateToPreview}
                     className="py-2.5 px-3 bg-[#6B51A5] hover:bg-[#583F8F] text-white font-bold text-xs rounded-2xl shadow-sm flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
-                    <span>Sửa trong Builder</span>
+                    <span>Edit in Builder</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 )}
@@ -1127,10 +1127,10 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                     type="button"
                     onClick={() => onTakeExamNow(generatedExam)}
                     className="py-2.5 px-3 bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs rounded-2xl shadow-sm flex items-center justify-center gap-1.5 transition cursor-pointer"
-                    title="Vào thi thử CBT trực tiếp"
+                    title="Take live CBT test now"
                   >
                     <Play className="w-3.5 h-3.5" />
-                    <span>Làm bài ngay</span>
+                    <span>Take Test Now</span>
                   </button>
                 )}
 
@@ -1138,10 +1138,10 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                   type="button"
                   onClick={handlePublishToDatabase}
                   className="py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 text-white font-bold text-xs rounded-2xl shadow-sm flex items-center justify-center gap-1.5 transition cursor-pointer"
-                  title="Xuất bản đề thi để học sinh có thể vào phòng thi"
+                  title="Publish exam so candidates can access it"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Xuất bản</span>
+                  <span>Publish</span>
                 </button>
 
                 <div className="flex gap-1.5">
@@ -1149,17 +1149,17 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
                     type="button"
                     onClick={handleSaveDraft}
                     className="flex-1 py-2.5 px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-2xl flex items-center justify-center gap-1 transition cursor-pointer"
-                    title="Lưu bản nháp (Học sinh chưa thể truy cập)"
+                    title="Save draft (Candidates cannot access yet)"
                   >
                     <Save className="w-3.5 h-3.5 text-amber-700" />
-                    <span>Lưu nháp</span>
+                    <span>Save Draft</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleDownloadJson}
                     className="py-2.5 px-2.5 bg-purple-50 hover:bg-purple-100 text-[#3C2A63] font-bold text-xs rounded-2xl border border-purple-200 flex items-center justify-center transition cursor-pointer"
-                    title="Tải file JSON đề thi"
+                    title="Download Exam JSON"
                   >
                     <Download className="w-3.5 h-3.5 text-[#6B51A5]" />
                   </button>

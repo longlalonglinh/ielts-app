@@ -2184,7 +2184,7 @@ export async function uploadAndParseIeltsPdf(file: File): Promise<any> {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || 'LỖI_KHI_TRÍCH_XUẤT_PDF');
+    throw new Error(errorData.error || 'FAILED_TO_EXTRACT_PDF');
   }
 
   const result = await response.json();

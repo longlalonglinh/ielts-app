@@ -378,10 +378,10 @@ export const VisualTableEditor: React.FC<VisualTableEditorProps> = ({
                               ? 'bg-[#6B51A5] text-white shadow-xs'
                               : 'bg-purple-50 text-[#6B51A5] hover:bg-purple-100'
                           }`}
-                          title="Click hoặc bấm chuột phải vào ô để chuyển thành ô điền đáp án [blank]"
+                          title="Click or right-click cell to convert to fill-in-the-blank [blank]"
                         >
                           <Check className="w-3 h-3" />
-                          <span>{cell.is_blank ? 'Ô Điền Đáp Án [blank] (Active)' : 'Chuyển thành ô điền đáp án'}</span>
+                          <span>{cell.is_blank ? 'Fill-in-the-blank [blank] (Active)' : 'Convert to blank'}</span>
                         </button>
 
                         {cIdx === row.cells.length - 1 && rows.length > 1 && (

@@ -1,29 +1,29 @@
 export * from './types/practice';
 
 export enum IELTSQuestionType {
-  // Nhóm Trắc nghiệm
+  // Multiple Choice Group
   MULTIPLE_CHOICE = "MULTIPLE_CHOICE",
-  MULTIPLE_CHOICE_MULTIPLE_ANSWERS = "MULTIPLE_CHOICE_MULTIPLE_ANSWERS", // Chọn 2 hoặc 3 đáp án (A, C, E)
+  MULTIPLE_CHOICE_MULTIPLE_ANSWERS = "MULTIPLE_CHOICE_MULTIPLE_ANSWERS", // Choose 2 or 3 answers (e.g., A, C, E)
 
-  // Nhóm Đúng / Sai / Không đề cập
+  // True / False / Not Given Group
   TRUE_FALSE_NOT_GIVEN = "TRUE_FALSE_NOT_GIVEN",
   YES_NO_NOT_GIVEN = "YES_NO_NOT_GIVEN",
 
-  // Nhóm Nối (Matching)
+  // Matching Group
   MATCHING_HEADINGS = "MATCHING_HEADINGS",
   MATCHING_INFORMATION = "MATCHING_INFORMATION",
   MATCHING_FEATURES = "MATCHING_FEATURES",
   MATCHING_SENTENCE_ENDINGS = "MATCHING_SENTENCE_ENDINGS",
 
-  // Nhóm Điền từ (Completion)
+  // Completion Group
   FILL_IN_THE_BLANK = "FILL_IN_THE_BLANK", // Sentence/Note Completion
-  SUMMARY_COMPLETION_TEXT = "SUMMARY_COMPLETION_TEXT", // Lấy từ bài đọc
-  SUMMARY_COMPLETION_BOX = "SUMMARY_COMPLETION_BOX", // Chọn từ trong bảng từ vựng
+  SUMMARY_COMPLETION_TEXT = "SUMMARY_COMPLETION_TEXT", // Extracted directly from passage
+  SUMMARY_COMPLETION_BOX = "SUMMARY_COMPLETION_BOX", // Selected from vocabulary word box
   TABLE_COMPLETION = "TABLE_COMPLETION",
   FLOW_CHART_COMPLETION = "FLOW_CHART_COMPLETION",
   DIAGRAM_LABEL_COMPLETION = "DIAGRAM_LABEL_COMPLETION",
 
-  // Nhóm Câu trả lời ngắn
+  // Short Answer Group
   SHORT_ANSWER = "SHORT_ANSWER"
 }
 
@@ -237,7 +237,7 @@ export interface ExamData {
   exam_code: string;
   title: string;
   exam_type?: ExamType; // 'one_skill' | 'two_skills' | 'full_test'
-  skills?: SkillType[]; // ['reading'] hoặc ['listening', 'reading'] hoặc ['listening', 'reading', 'writing']
+  skills?: SkillType[]; // ['reading'] or ['listening', 'reading'] or ['listening', 'reading', 'writing']
   retakeMode?: boolean;
   targetSkill?: SkillType;
   sections?: ExamSkillSection[];

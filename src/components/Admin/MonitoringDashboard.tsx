@@ -732,7 +732,7 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
                       {isDisconnected ? (
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
                           <WifiOff className="w-3 h-3 text-rose-600" />
-                          <span>MẤT KẾT NỐI (LOST SIGNAL)</span>
+                          <span>LOST SIGNAL</span>
                         </span>
                       ) : (
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
@@ -788,7 +788,7 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
                             {isDisconnected ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-100 text-rose-800 border border-rose-300 font-bold text-[11px]">
                                 <WifiOff className="w-3.5 h-3.5 text-rose-600" />
-                                <span>MẤT KẾT NỐI (DISCONNECTED)</span>
+                                <span>DISCONNECTED</span>
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[11px]">
