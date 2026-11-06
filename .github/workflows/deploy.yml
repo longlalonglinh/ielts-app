@@ -1,13 +1,8 @@
-# NOTE FOR DUAL DEPLOYMENT ARCHITECTURE:
-# GitHub Pages only hosts static frontend assets (HTML, CSS, JS from ./dist).
-# The Express backend API (server.ts) containing Gemini multimodal processing must be deployed 
-# to a Node.js/Bun hosting platform (e.g. Render, Railway, Fly.io, or VPS).
-# Configure `secrets.VITE_API_BASE_URL` in your repository to point frontend API calls to that server URL.
 name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
 
 permissions:
   contents: read
@@ -19,42 +14,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build
-        run: |
-          if [ -n "${{ secrets.CUSTOM_DOMAIN }}" ]; then
-            echo "${{ secrets.CUSTOM_DOMAIN }}" > public/CNAME
-          fi
-          bun run build
+      - name: Build Vite App
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL || secrets.VITE_API_BASE_URL }}
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || secrets.VITE_API_URL }}
-          VITE_BASE_PATH: ${{ secrets.VITE_BASE_PATH || '/' }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+        run: bun run build
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist'
+          path: ./dist
 
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
