@@ -3,7 +3,8 @@ import {
   CustomPracticeDeck, 
   PracticeCard, 
   PracticeQuestionType, 
-  PracticeOption 
+  PracticeOption,
+  PracticeCardItem 
 } from '../../types/practice';
 import { practiceService } from '../../services/practiceService';
 import { DEFAULT_API_URL } from '../../services/api';
@@ -627,7 +628,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
     URL.revokeObjectURL(url);
   };
 
-  // Import from JSON file
+  // Smart Multi-Format Adapter: Import JSON from backup, AI generated files, or custom question banks
   const handleImportJsonFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -636,36 +637,244 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
     reader.onload = (event) => {
       try {
         const content = event.target?.result as string;
-        const parsed = JSON.parse(content);
-
-        // Can be a single deck or an array of decks
-        if (parsed.deck_id && parsed.cards && Array.isArray(parsed.cards)) {
-          const importedDeck: CustomPracticeDeck = {
-            ...parsed,
-            deck_id: parsed.deck_id.toUpperCase(),
-            is_custom: true,
-            updated_at: new Date().toISOString()
-          };
-          practiceService.saveDeck(importedDeck);
-          refreshDecks(importedDeck.deck_id);
-          setSuccessMsg(`Đã nhập thành công bộ đề [${importedDeck.deck_id}] với ${importedDeck.cards.length} câu hỏi!`);
-          setTimeout(() => setSuccessMsg(null), 4000);
-        } else if (Array.isArray(parsed)) {
-          let count = 0;
-          parsed.forEach(deck => {
-            if (deck.deck_id && deck.cards) {
-              practiceService.saveDeck({ ...deck, is_custom: true });
-              count++;
-            }
-          });
-          refreshDecks();
-          setSuccessMsg(`Đã nhập thành công ${count} bộ bài tập từ tệp sao lưu!`);
-          setTimeout(() => setSuccessMsg(null), 4000);
-        } else {
-          setErrorMsg('Tệp JSON không hợp lệ hoặc thiếu cấu trúc bộ đề chuẩn.');
+        if (!content || !content.trim()) {
+          throw new Error('Tệp JSON rỗng (không có nội dung).');
         }
+
+        let rawData: any;
+        try {
+          rawData = JSON.parse(content);
+        } catch (jsonErr: any) {
+          throw new Error(`Cú pháp JSON không hợp lệ: ${jsonErr.message}`);
+        }
+
+        // 1. Determine raw deck list flexibly
+        let rawDecks: any[] = [];
+        if (Array.isArray(rawData)) {
+          // Could be array of decks OR array of pure questions
+          const isArrayOfQuestions = rawData.length > 0 && 
+            !rawData[0].cards && 
+            !rawData[0].questions && 
+            !rawData[0].items && 
+            (rawData[0].sentence || rawData[0].question || rawData[0].stimulusText || rawData[0].targetWord || rawData[0].target_word);
+          
+          if (isArrayOfQuestions) {
+            const fileNameClean = file.name.replace(/\.[^/.]+$/, '').trim();
+            rawDecks = [{
+              title: fileNameClean || 'Bộ đề luyện tập nhập từ JSON',
+              code: 'IMPORTED_DECK',
+              questions: rawData
+            }];
+          } else {
+            rawDecks = rawData;
+          }
+        } else if (rawData && typeof rawData === 'object') {
+          if (Array.isArray(rawData.decks)) {
+            rawDecks = rawData.decks;
+          } else if (Array.isArray(rawData.data)) {
+            rawDecks = rawData.data;
+          } else if (Array.isArray(rawData.items) && rawData.items.length > 0 && (rawData.items[0].cards || rawData.items[0].questions)) {
+            rawDecks = rawData.items;
+          } else if (rawData.cards || rawData.questions || rawData.deck_id || rawData.id || rawData.code || rawData.title) {
+            rawDecks = [rawData];
+          } else if (rawData.sentence || rawData.question || rawData.stimulusText) {
+            rawDecks = [{
+              title: 'Bộ đề luyện tập nhập từ JSON',
+              code: 'IMPORTED_DECK',
+              questions: [rawData]
+            }];
+          } else {
+            throw new Error('Tệp JSON không chứa mảng bộ đề hoặc câu hỏi nào hợp lệ.');
+          }
+        } else {
+          throw new Error('Định dạng tệp JSON không hợp lệ.');
+        }
+
+        if (rawDecks.length === 0) {
+          throw new Error('Mảng dữ liệu bộ đề trong tệp JSON rỗng.');
+        }
+
+        // 2. Normalize and adapt every deck and question
+        let totalImportedQuestions = 0;
+        const sanitizedDecks: CustomPracticeDeck[] = rawDecks.map((deck: any, dIndex: number) => {
+          const rawQList: any[] = Array.isArray(deck.cards)
+            ? deck.cards
+            : Array.isArray(deck.questions)
+              ? deck.questions
+              : Array.isArray(deck.items)
+                ? deck.items
+                : [];
+
+          const rawId = deck.deck_id || deck.id || deck.code || `DECK_${Date.now()}_${dIndex + 1}`;
+          const cleanDeckId = String(rawId).trim().toUpperCase();
+          const deckTitle = deck.title || deck.name || `Bộ bài tập ${cleanDeckId}`;
+          const rawCategory = deck.category || 'Vocabulary';
+          const validCategories = ['Vocabulary', 'Grammar', 'Communication', 'IELTS Academic', 'IELTS Reading', 'IELTS Listening', 'IELTS Writing', 'General English', 'Custom'];
+          const deckCategory = validCategories.includes(rawCategory) ? rawCategory : 'Vocabulary';
+          
+          let deckLevel: 'A1-A2' | 'B1-B2' | 'C1-C2' = 'B1-B2';
+          if (deck.level) {
+            const lvlStr = String(deck.level).toUpperCase();
+            if (lvlStr.includes('A1') || lvlStr.includes('A2')) deckLevel = 'A1-A2';
+            else if (lvlStr.includes('C1') || lvlStr.includes('C2')) deckLevel = 'C1-C2';
+          }
+
+          const sanitizedCards: PracticeCard[] = rawQList.map((q: any, qIndex: number) => {
+            const cardId = String(q.id || q.card_id || q.question_id || `q_${Date.now()}_${dIndex}_${qIndex + 1}`);
+
+            // A. Normalize type
+            let qType: PracticeQuestionType = 'multiple-choice';
+            const rawType = String(q.type || q.question_type || '').toLowerCase();
+            if (rawType.includes('multi-response') || rawType.includes('multi_response') || rawType.includes('multiple-response')) {
+              qType = 'multiple-response';
+            } else if (rawType.includes('true-false') || rawType.includes('tfng') || rawType.includes('t/f/ng') || rawType.includes('true_false')) {
+              qType = 'true-false-not-given';
+            } else if (rawType.includes('category') || rawType.includes('matching')) {
+              qType = 'category-matching';
+            } else {
+              qType = 'multiple-choice';
+            }
+
+            // B. Normalize cognitive level
+            let cogLevel: 'remembering' | 'understanding' | 'applying' | 'analyzing' = 'applying';
+            const rawCog = String(q.cognitiveLevel || q.cognitive_level || '').toLowerCase();
+            if (rawCog.includes('remember')) cogLevel = 'remembering';
+            else if (rawCog.includes('understand')) cogLevel = 'understanding';
+            else if (rawCog.includes('analyz') || rawCog.includes('analys')) cogLevel = 'analyzing';
+
+            // C. Normalize sentences / stimulus
+            const sentenceEn = String(q.sentence || q.sentence_en || q.stimulusText || q.stimulus_text || q.question || q.prompt || '').trim();
+            const sentenceVi = String(q.translation || q.sentence_vi || q.vietnameseContext || q.vietnamese_context || q.context || '').trim();
+
+            // D. Normalize options
+            let normalizedOptions: PracticeOption[] = [];
+            const rawOpts = q.options_data || q.options;
+
+            if (Array.isArray(rawOpts) && rawOpts.length > 0) {
+              if (typeof rawOpts[0] === 'string') {
+                // String array e.g. ["A. respiration", "B. photosynthesis"]
+                normalizedOptions = rawOpts.map((optStr: any, optIdx: number) => {
+                  const optLetter = String.fromCharCode(65 + optIdx);
+                  const cleanText = String(optStr).replace(/^[A-F]\.\s*/i, '').trim();
+                  
+                  // Detect if this option is correct
+                  let isCorrect = false;
+                  if (Array.isArray(q.correctAnswer)) {
+                    isCorrect = q.correctAnswer.includes(optLetter) || q.correctAnswer.includes(cleanText) || q.correctAnswer.includes(optIdx);
+                  } else if (Array.isArray(q.accepted_answers)) {
+                    isCorrect = q.accepted_answers.includes(optLetter) || q.accepted_answers.includes(cleanText);
+                  } else if (q.correctAnswer !== undefined) {
+                    isCorrect = String(q.correctAnswer).trim().toUpperCase() === optLetter || String(q.correctAnswer).trim().toLowerCase() === cleanText.toLowerCase();
+                  } else if (q.correct_answer !== undefined) {
+                    isCorrect = String(q.correct_answer).trim().toUpperCase() === optLetter || String(q.correct_answer).trim().toLowerCase() === cleanText.toLowerCase();
+                  } else if (q.cloze_target) {
+                    isCorrect = String(q.cloze_target).trim().toLowerCase() === cleanText.toLowerCase();
+                  }
+
+                  return {
+                    id: `opt_${optIdx + 1}`,
+                    text: cleanText || `Option ${optLetter}`,
+                    isCorrect,
+                    distractorRationale: q.explanation || q.distractorRationale || ''
+                  };
+                });
+              } else {
+                // Object array
+                normalizedOptions = rawOpts.map((optObj: any, optIdx: number) => ({
+                  id: optObj.id || `opt_${optIdx + 1}`,
+                  text: String(optObj.text || optObj.label || optObj.value || `Option ${optIdx + 1}`),
+                  isCorrect: Boolean(optObj.isCorrect || optObj.is_correct || optObj.correct),
+                  distractorRationale: optObj.distractorRationale || optObj.explanation || '',
+                  category: optObj.category
+                }));
+              }
+            }
+
+            // Ensure at least 1 correct option if multiple-choice
+            if (qType === 'multiple-choice' && normalizedOptions.length > 0 && !normalizedOptions.some(o => o.isCorrect)) {
+              normalizedOptions[0].isCorrect = true;
+            }
+
+            const minSel = Number(q.minSelections || q.min_selections || (qType === 'multiple-response' ? 2 : 1));
+            const maxSel = Number(q.maxSelections || q.max_selections || (qType === 'multiple-response' ? 2 : 1));
+            const targetWord = String(q.targetWord || q.target_word || q.cloze_target || '').trim();
+            const ipa = String(q.ipa || q.phonetic || '').trim();
+            const hints = String(q.hints || q.hint || '').trim();
+            const grammarExp = String(q.grammarExplanation || q.grammar_explanation || q.explanation || '').trim();
+
+            const correctAnswersList = normalizedOptions.filter(o => o.isCorrect).map(o => o.text);
+            if (targetWord && !correctAnswersList.includes(targetWord)) {
+              correctAnswersList.push(targetWord);
+            }
+
+            const item: PracticeCardItem = {
+              id: cardId,
+              type: qType,
+              cognitiveLevel: cogLevel,
+              learningOutcomeId: q.learningOutcomeId || 'LO_IMPORT',
+              promptPrefix: q.promptPrefix || '',
+              stimulusText: sentenceEn,
+              promptSuffix: q.promptSuffix,
+              options: normalizedOptions,
+              minSelections: minSel,
+              maxSelections: maxSel,
+              targetWord,
+              explanation: grammarExp,
+              hints,
+              categories: q.categories
+            };
+
+            const card: PracticeCard = {
+              id: cardId,
+              sentence_en: sentenceEn,
+              sentence_vi: sentenceVi,
+              cloze_target: targetWord || (correctAnswersList[0] || ''),
+              target_word: targetWord,
+              part_of_speech: q.partOfSpeech || q.part_of_speech || '',
+              phonetic: ipa,
+              hints,
+              accepted_answers: correctAnswersList.length > 0 ? correctAnswersList : ['answer'],
+              explanation: grammarExp,
+              type: qType,
+              cognitive_level: cogLevel,
+              options_data: normalizedOptions,
+              options: normalizedOptions.map(o => o.text),
+              min_selections: minSel,
+              max_selections: maxSel,
+              item
+            };
+
+            return card;
+          });
+
+          totalImportedQuestions += sanitizedCards.length;
+
+          return {
+            deck_id: cleanDeckId,
+            title: deckTitle,
+            category: deckCategory as any,
+            description: deck.description || '',
+            target_language: deck.target_language || 'en',
+            native_language: deck.native_language || 'vi',
+            level: deckLevel,
+            cards: sanitizedCards,
+            created_at: deck.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            is_custom: true
+          };
+        });
+
+        // 3. Save each sanitized deck to practiceService
+        sanitizedDecks.forEach(d => {
+          practiceService.saveDeck(d);
+        });
+
+        refreshDecks(sanitizedDecks[0]?.deck_id);
+        setSuccessMsg(`Đã nhập thành công ${sanitizedDecks.length} bộ bài tập (${totalImportedQuestions} câu hỏi)!`);
+        setTimeout(() => setSuccessMsg(null), 5000);
       } catch (err: any) {
-        setErrorMsg('Lỗi đọc tệp JSON: ' + (err.message || 'Cú pháp không đúng'));
+        console.error('Chi tiết lỗi import JSON:', err);
+        setErrorMsg(`Lỗi nhập tệp JSON: ${err.message || 'Tệp JSON không hợp lệ'}`);
       }
     };
     reader.readAsText(file);

@@ -1669,6 +1669,7 @@ export async function fetchExam(
 
 /**
  * Fetch practice decks with retry and IndexedDB backup
+ * Uses POST with text/plain to avoid CORS preflight, with GET fallback
  */
 export async function fetchPracticeDecksFromGAS(
   apiUrl: string
@@ -1683,21 +1684,53 @@ export async function fetchPracticeDecksFromGAS(
     return { success: false, error: 'Google Apps Script URL is not configured' };
   }
 
+  // 1. Try POST with text/plain (CORS friendly, no preflight, follows redirects)
+  try {
+    const postRes = await fetchWithRetry(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      redirect: 'follow',
+      body: JSON.stringify({
+        action: 'GET_PRACTICE_DECKS'
+      })
+    }, 2, 700);
+
+    if (postRes.ok) {
+      const data = await postRes.json();
+      if (data && (data.success || data.status === 'success')) {
+        const fetchedDecks = Array.isArray(data.decks) ? data.decks : [];
+        if (fetchedDecks.length > 0) {
+          savePracticeDecksToIndexedDB(fetchedDecks).catch(() => {});
+        }
+        return {
+          success: true,
+          is_initialized: data.is_initialized !== false,
+          decks: fetchedDecks,
+          message: data.message
+        };
+      }
+    }
+  } catch (postErr: any) {
+    console.warn('POST GET_PRACTICE_DECKS failed, attempting GET fallback:', postErr.message || postErr);
+  }
+
+  // 2. Fallback GET
   try {
     const urls = [
-      `${apiUrl}?action=get_practice_decks`,
-      `${apiUrl}?action=getPracticeDecks`
+      `${apiUrl}?action=GET_PRACTICE_DECKS`,
+      `${apiUrl}?action=get_practice_decks`
     ];
 
     for (const fetchUrl of urls) {
       const res = await fetchWithRetry(fetchUrl, {
         method: 'GET',
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        redirect: 'follow'
       }, 2, 700);
 
       if (res.ok) {
         const data = await res.json();
-        if (data && data.success) {
+        if (data && (data.success || data.status === 'success')) {
           const fetchedDecks = Array.isArray(data.decks) ? data.decks : [];
           if (fetchedDecks.length > 0) {
             savePracticeDecksToIndexedDB(fetchedDecks).catch(() => {});
@@ -1749,8 +1782,9 @@ export async function initPracticeDatabaseInGAS(
     const res = await fetchWithRetry(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      redirect: 'follow',
       body: JSON.stringify({
-        action: 'init_practice_sheet',
+        action: 'INIT_PRACTICE_DB',
         mode,
         decks
       })
@@ -1758,20 +1792,32 @@ export async function initPracticeDatabaseInGAS(
 
     if (res.ok) {
       const result = await res.json();
-      if (result && result.success) {
+      if (result && (result.success || result.status === 'success')) {
         return {
           success: true,
           message: result.message || 'Practice database initialized on Google Sheets successfully!',
           total_cards: result.total_cards
         };
+      } else {
+        return {
+          success: false,
+          error: result?.error || result?.message || 'Database initialization failed on Google Apps Script.'
+        };
       }
+    } else {
+      const errText = await res.text().catch(() => '');
+      return {
+        success: false,
+        error: `Google Apps Script returned HTTP ${res.status}: ${errText.slice(0, 150)}`
+      };
     }
   } catch (err: any) {
     console.warn('initPracticeDatabaseInGAS failed:', err);
-    return { success: true, message: 'Saved to IndexedDB backup (network error initializing GAS)', total_cards: decks.reduce((acc, d) => acc + (d.cards?.length || 0), 0) };
+    return { 
+      success: false, 
+      error: `Database initialization failed (${err.message || 'Network error'}). Please verify Web App access permissions (Anyone) on Google Apps Script.` 
+    };
   }
-
-  return { success: false, error: 'Database initialization failed. Please verify Web App access permissions (Anyone) on Google Apps Script.' };
 }
 
 /**
@@ -1792,8 +1838,9 @@ export async function savePracticeDeckToGAS(
     const res = await fetchWithRetry(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      redirect: 'follow',
       body: JSON.stringify({
-        action: 'save_practice_deck',
+        action: 'SAVE_PRACTICE_DECK',
         mode: 'append',
         deck
       })
@@ -1801,16 +1848,28 @@ export async function savePracticeDeckToGAS(
 
     if (res.ok) {
       const result = await res.json();
-      if (result && result.success) {
+      if (result && (result.success || result.status === 'success')) {
         return { success: true, message: result.message || 'Practice deck saved to Google Sheets!' };
+      } else {
+        return {
+          success: false,
+          error: result?.error || result?.message || 'Unable to save practice deck to Google Sheets'
+        };
       }
+    } else {
+      const errText = await res.text().catch(() => '');
+      return {
+        success: false,
+        error: `Google Apps Script returned HTTP ${res.status}: ${errText.slice(0, 150)}`
+      };
     }
   } catch (err: any) {
     console.warn('savePracticeDeckToGAS failed:', err);
-    return { success: true, message: 'Saved to IndexedDB (Google Sheets sync will retry)' };
+    return { 
+      success: false, 
+      error: `Unable to save practice deck to Google Sheets: ${err.message || 'Network error'}` 
+    };
   }
-
-  return { success: false, error: 'Unable to save practice deck to Google Sheets' };
 }
 
 /**

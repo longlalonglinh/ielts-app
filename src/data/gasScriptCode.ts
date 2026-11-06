@@ -69,14 +69,14 @@ function setupInitialSheets() {
     sheetCheatlogs.getRange("1:1").setFontWeight("bold").setBackground("#e2e8f0");
   }
   
-  // Tab 5: PRACTICE_QUESTIONS
+  // Tab 5: PRACTICE_QUESTIONS (19 standard columns for Multi-Format & Bloom Taxonomy)
   var sheetPractice = ss.getSheetByName('PRACTICE_QUESTIONS') || ss.insertSheet('PRACTICE_QUESTIONS');
   if (sheetPractice.getLastRow() === 0) {
     sheetPractice.appendRow([
-      'DECK_ID', 'DECK_TITLE', 'CATEGORY', 'DESCRIPTION', 'LEVEL', 
-      'CARD_ID', 'SENTENCE_EN', 'SENTENCE_VI', 'CLOZE_TARGET', 'TARGET_WORD', 
-      'PART_OF_SPEECH', 'PHONETIC', 'HINTS', 'OPTIONS_JSON', 'ACCEPTED_ANSWERS_JSON', 
-      'EXPLANATION', 'GRAMMAR_POINTS_JSON', 'DIFFICULTY', 'UPDATED_AT'
+      'id', 'code', 'title', 'category', 'level', 'description', 
+      'question_id', 'type', 'cognitive_level', 'sentence', 'translation', 
+      'min_selections', 'max_selections', 'options_json', 'target_word', 
+      'ipa', 'hints', 'grammar_explanation', 'updated_at'
     ]);
     sheetPractice.getRange("1:1").setFontWeight("bold").setBackground("#c7d2fe");
   }
@@ -328,12 +328,97 @@ function doGet(e) {
       return createJsonResponse({ status: 'success', success: true, count: cheatlogs.length, data: cheatlogs, cheatlogs: cheatlogs });
     }
     
+    // 6. GET PRACTICE DECKS
+    if (action === 'getpracticedecks' || action === 'getpracticesheet' || action === 'getdecks') {
+      var sheetP = getFlexibleSheet(ss, ['PRACTICE_QUESTIONS', 'Practice_Questions', 'practice_questions', 'PRACTICE']);
+      if (!sheetP || sheetP.getLastRow() <= 1) {
+        return createJsonResponse({
+          status: 'success',
+          success: true,
+          is_initialized: Boolean(sheetP),
+          decks: [],
+          message: 'No practice questions found on sheet.'
+        });
+      }
+      
+      var dataP = sheetP.getDataRange().getValues();
+      var decksMap = {};
+      for (var pi = 1; pi < dataP.length; pi++) {
+        var pRow = dataP[pi];
+        var deckKey = String(pRow[0] || pRow[1] || 'DEFAULT').trim().toUpperCase();
+        if (!deckKey) continue;
+        
+        if (!decksMap[deckKey]) {
+          decksMap[deckKey] = {
+            deck_id: deckKey,
+            code: String(pRow[1] || deckKey),
+            title: String(pRow[2] || ('Practice Set ' + deckKey)),
+            category: String(pRow[3] || 'Vocabulary'),
+            level: String(pRow[4] || 'B1-B2'),
+            description: String(pRow[5] || ''),
+            target_language: 'en',
+            native_language: 'vi',
+            cards: [],
+            is_custom: true
+          };
+        }
+        
+        var optionsParsed = parseJsonSafe(pRow[13]);
+        var cardObj = {
+          id: String(pRow[6] || ('Q_' + pi)),
+          type: String(pRow[7] || 'multiple-choice'),
+          cognitive_level: String(pRow[8] || 'applying'),
+          sentence_en: String(pRow[9] || ''),
+          sentence_vi: String(pRow[10] || ''),
+          min_selections: Number(pRow[11]) || 1,
+          max_selections: Number(pRow[12]) || 1,
+          cloze_target: String(pRow[14] || ''),
+          target_word: String(pRow[14] || ''),
+          phonetic: String(pRow[15] || ''),
+          hints: String(pRow[16] || ''),
+          explanation: String(pRow[17] || ''),
+          accepted_answers: [String(pRow[14] || '')].filter(Boolean),
+          options_data: Array.isArray(optionsParsed) && optionsParsed.length > 0 && typeof optionsParsed[0] === 'object' ? optionsParsed : undefined,
+          options: Array.isArray(optionsParsed) && optionsParsed.length > 0 && typeof optionsParsed[0] === 'string' ? optionsParsed : undefined,
+          updated_at: String(pRow[18] || '')
+        };
+        
+        if (cardObj.options_data) {
+          cardObj.item = {
+            id: cardObj.id,
+            type: cardObj.type,
+            cognitiveLevel: cardObj.cognitive_level,
+            learningOutcomeId: 'LO_SHEETS',
+            promptPrefix: '',
+            stimulusText: cardObj.sentence_en,
+            options: cardObj.options_data,
+            minSelections: cardObj.min_selections,
+            maxSelections: cardObj.max_selections,
+            targetWord: cardObj.target_word,
+            explanation: cardObj.explanation,
+            hints: cardObj.hints
+          };
+        }
+        
+        decksMap[deckKey].cards.push(cardObj);
+      }
+      
+      var decksList = Object.keys(decksMap).map(function(k) { return decksMap[k]; });
+      return createJsonResponse({
+        status: 'success',
+        success: true,
+        is_initialized: true,
+        count: decksList.length,
+        decks: decksList
+      });
+    }
+    
     // Fallback: system info
     return createJsonResponse({
       status: 'success',
       success: true,
       message: 'IELTS Google Apps Script API V2.5 Ready.',
-      available_actions: ['ping', 'get_exams', 'get_exam', 'get_submissions', 'get_cheatlogs']
+      available_actions: ['ping', 'get_exams', 'get_exam', 'get_submissions', 'get_cheatlogs', 'get_practice_decks']
     });
     
   } catch (err) {
@@ -641,6 +726,230 @@ function doPost(e) {
         questions_count: allQuestions.length,
         message: 'Exam uploaded and synchronized successfully!'
       };
+    }
+    
+    // 4. INIT PRACTICE DB (Create PRACTICE_QUESTIONS tab with 19 columns and sync starter decks)
+    else if (action === 'initpracticedb' || action === 'initpracticesheet' || action === 'initpracticequestions') {
+      var sheetP = ss.getSheetByName('PRACTICE_QUESTIONS') || ss.insertSheet('PRACTICE_QUESTIONS');
+      var mode = payload.mode || 'replace_all';
+      var decks = payload.decks || [];
+      
+      var headerRow = [
+        'id', 'code', 'title', 'category', 'level', 'description', 
+        'question_id', 'type', 'cognitive_level', 'sentence', 'translation', 
+        'min_selections', 'max_selections', 'options_json', 'target_word', 
+        'ipa', 'hints', 'grammar_explanation', 'updated_at'
+      ];
+      
+      if (sheetP.getLastRow() === 0) {
+        sheetP.appendRow(headerRow);
+        sheetP.getRange("1:1").setFontWeight("bold").setBackground("#c7d2fe");
+      } else if (mode === 'replace_all') {
+        var lastRow = sheetP.getLastRow();
+        if (lastRow > 1) {
+          sheetP.deleteRows(2, lastRow - 1);
+        }
+      }
+      
+      var totalCards = 0;
+      var nowTime = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd HH:mm:ss");
+      
+      for (var d = 0; d < decks.length; d++) {
+        var curDeck = decks[d];
+        var dId = String(curDeck.deck_id || curDeck.id || curDeck.code || ('DECK_' + (d + 1))).trim().toUpperCase();
+        var dCode = String(curDeck.code || dId);
+        var dTitle = curDeck.title || ('Practice Set ' + dId);
+        var dCategory = curDeck.category || 'Vocabulary';
+        var dLevel = curDeck.level || 'B1-B2';
+        var dDesc = curDeck.description || '';
+        
+        var cards = curDeck.cards || curDeck.questions || curDeck.items || [];
+        for (var c = 0; c < cards.length; c++) {
+          var card = cards[c];
+          var qId = String(card.id || card.card_id || card.question_id || ('Q_' + (c + 1)));
+          var qType = String(card.type || 'multiple-choice');
+          if (qType === 'multi-response') qType = 'multiple-response';
+          var cogLevel = String(card.cognitive_level || card.cognitiveLevel || 'applying');
+          var sentence = String(card.sentence_en || card.sentence || card.stimulusText || card.question || '');
+          var translation = String(card.sentence_vi || card.translation || card.vietnameseContext || '');
+          var minSel = Number(card.min_selections || card.minSelections || (qType === 'multiple-response' ? 2 : 1));
+          var maxSel = Number(card.max_selections || card.maxSelections || (qType === 'multiple-response' ? 2 : 1));
+          var optionsJson = JSON.stringify(card.options_data || card.options || []);
+          var targetWord = String(card.target_word || card.targetWord || card.cloze_target || '');
+          var ipa = String(card.phonetic || card.ipa || '');
+          var hints = String(card.hints || card.hint || '');
+          var grammarExp = String(card.explanation || card.grammar_explanation || card.grammarExplanation || '');
+          var updatedAt = card.updated_at || nowTime;
+          
+          sheetP.appendRow([
+            dId, dCode, dTitle, dCategory, dLevel, dDesc,
+            qId, qType, cogLevel, sentence, translation,
+            minSel, maxSel, optionsJson, targetWord,
+            ipa, hints, grammarExp, updatedAt
+          ]);
+          totalCards++;
+        }
+      }
+      
+      response = {
+        status: 'success',
+        success: true,
+        message: 'Practice database initialized on Google Sheets successfully!',
+        total_cards: totalCards
+      };
+    }
+    
+    // 5. SAVE / UPDATE PRACTICE DECK
+    else if (action === 'savepracticedeck' || action === 'savepracticequestions') {
+      var sheetP = ss.getSheetByName('PRACTICE_QUESTIONS') || ss.insertSheet('PRACTICE_QUESTIONS');
+      if (sheetP.getLastRow() === 0) {
+        sheetP.appendRow([
+          'id', 'code', 'title', 'category', 'level', 'description', 
+          'question_id', 'type', 'cognitive_level', 'sentence', 'translation', 
+          'min_selections', 'max_selections', 'options_json', 'target_word', 
+          'ipa', 'hints', 'grammar_explanation', 'updated_at'
+        ]);
+        sheetP.getRange("1:1").setFontWeight("bold").setBackground("#c7d2fe");
+      }
+      
+      var targetDeck = payload.deck || payload.practice_deck || {};
+      var targetId = String(targetDeck.deck_id || targetDeck.id || targetDeck.code || '').trim().toUpperCase();
+      
+      if (targetId && sheetP.getLastRow() > 1) {
+        var dataP = sheetP.getDataRange().getValues();
+        for (var pr = dataP.length - 1; pr >= 1; pr--) {
+          var rowDeckId = String(dataP[pr][0]).trim().toUpperCase();
+          var rowDeckCode = String(dataP[pr][1]).trim().toUpperCase();
+          if (rowDeckId === targetId || rowDeckCode === targetId) {
+            sheetP.deleteRow(pr + 1);
+          }
+        }
+      }
+      
+      var dCode = String(targetDeck.code || targetId);
+      var dTitle = targetDeck.title || ('Practice Set ' + targetId);
+      var dCategory = targetDeck.category || 'Vocabulary';
+      var dLevel = targetDeck.level || 'B1-B2';
+      var dDesc = targetDeck.description || '';
+      var cards = targetDeck.cards || targetDeck.questions || targetDeck.items || [];
+      var nowTime = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd HH:mm:ss");
+      
+      for (var sc = 0; sc < cards.length; sc++) {
+        var sCard = cards[sc];
+        var sqId = String(sCard.id || sCard.card_id || sCard.question_id || ('Q_' + (sc + 1)));
+        var sqType = String(sCard.type || 'multiple-choice');
+        if (sqType === 'multi-response') sqType = 'multiple-response';
+        var scog = String(sCard.cognitive_level || sCard.cognitiveLevel || 'applying');
+        var sSent = String(sCard.sentence_en || sCard.sentence || sCard.stimulusText || sCard.question || '');
+        var sTrans = String(sCard.sentence_vi || sCard.translation || sCard.vietnameseContext || '');
+        var sMin = Number(sCard.min_selections || sCard.minSelections || (sqType === 'multiple-response' ? 2 : 1));
+        var sMax = Number(sCard.max_selections || sCard.maxSelections || (sqType === 'multiple-response' ? 2 : 1));
+        var sOpt = JSON.stringify(sCard.options_data || sCard.options || []);
+        var sWord = String(sCard.target_word || sCard.targetWord || sCard.cloze_target || '');
+        var sIpa = String(sCard.phonetic || sCard.ipa || '');
+        var sHint = String(sCard.hints || sCard.hint || '');
+        var sGram = String(sCard.explanation || sCard.grammar_explanation || sCard.grammarExplanation || '');
+        
+        sheetP.appendRow([
+          targetId, dCode, dTitle, dCategory, dLevel, dDesc,
+          sqId, sqType, scog, sSent, sTrans,
+          sMin, sMax, sOpt, sWord,
+          sIpa, sHint, sGram, nowTime
+        ]);
+      }
+      
+      response = {
+        status: 'success',
+        success: true,
+        deck_id: targetId,
+        cards_count: cards.length,
+        message: 'Practice deck saved to Google Sheets successfully!'
+      };
+    }
+    
+    // 6. GET PRACTICE DECKS (POST support for CORS / static hosting)
+    else if (action === 'getpracticedecks' || action === 'getpracticesheet') {
+      var sheetP = getFlexibleSheet(ss, ['PRACTICE_QUESTIONS', 'Practice_Questions', 'practice_questions', 'PRACTICE']);
+      if (!sheetP || sheetP.getLastRow() <= 1) {
+        response = {
+          status: 'success',
+          success: true,
+          is_initialized: Boolean(sheetP),
+          decks: [],
+          message: 'No practice questions found on sheet.'
+        };
+      } else {
+        var dataP = sheetP.getDataRange().getValues();
+        var decksMap = {};
+        for (var pi = 1; pi < dataP.length; pi++) {
+          var pRow = dataP[pi];
+          var deckKey = String(pRow[0] || pRow[1] || 'DEFAULT').trim().toUpperCase();
+          if (!deckKey) continue;
+          
+          if (!decksMap[deckKey]) {
+            decksMap[deckKey] = {
+              deck_id: deckKey,
+              code: String(pRow[1] || deckKey),
+              title: String(pRow[2] || ('Practice Set ' + deckKey)),
+              category: String(pRow[3] || 'Vocabulary'),
+              level: String(pRow[4] || 'B1-B2'),
+              description: String(pRow[5] || ''),
+              target_language: 'en',
+              native_language: 'vi',
+              cards: [],
+              is_custom: true
+            };
+          }
+          
+          var optionsParsed = parseJsonSafe(pRow[13]);
+          var cardObj = {
+            id: String(pRow[6] || ('Q_' + pi)),
+            type: String(pRow[7] || 'multiple-choice'),
+            cognitive_level: String(pRow[8] || 'applying'),
+            sentence_en: String(pRow[9] || ''),
+            sentence_vi: String(pRow[10] || ''),
+            min_selections: Number(pRow[11]) || 1,
+            max_selections: Number(pRow[12]) || 1,
+            cloze_target: String(pRow[14] || ''),
+            target_word: String(pRow[14] || ''),
+            phonetic: String(pRow[15] || ''),
+            hints: String(pRow[16] || ''),
+            explanation: String(pRow[17] || ''),
+            accepted_answers: [String(pRow[14] || '')].filter(Boolean),
+            options_data: Array.isArray(optionsParsed) && optionsParsed.length > 0 && typeof optionsParsed[0] === 'object' ? optionsParsed : undefined,
+            options: Array.isArray(optionsParsed) && optionsParsed.length > 0 && typeof optionsParsed[0] === 'string' ? optionsParsed : undefined,
+            updated_at: String(pRow[18] || '')
+          };
+          
+          if (cardObj.options_data) {
+            cardObj.item = {
+              id: cardObj.id,
+              type: cardObj.type,
+              cognitiveLevel: cardObj.cognitive_level,
+              learningOutcomeId: 'LO_SHEETS',
+              promptPrefix: '',
+              stimulusText: cardObj.sentence_en,
+              options: cardObj.options_data,
+              minSelections: cardObj.min_selections,
+              maxSelections: cardObj.max_selections,
+              targetWord: cardObj.target_word,
+              explanation: cardObj.explanation,
+              hints: cardObj.hints
+            };
+          }
+          
+          decksMap[deckKey].cards.push(cardObj);
+        }
+        
+        var decksList = Object.keys(decksMap).map(function(k) { return decksMap[k]; });
+        response = {
+          status: 'success',
+          success: true,
+          is_initialized: true,
+          count: decksList.length,
+          decks: decksList
+        };
+      }
     }
     
     return createJsonResponse(response);

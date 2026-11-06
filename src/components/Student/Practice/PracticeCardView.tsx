@@ -44,83 +44,178 @@ interface PracticeCardViewProps {
 
 /**
  * Normalizes either legacy PracticeCard or structured PracticeCardItem into a unified PracticeCardItem model.
+ * Robust against raw string arrays, missing IDs, unmapped targets, and multi-format JSON imports.
  */
 function normalizeToCardItem(input: PracticeCard | PracticeCardItem): PracticeCardItem {
-  // If already a PracticeCardItem
-  if ('type' in input && input.type && Array.isArray((input as PracticeCardItem).options)) {
-    return input as PracticeCardItem;
-  }
+  const legacy = input as any;
 
-  const legacy = input as PracticeCard;
+  // 1. Gather all possible target answers
+  const rawTargets: string[] = [];
+  const extractTargets = (val: any) => {
+    if (!val) return;
+    if (Array.isArray(val)) {
+      val.forEach(v => extractTargets(v));
+    } else if (typeof val === 'string') {
+      val.split(/[,|]/).forEach(s => {
+        const trimmed = s.trim().toLowerCase();
+        if (trimmed) rawTargets.push(trimmed);
+      });
+    }
+  };
 
-  // If card has an embedded item
+  extractTargets(legacy.cloze_target);
+  extractTargets(legacy.target_word);
+  extractTargets(legacy.targetWord);
+  extractTargets(legacy.accepted_answers);
+  extractTargets(legacy.acceptedAnswers);
+  extractTargets(legacy.correct_answer);
+  extractTargets(legacy.correctAnswer);
+  extractTargets(legacy.correct_answers);
+  extractTargets(legacy.correctAnswers);
   if (legacy.item) {
-    return legacy.item;
+    extractTargets(legacy.item.targetWord);
+    extractTargets(legacy.item.acceptedAnswers);
   }
 
-  // Derive from legacy PracticeCard properties
-  let type: PracticeQuestionType = legacy.type || 'multiple-choice';
-  let options: PracticeOption[] = [];
+  // 2. Resolve raw options list from any available property
+  let rawOptions: any[] = [];
+  if (Array.isArray(legacy.options_data) && legacy.options_data.length > 0) {
+    rawOptions = legacy.options_data;
+  } else if (Array.isArray(legacy.options) && legacy.options.length > 0) {
+    rawOptions = legacy.options;
+  } else if (legacy.item && Array.isArray(legacy.item.options) && legacy.item.options.length > 0) {
+    rawOptions = legacy.item.options;
+  } else if (Array.isArray(legacy.choices) && legacy.choices.length > 0) {
+    rawOptions = legacy.choices;
+  }
 
-  if (legacy.options_data && legacy.options_data.length > 0) {
-    options = legacy.options_data;
-  } else if (legacy.options && legacy.options.length > 0) {
-    const target = (legacy.cloze_target || '').toLowerCase().trim();
-    const acceptedTargets = [target, ...(legacy.accepted_answers || []).map(a => a.toLowerCase().trim())];
+  // 3. Determine base question type
+  let type: PracticeQuestionType = legacy.type || (legacy.item?.type) || 'multiple-choice';
 
-    options = legacy.options.map((optText, idx) => {
-      const cleanOpt = optText.toLowerCase().trim();
-      const isCorrect = acceptedTargets.includes(cleanOpt);
-      const isTargetLemma = cleanOpt === target;
+  // 4. Normalize every option into a complete PracticeOption object with non-empty id, text, and isCorrect
+  const normalizedOptions: PracticeOption[] = rawOptions.map((rawOpt: any, idx: number) => {
+    const defaultId = `opt_${idx + 1}`;
+
+    if (typeof rawOpt === 'string') {
+      const cleanText = rawOpt.trim();
+      const cleanLower = cleanText.toLowerCase();
+      const isCorrect = rawTargets.some(t => t === cleanLower || cleanLower.includes(t) || t.includes(cleanLower));
 
       let rationale = '';
       if (isCorrect) {
-        rationale = legacy.explanation || `Correct lexical choice: "${optText}" aligns with the required academic collocation and sentence grammar.`;
+        rationale = legacy.explanation || `Correct lexical choice: "${cleanText}" aligns with the academic context and collocation.`;
       } else {
-        // Distractor explanation
-        if (cleanOpt.endsWith('ly')) {
+        if (cleanLower.endsWith('ly')) {
           rationale = `Adverb form ("-ly" suffix): Incorrect syntactic position; a noun/verb/adjective is required in this context.`;
-        } else if (cleanOpt.endsWith('tion') || cleanOpt.endsWith('ment') || cleanOpt.endsWith('ness')) {
-          rationale = `Noun derivative ("-tion/-ment/-ness"): The sentence structure demands a different part of speech.`;
-        } else if (cleanOpt.endsWith('ed') || cleanOpt.endsWith('ing')) {
-          rationale = `Participle form ("-ed/-ing"): Tense or voice mismatch with the governing clause structure.`;
+        } else if (cleanLower.endsWith('tion') || cleanLower.endsWith('ment') || cleanLower.endsWith('ness')) {
+          rationale = `Noun derivative: The sentence structure demands a different part of speech.`;
+        } else if (cleanLower.endsWith('ed') || cleanLower.endsWith('ing')) {
+          rationale = `Participle form: Tense or voice mismatch with the governing clause structure.`;
         } else {
-          rationale = `Distractor trap: Does not satisfy the collocations or semantic constraints of the context. Correct target: "${legacy.cloze_target}".`;
+          rationale = `Distractor trap: Does not satisfy the collocations or semantic constraints of the context.`;
         }
       }
 
       return {
-        id: `opt-${idx}`,
-        text: optText,
+        id: defaultId,
+        text: cleanText || `Option ${idx + 1}`,
         isCorrect,
         distractorRationale: rationale
       };
-    });
+    }
 
-    // Check if multiple correct answers exist
-    const correctCount = options.filter(o => o.isCorrect).length;
-    if (correctCount > 1 || (legacy.min_selections && legacy.min_selections > 1)) {
-      type = 'multiple-response';
+    if (rawOpt && typeof rawOpt === 'object') {
+      const optId = String(rawOpt.id || defaultId);
+      const text = String(rawOpt.text || rawOpt.label || rawOpt.value || `Option ${idx + 1}`).trim();
+      const cleanLower = text.toLowerCase();
+
+      let isCorrect: boolean;
+      if (typeof rawOpt.isCorrect === 'boolean') {
+        isCorrect = rawOpt.isCorrect;
+      } else if (typeof rawOpt.is_correct === 'boolean') {
+        isCorrect = rawOpt.is_correct;
+      } else if (typeof rawOpt.correct === 'boolean') {
+        isCorrect = rawOpt.correct;
+      } else {
+        isCorrect = rawTargets.some(t => t === cleanLower || cleanLower.includes(t) || t.includes(cleanLower));
+      }
+
+      let rationale = rawOpt.distractorRationale || rawOpt.explanation || '';
+      if (!rationale) {
+        rationale = isCorrect
+          ? (legacy.explanation || `Correct choice: "${text}" satisfies all syntactic and semantic constraints.`)
+          : `Distractor trap: Does not satisfy the collocations or semantic constraints of the context.`;
+      }
+
+      return {
+        id: optId,
+        text,
+        isCorrect,
+        distractorRationale: rationale,
+        category: rawOpt.category
+      };
+    }
+
+    return {
+      id: defaultId,
+      text: `Option ${idx + 1}`,
+      isCorrect: false
+    };
+  });
+
+  // 5. Check if multiple correct answers exist or min_selections indicates multi-response
+  const correctCount = normalizedOptions.filter(o => o.isCorrect).length;
+  if (correctCount > 1 || (legacy.min_selections && legacy.min_selections > 1) || (legacy.minSelections && legacy.minSelections > 1)) {
+    type = 'multiple-response';
+  }
+
+  // 6. Safeguards against 0 correct options
+  if (type === 'multiple-choice' && normalizedOptions.length > 0 && !normalizedOptions.some(o => o.isCorrect)) {
+    const matchIdx = normalizedOptions.findIndex(o => rawTargets.includes(o.text.toLowerCase()));
+    if (matchIdx !== -1) {
+      normalizedOptions[matchIdx].isCorrect = true;
+    } else {
+      normalizedOptions[0].isCorrect = true;
     }
   }
 
+  if (type === 'multiple-response' && normalizedOptions.length > 0 && !normalizedOptions.some(o => o.isCorrect)) {
+    let matched = false;
+    normalizedOptions.forEach(o => {
+      if (rawTargets.some(t => o.text.toLowerCase().includes(t) || t.includes(o.text.toLowerCase()))) {
+        o.isCorrect = true;
+        matched = true;
+      }
+    });
+    if (!matched) {
+      const countToMark = Math.min(normalizedOptions.length, legacy.min_selections || legacy.minSelections || 2);
+      for (let i = 0; i < countToMark; i++) {
+        normalizedOptions[i].isCorrect = true;
+      }
+    }
+  }
+
+  const minSelections = legacy.minSelections || legacy.min_selections || (type === 'multiple-response' ? Math.max(1, normalizedOptions.filter(o => o.isCorrect).length) : 1);
+  const maxSelections = legacy.maxSelections || legacy.max_selections || (type === 'multiple-response' ? normalizedOptions.length : 1);
+
   return {
-    id: legacy.id,
+    id: legacy.id || `card_${Date.now()}`,
     type,
-    cognitiveLevel: legacy.cognitive_level || 'applying',
-    learningOutcomeId: legacy.learning_outcome_id || 'LO-IELTS-ACAD-01',
-    promptPrefix: legacy.prompt_prefix || (type === 'multiple-response' ? 'Select ALL correct answers that apply:' : 'Choose the most appropriate option:'),
-    stimulusText: legacy.sentence_en || '',
-    promptSuffix: legacy.prompt_suffix || '',
-    options,
-    minSelections: legacy.min_selections || 1,
-    maxSelections: legacy.max_selections || (options.length > 0 ? options.length : 1),
+    cognitiveLevel: legacy.cognitive_level || legacy.cognitiveLevel || 'applying',
+    learningOutcomeId: legacy.learning_outcome_id || legacy.learningOutcomeId || 'LO-IELTS-ACAD-01',
+    promptPrefix: legacy.prompt_prefix || legacy.promptPrefix || (type === 'multiple-response' ? 'Select ALL correct answers that apply:' : type === 'true-false-not-given' ? 'Evaluate statement truth value:' : 'Choose the most appropriate option:'),
+    stimulusText: legacy.sentence_en || legacy.stimulusText || legacy.sentence || '',
+    promptSuffix: legacy.prompt_suffix || legacy.promptSuffix || '',
+    options: normalizedOptions,
+    minSelections,
+    maxSelections,
     itemDifficulty: legacy.difficulty === 'hard' ? 1.5 : legacy.difficulty === 'easy' ? -0.8 : 0.0,
-    targetWord: legacy.target_word || legacy.cloze_target,
-    partOfSpeech: legacy.part_of_speech,
+    targetWord: legacy.target_word || legacy.targetWord || legacy.cloze_target,
+    partOfSpeech: legacy.part_of_speech || legacy.partOfSpeech,
     explanation: legacy.explanation,
-    grammarPoints: legacy.grammar_points,
-    hints: legacy.hints
+    grammarPoints: legacy.grammar_points || legacy.grammarPoints,
+    hints: legacy.hints,
+    categories: legacy.categories || legacy.item?.categories
   };
 }
 
@@ -257,7 +352,7 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
     if (item.type === 'multiple-choice') {
       if (item.options.length > 0) {
         if (!selectedSingleId) return;
-        const selectedOpt = item.options.find(o => o.id === selectedSingleId);
+        const selectedOpt = item.options.find((o, idx) => (o.id || `opt_${idx + 1}`) === selectedSingleId);
         itemCorrect = Boolean(selectedOpt?.isCorrect);
       } else {
         // Cloze gap text input fallback
@@ -287,9 +382,10 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
     } else if (item.type === 'category-matching') {
       const keys = Object.keys(categorizedMap);
       if (keys.length === 0) return;
-      itemCorrect = item.options.every(opt => {
+      itemCorrect = item.options.every((opt, idx) => {
+        const optId = opt.id || `opt_${idx + 1}`;
         if (!opt.category) return true;
-        return categorizedMap[opt.id] === opt.category;
+        return categorizedMap[optId] === opt.category;
       });
     }
 
@@ -297,7 +393,7 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
     setIsSubmitted(true);
 
     // Expand all rationale micro-explanations upon submit
-    const allOptIds = new Set(item.options.map(o => o.id));
+    const allOptIds = new Set(item.options.map((o, idx) => o.id || `opt_${idx + 1}`));
     setExpandedRationaleIds(allOptIds);
   };
 
@@ -340,8 +436,10 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
           </div>
 
           <div className="space-y-2.5">
-            {item.options.map((opt) => {
-              const isSelected = selectedSingleId === opt.id;
+            {item.options.map((opt, idx) => {
+              const optId = opt.id || `opt_${idx + 1}`;
+              const optText = typeof opt === 'string' ? opt : (opt.text || `Option ${idx + 1}`);
+              const isSelected = selectedSingleId === optId;
               
               // Pedagogy Tier 1: Multi-layered colored border
               let containerStyle = 'bg-white border-purple-200 text-[#3C2A63] hover:border-[#6B51A5] hover:bg-purple-50/50';
@@ -371,16 +469,16 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
                 containerStyle = 'bg-purple-50 border-[#6B51A5] text-[#3C2A63] ring-2 ring-[#6B51A5]/30 shadow-sm';
               }
 
-              const isExpanded = expandedRationaleIds.has(opt.id);
+              const isExpanded = expandedRationaleIds.has(optId);
 
               return (
                 <div
-                  key={opt.id}
+                  key={optId}
                   className={`rounded-2xl border transition-all p-3.5 ${containerStyle}`}
                 >
                   <button
                     type="button"
-                    onClick={() => handleSelectSingle(opt.id)}
+                    onClick={() => handleSelectSingle(optId)}
                     disabled={isSubmitted}
                     className="w-full text-left flex items-start justify-between gap-3 cursor-pointer"
                   >
@@ -397,7 +495,7 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
                       </div>
 
                       <div>
-                        <span className="text-sm font-semibold">{opt.text}</span>
+                        <span className="text-sm font-semibold">{optText}</span>
                       </div>
                     </div>
 
@@ -413,7 +511,7 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleRationale(opt.id);
+                            toggleRationale(optId);
                           }}
                           className="p-1 text-slate-500 hover:text-[#6B51A5] rounded-md"
                           title="Toggle explanation"
@@ -466,8 +564,10 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
           </div>
 
           <div className="space-y-2.5">
-            {item.options.map((opt) => {
-              const isSelected = selectedMultipleIds.has(opt.id);
+            {item.options.map((opt, idx) => {
+              const optId = opt.id || `opt_${idx + 1}`;
+              const optText = typeof opt === 'string' ? opt : (opt.text || `Option ${idx + 1}`);
+              const isSelected = selectedMultipleIds.has(optId);
 
               // Pedagogy Tier 1: Multi-layered colored border
               let containerStyle = 'bg-white border-purple-200 text-[#3C2A63] hover:border-[#6B51A5] hover:bg-purple-50/50';
@@ -494,16 +594,16 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
                 containerStyle = 'bg-purple-50 border-[#6B51A5] text-[#3C2A63] ring-2 ring-[#6B51A5]/30 shadow-sm';
               }
 
-              const isExpanded = expandedRationaleIds.has(opt.id);
+              const isExpanded = expandedRationaleIds.has(optId);
 
               return (
                 <div
-                  key={opt.id}
+                  key={optId}
                   className={`rounded-2xl border transition-all p-3.5 ${containerStyle}`}
                 >
                   <button
                     type="button"
-                    onClick={() => handleToggleMultiple(opt.id)}
+                    onClick={() => handleToggleMultiple(optId)}
                     disabled={isSubmitted}
                     className="w-full text-left flex items-start justify-between gap-3 cursor-pointer"
                   >
@@ -520,7 +620,7 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
                       </div>
 
                       <div>
-                        <span className="text-sm font-semibold">{opt.text}</span>
+                        <span className="text-sm font-semibold">{optText}</span>
                       </div>
                     </div>
 
@@ -536,7 +636,7 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            toggleRationale(opt.id);
+                            toggleRationale(optId);
                           }}
                           className="p-1 text-slate-500 hover:text-[#6B51A5] rounded-md"
                           title="Toggle explanation"
@@ -694,8 +794,10 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
           </span>
 
           <div className="space-y-3">
-            {item.options.map(opt => {
-              const assignedCat = categorizedMap[opt.id];
+            {item.options.map((opt, idx) => {
+              const optId = opt.id || `opt_${idx + 1}`;
+              const optText = typeof opt === 'string' ? opt : (opt.text || `Option ${idx + 1}`);
+              const assignedCat = categorizedMap[optId];
               const isCorrectCat = opt.category ? assignedCat === opt.category : true;
 
               let cardStyle = 'bg-white border-purple-200';
@@ -706,9 +808,9 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
               }
 
               return (
-                <div key={opt.id} className={`p-3.5 rounded-2xl border transition space-y-2 ${cardStyle}`}>
+                <div key={optId} className={`p-3.5 rounded-2xl border transition space-y-2 ${cardStyle}`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-[#3C2A63]">{opt.text}</span>
+                    <span className="text-sm font-bold text-[#3C2A63]">{optText}</span>
                     {isSubmitted && (
                       <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
                         isCorrectCat ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300'
@@ -727,7 +829,7 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
                           key={cat.id}
                           type="button"
                           disabled={isSubmitted}
-                          onClick={() => handleAssignCategory(opt.id, cat.id)}
+                          onClick={() => handleAssignCategory(optId, cat.id)}
                           className={`px-3 py-1 text-xs rounded-xl border font-semibold transition cursor-pointer ${
                             isChosen
                               ? 'bg-[#6B51A5] text-white border-[#6B51A5] shadow-xs'
