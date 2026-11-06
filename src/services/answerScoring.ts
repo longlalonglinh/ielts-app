@@ -1,4 +1,5 @@
 import { ExamData, Question } from '../types';
+import { PracticeOption } from '../types/practice';
 
 /**
  * 1. ANSWER NORMALIZATION ENGINE (Automated answer normalization)
@@ -629,5 +630,119 @@ export function computeAnswersChecksum(answers: Record<string, string> | undefin
     }
   }
   return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * -----------------------------------------------------------------------------
+ * 11. PARTIAL CREDIT SCORING ALGORITHM (Multiple-Response / Multiple-Choice)
+ * -----------------------------------------------------------------------------
+ * Applies partial credit scoring with a balanced guessing penalty:
+ * 
+ *   Score = max(0, (C_selected / C_total) - (I_selected / I_total)) * MaxPoints
+ * 
+ * Where:
+ * - C_selected: Number of correct options selected by student
+ * - C_total: Total number of correct options in the item
+ * - I_selected: Number of incorrect options selected by student
+ * - I_total: Total number of incorrect options (distractors) in the item
+ * - MaxPoints: Maximum points allocated to this question (default: 1.0)
+ * 
+ * If the learner selects all options indiscriminately (guessing blindly),
+ * (C_selected / C_total) = 1.0 and (I_selected / I_total) = 1.0,
+ * resulting in 1.0 - 1.0 = 0.0 points.
+ */
+export interface PartialCreditResult {
+  score: number;
+  maxPoints: number;
+  cSelected: number;
+  cTotal: number;
+  iSelected: number;
+  iTotal: number;
+  isFullyCorrect: boolean;
+  isPartial: boolean;
+  accuracyFraction: number; // Raw fraction [0.0 - 1.0] before multiplying maxPoints
+}
+
+/**
+ * Calculates raw score using the guessing penalty formula directly from counts.
+ */
+export function calculatePartialCreditFromCounts(
+  cSelected: number,
+  cTotal: number,
+  iSelected: number,
+  iTotal: number,
+  maxPoints: number = 1.0
+): number {
+  if (cTotal <= 0) return 0.0;
+  const cRatio = cSelected / cTotal;
+  const iRatio = iTotal > 0 ? iSelected / iTotal : 0.0;
+  const fraction = Math.max(0.0, cRatio - iRatio);
+  return Math.round(fraction * maxPoints * 100) / 100;
+}
+
+/**
+ * Comprehensive evaluator for PracticeOption arrays and selected IDs.
+ */
+export function calculatePartialCreditScore(
+  selectedOptionIds: string[],
+  options: PracticeOption[],
+  maxPoints: number = 1.0
+): PartialCreditResult {
+  const selectedSet = new Set(selectedOptionIds.map(id => String(id).trim()));
+
+  let cTotal = 0;
+  let iTotal = 0;
+  let cSelected = 0;
+  let iSelected = 0;
+
+  for (const opt of options) {
+    const isSelected = selectedSet.has(String(opt.id).trim());
+    if (opt.isCorrect) {
+      cTotal++;
+      if (isSelected) {
+        cSelected++;
+      }
+    } else {
+      iTotal++;
+      if (isSelected) {
+        iSelected++;
+      }
+    }
+  }
+
+  // Edge case: item has no correct answers configured
+  if (cTotal === 0) {
+    return {
+      score: 0.0,
+      maxPoints,
+      cSelected,
+      cTotal,
+      iSelected,
+      iTotal,
+      isFullyCorrect: false,
+      isPartial: false,
+      accuracyFraction: 0.0
+    };
+  }
+
+  const cRatio = cSelected / cTotal;
+  const iRatio = iTotal > 0 ? (iSelected / iTotal) : 0.0;
+  const accuracyFraction = Math.max(0.0, cRatio - iRatio);
+  const score = Math.round(accuracyFraction * maxPoints * 100) / 100;
+
+  const isFullyCorrect = cSelected === cTotal && iSelected === 0;
+  const isPartial = score > 0 && !isFullyCorrect;
+
+  return {
+    score,
+    maxPoints,
+    cSelected,
+    cTotal,
+    iSelected,
+    iTotal,
+    isFullyCorrect,
+    isPartial,
+    accuracyFraction
+  };
 }
 

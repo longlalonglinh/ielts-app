@@ -8,7 +8,8 @@ import {
   Clock, 
   WifiOff, 
   Database,
-  Sparkles
+  Sparkles,
+  Download
 } from 'lucide-react';
 
 interface SubmissionProgressModalProps {
@@ -189,12 +190,54 @@ export const SubmissionProgressModal: React.FC<SubmissionProgressModalProps> = (
             })}
           </div>
 
-          {/* Reassurance Notice */}
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3 text-xs text-slate-600">
-            <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-            <p className="text-[11px] leading-relaxed">
-              <strong>Dual Vault Security:</strong> If your network connection drops, your exam is sealed instantly on your local device and submitted automatically once reconnected.
-            </p>
+          {/* Reassurance Notice & Emergency Rescue Button */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2 text-xs text-slate-600">
+            <div className="flex items-center gap-2.5">
+              <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+              <p className="text-[11px] leading-relaxed">
+                <strong>An Toàn Bộ Nhớ Cục Bộ:</strong> Toàn bộ câu trả lời đã được mã hóa an toàn trên máy của bạn.
+              </p>
+            </div>
+            
+            <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
+              <span className="text-[10px] text-slate-500">
+                Gặp sự cố mạng chờ lâu?
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    const savedSubs = localStorage.getItem('ielts_student_submissions');
+                    let subRecord: any = null;
+                    if (savedSubs) {
+                      const arr = JSON.parse(savedSubs);
+                      if (Array.isArray(arr) && arr.length > 0) subRecord = arr[0];
+                    }
+                    const dataToExport = subRecord || {
+                      sbd,
+                      exam_code: examCode,
+                      timestamp: new Date().toISOString(),
+                      answers: JSON.parse(localStorage.getItem('ielts_exam_state') || '{}')
+                    };
+                    const cleanSbd = (sbd || 'CANDIDATE').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+                    const cleanCode = (examCode || 'EXAM').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+                    const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${cleanSbd}_${cleanCode}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  } catch (e) {}
+                }}
+                className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+              >
+                <Download className="w-3 h-3" />
+                <span>Tải mã nộp bài cứu hộ (.json)</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

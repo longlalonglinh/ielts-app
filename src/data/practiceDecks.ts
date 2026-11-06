@@ -32,6 +32,75 @@ export const STARTER_PRACTICE_DECKS: CustomPracticeDeck[] = [
         difficulty: 'medium'
       },
       {
+        id: 'c_mr1',
+        type: 'multiple-response',
+        sentence_en: 'Which of the following academic words can appropriately replace "vital" in the context: "Clean water is of vital importance to public health"?',
+        sentence_vi: 'Những từ học thuật nào dưới đây có thể thay thế chính xác cho "vital" trong ngữ cảnh: "Nước sạch có tầm quan trọng sống còn đối với sức khỏe cộng đồng"?',
+        cloze_target: 'crucial, pivotal',
+        target_word: 'crucial, pivotal',
+        part_of_speech: 'adjectives',
+        accepted_answers: ['crucial', 'pivotal'],
+        explanation: 'Both "crucial" and "pivotal" are exact academic synonyms for "vital", denoting fundamental and decisive importance.',
+        grammar_points: [
+          'Synonyms: vital, crucial, pivotal, paramount',
+          'Antonyms: trivial, negligible, inconsequential'
+        ],
+        prompt_prefix: 'Select ALL correct synonyms (Chọn tất cả các phương án đúng):',
+        min_selections: 1,
+        max_selections: 4,
+        options_data: [
+          { id: 'mr1', text: 'crucial', isCorrect: true, distractorRationale: 'Valid synonym: denotes supreme importance in academic registers.' },
+          { id: 'mr2', text: 'pivotal', isCorrect: true, distractorRationale: 'Valid synonym: expresses central or decisive significance.' },
+          { id: 'mr3', text: 'trivial', isCorrect: false, distractorRationale: 'Distractor trap (Antonym): means of little value or importance.' },
+          { id: 'mr4', text: 'negligible', isCorrect: false, distractorRationale: 'Distractor trap (Antonym): means insignificant or negligible.' }
+        ],
+        difficulty: 'medium'
+      },
+      {
+        id: 'c_tfng1',
+        type: 'true-false-not-given',
+        sentence_en: 'According to the reading passage: "While solar panel manufacturing requires high upfront energy, modern photovoltaic cells recoup their production energy within 18 months of operation."',
+        sentence_vi: 'Theo đoạn văn: "Mặc dù quá trình sản xuất pin năng lượng mặt trời tiêu tốn năng lượng ban đầu cao, các tấm pin quang điện hiện đại có thể hoàn vốn năng lượng sản xuất trong vòng 18 tháng vận hành."',
+        cloze_target: 'TRUE',
+        target_word: 'TRUE',
+        part_of_speech: 'evaluation',
+        accepted_answers: ['TRUE', 'T'],
+        explanation: 'The statement directly confirms that photovoltaic cells recover their embedded energy within 18 months.',
+        grammar_points: [
+          'TRUE: The statement agrees with the information in the text.',
+          'FALSE: The statement contradicts or is opposite to the text.',
+          'NOT GIVEN: There is no information on this in the text.'
+        ],
+        prompt_prefix: 'Evaluate the statement: "Photovoltaic cells successfully offset their manufacturing energy investment in under two years."',
+        options_data: [
+          { id: 'tf1', text: 'TRUE', isCorrect: true, distractorRationale: 'Confirmed fact: 18 months is under two years (24 months).' }
+        ],
+        difficulty: 'easy'
+      },
+      {
+        id: 'c_cat1',
+        type: 'category-matching',
+        sentence_en: 'Classify these IELTS Academic terms into their correct Part of Speech (Word Class):',
+        sentence_vi: 'Phân loại các từ vựng học thuật IELTS sau vào đúng nhóm từ loại tương ứng:',
+        cloze_target: 'deterioration, accelerate, exponential',
+        target_word: 'word-classes',
+        part_of_speech: 'classification',
+        accepted_answers: ['deterioration', 'accelerate', 'exponential'],
+        explanation: '"deterioration" is a noun (-tion), "accelerate" is a verb (-ate), and "exponential" is an adjective (-ial).',
+        grammar_points: [
+          'Noun suffixes: -tion, -ment, -ance, -ity',
+          'Verb suffixes: -ate, -ify, -ise, -en',
+          'Adjective suffixes: -ial, -ic, -ive, -ous'
+        ],
+        prompt_prefix: 'Assign each term to Noun, Verb, or Adjective:',
+        options_data: [
+          { id: 'cm1', text: 'deterioration', isCorrect: true, category: 'noun', distractorRationale: 'Noun (-tion suffix): the process of becoming progressively worse.' },
+          { id: 'cm2', text: 'accelerate', isCorrect: true, category: 'verb', distractorRationale: 'Verb (-ate suffix): to increase in rate, speed, or velocity.' },
+          { id: 'cm3', text: 'exponential', isCorrect: true, category: 'adjective', distractorRationale: 'Adjective (-ial suffix): describing extremely rapid mathematical increase.' }
+        ],
+        difficulty: 'hard'
+      },
+      {
         id: 'c2',
         sentence_en: 'Renewable energy plays a _____ role in combating global climate change.',
         sentence_vi: 'Sustainable energy sources hold a crucial, decisive position in the fight against planetary warming.',

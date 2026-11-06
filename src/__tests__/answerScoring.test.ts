@@ -5,9 +5,12 @@ import {
   isAnswerCorrect,
   calculateAcademicReadingBand,
   calculateListeningBand,
-  gradeExamAnswers
+  gradeExamAnswers,
+  calculatePartialCreditScore,
+  calculatePartialCreditFromCounts
 } from '../services/answerScoring';
 import { ExamData } from '../types';
+import { PracticeOption } from '../types/practice';
 
 describe('answerScoring.ts - Unit Tests', () => {
   describe('1. normalizeAnswer()', () => {
@@ -290,6 +293,74 @@ describe('answerScoring.ts - Unit Tests', () => {
       expect(summary.reading_max).toBe(1);
       expect(summary.reading_band).toBeGreaterThan(0);
       expect(summary.results['r1'].is_correct).toBe(true);
+    });
+  });
+
+  describe('6. calculatePartialCreditScore() - Multiple-Response Scoring with Guessing Penalty', () => {
+    const testOptions: PracticeOption[] = [
+      { id: 'opt-a', text: 'Verb form', isCorrect: true, distractorRationale: 'Valid verb' },
+      { id: 'opt-b', text: 'Adjective form', isCorrect: true, distractorRationale: 'Valid adjective' },
+      { id: 'opt-c', text: 'Noun form', isCorrect: false, distractorRationale: 'Trap noun' },
+      { id: 'opt-d', text: 'Adverb form', isCorrect: false, distractorRationale: 'Trap adverb' }
+    ];
+
+    it('should award 100% (MaxPoints) when all correct and zero incorrect options are selected', () => {
+      const res = calculatePartialCreditScore(['opt-a', 'opt-b'], testOptions, 1.0);
+      expect(res.score).toBe(1.0);
+      expect(res.cSelected).toBe(2);
+      expect(res.cTotal).toBe(2);
+      expect(res.iSelected).toBe(0);
+      expect(res.iTotal).toBe(2);
+      expect(res.isFullyCorrect).toBe(true);
+      expect(res.isPartial).toBe(false);
+    });
+
+    it('should award partial credit when 1 of 2 correct and 0 incorrect options are selected (0.5 maxPoints)', () => {
+      const res = calculatePartialCreditScore(['opt-a'], testOptions, 1.0);
+      // (1 / 2) - (0 / 2) = 0.5
+      expect(res.score).toBe(0.5);
+      expect(res.cSelected).toBe(1);
+      expect(res.cTotal).toBe(2);
+      expect(res.iSelected).toBe(0);
+      expect(res.isFullyCorrect).toBe(false);
+      expect(res.isPartial).toBe(true);
+    });
+
+    it('should award 0 points when a student blindly selects ALL options (Guessing Penalty)', () => {
+      // C_sel = 2, C_tot = 2 => 1.0
+      // I_sel = 2, I_tot = 2 => 1.0
+      // 1.0 - 1.0 = 0.0!
+      const res = calculatePartialCreditScore(['opt-a', 'opt-b', 'opt-c', 'opt-d'], testOptions, 1.0);
+      expect(res.score).toBe(0.0);
+      expect(res.isFullyCorrect).toBe(false);
+      expect(res.isPartial).toBe(false);
+    });
+
+    it('should clamp score to 0 when incorrect ratio exceeds correct ratio', () => {
+      // 1 correct out of 2 (0.5), 2 incorrect out of 2 (1.0) => 0.5 - 1.0 = -0.5 => clamped to 0
+      const res = calculatePartialCreditScore(['opt-a', 'opt-c', 'opt-d'], testOptions, 1.0);
+      expect(res.score).toBe(0.0);
+    });
+
+    it('should return 0 when only incorrect options are chosen', () => {
+      const res = calculatePartialCreditScore(['opt-c'], testOptions, 1.0);
+      expect(res.score).toBe(0.0);
+      expect(res.cSelected).toBe(0);
+      expect(res.iSelected).toBe(1);
+    });
+
+    it('should scale appropriately with custom MaxPoints parameter', () => {
+      const res = calculatePartialCreditScore(['opt-a'], testOptions, 4.0);
+      // (1/2 - 0) * 4.0 = 2.0
+      expect(res.score).toBe(2.0);
+      expect(res.maxPoints).toBe(4.0);
+    });
+
+    it('calculatePartialCreditFromCounts evaluates correctly', () => {
+      expect(calculatePartialCreditFromCounts(2, 2, 0, 2, 10)).toBe(10);
+      expect(calculatePartialCreditFromCounts(1, 2, 0, 2, 10)).toBe(5);
+      expect(calculatePartialCreditFromCounts(2, 2, 2, 2, 10)).toBe(0);
+      expect(calculatePartialCreditFromCounts(0, 2, 1, 2, 10)).toBe(0);
     });
   });
 });

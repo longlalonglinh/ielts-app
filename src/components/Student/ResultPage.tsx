@@ -112,23 +112,33 @@ export const ResultPage: React.FC<ResultPageProps> = ({
   };
 
   const handleEmergencyExport = () => {
+    const cleanSbd = (result.sbd || 'CANDIDATE').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+    const cleanCode = (result.exam_code || 'EXAM').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `${cleanSbd}_${cleanCode}.json`;
+
     const exportData = {
       submission_id: result.submission_id,
       sbd: result.sbd,
       exam_code: result.exam_code,
+      test_mode: testMode,
       submitted_at: result.submitted_at || new Date().toISOString(),
       sealed_token: result.sealed_token,
       offline_receipt_code: result.offline_receipt_code,
       sync_status: result.sync_status || (isOffline ? 'QUEUED_OFFLINE' : 'CERTIFIED_ONLINE'),
       listening_raw_score: result.listening_raw_score,
+      listening_max_score: result.listening_max_score,
       listening_band: result.listening_band,
       reading_raw_score: result.reading_raw_score,
+      reading_max_score: result.reading_max_score,
       reading_band: result.reading_band,
       overall_band: result.overall_band,
-      writing_status: result.writing_status,
+      writing_status: result.writing_status || 'PENDING_TEACHER',
+      writing_task1_text: writingTask1,
+      writing_task2_text: writingTask2,
+      listening_answers: userAnswers,
+      reading_answers: userAnswers,
       user_answers: userAnswers,
-      writing_task1: writingTask1,
-      writing_task2: writingTask2,
+      answers: userAnswers,
       detailed_results: result.detailed_results
     };
 
@@ -136,8 +146,10 @@ export const ResultPage: React.FC<ResultPageProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `IELTS_OFFICIAL_RESULT_${result.exam_code}_${result.sbd}.json`;
+    a.download = fileName;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
@@ -278,13 +290,34 @@ export const ResultPage: React.FC<ResultPageProps> = ({
             <button
               type="button"
               onClick={handleEmergencyExport}
-              className="px-4 py-2.5 bg-white hover:bg-purple-50 text-[#3C2A63] border border-purple-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+              className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-md shadow-emerald-700/20 cursor-pointer"
               title="Download JSON file containing all responses and scores"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export Result (.json)</span>
+              <Download className="w-4 h-4" />
+              <span>TẢI MÃ NỘP BÀI DỰ PHÒNG (.JSON)</span>
             </button>
           </div>
+        </div>
+
+        {/* Dedicated Emergency Rescue Box */}
+        <div className="p-4 bg-emerald-50/90 border border-emerald-300/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="space-y-0.5">
+            <span className="font-extrabold text-emerald-950 flex items-center gap-1.5 text-xs">
+              <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>PHƯƠNG ÁN CỨU HỘ NỘP BÀI DÀNH CHO HỌC SINH (EMERGENCY BACKUP .JSON)</span>
+            </span>
+            <p className="text-emerald-900 leading-relaxed text-[11px]">
+              Nếu mạng chập chờn hoặc không thấy điểm trên bảng điểm chung, học sinh chỉ cần bấm nút tải tệp <strong>.JSON</strong> về máy và gửi qua Zalo / Email cho giáo viên. Giáo viên có thể nạp file trực tiếp vào trang Admin để khôi phục 100% bài làm.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleEmergencyExport}
+            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shrink-0"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Lưu file .JSON</span>
+          </button>
         </div>
 
         <div className="bg-white/80 border border-purple-100 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">

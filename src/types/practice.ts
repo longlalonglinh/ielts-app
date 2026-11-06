@@ -1,3 +1,38 @@
+export type PracticeQuestionType = 
+  | 'multiple-choice'      // Chọn 1 đáp án
+  | 'multiple-response'    // Chọn nhiều phương án đúng
+  | 'true-false-not-given' // Dạng Đúng / Sai / Không có trong bài
+  | 'category-matching';   // Phân loại / Nối nhóm từ loại
+
+export interface PracticeOption {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+  distractorRationale?: string; // Giải thích chi tiết tại sao đúng hoặc tại sao bẫy sai
+  category?: string; // For category-matching
+}
+
+export interface PracticeCardItem {
+  id: string;
+  type: PracticeQuestionType;
+  cognitiveLevel: 'remembering' | 'understanding' | 'applying' | 'analyzing'; // 4 cấp độ nhận thức
+  learningOutcomeId: string; // Chuẩn đầu ra bài học
+  promptPrefix: string;      // Lệnh hỏi đầu
+  stimulusText: string;      // Văn bản kích thích / Câu bài tập có ngữ cảnh
+  promptSuffix?: string;     // Lệnh hỏi chốt lại
+  options: PracticeOption[];
+  minSelections?: number;    // Giới hạn chọn tối thiểu (cho multiple-response)
+  maxSelections?: number;    // Giới hạn chọn tối đa
+  itemDifficulty?: number;   // Tham số độ khó b (Item Response Theory)
+  itemDiscrimination?: number; // Tham số độ phân biệt a
+  categories?: Array<{ id: string; name: string }>; // For category-matching
+  targetWord?: string;
+  partOfSpeech?: string;
+  explanation?: string;
+  grammarPoints?: string[];
+  hints?: string;
+}
+
 export interface PracticeCard {
   id: string;
   sentence_en: string; // The complete English sentence or cloze prompt e.g. "We need to analyze the comprehensive _____ of this environmental policy."
@@ -12,6 +47,17 @@ export interface PracticeCard {
   grammar_points?: string[]; // Bullet points e.g. ["Collocation: comprehensive impact", "Preposition: impact on"]
   options?: string[]; // Optional 4 multiple choice options for beginners
   difficulty?: 'easy' | 'medium' | 'hard';
+
+  // Extended properties for multi-format PracticeCardItem integration
+  item?: PracticeCardItem;
+  type?: PracticeQuestionType;
+  options_data?: PracticeOption[];
+  cognitive_level?: 'remembering' | 'understanding' | 'applying' | 'analyzing';
+  learning_outcome_id?: string;
+  prompt_prefix?: string;
+  prompt_suffix?: string;
+  min_selections?: number;
+  max_selections?: number;
 }
 
 export interface CustomPracticeDeck {

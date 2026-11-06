@@ -1,0 +1,697 @@
+```python
+with zipfile.ZipFile('longlalonglinh/ielts-app', 'r') as z:
+    api_ts = z.read('ielts-app-bff2f27c8b559763793f33628941c7c14c130659/src/services/api.ts').decode('utf-8', errors='ignore')
+
+# Check how apiUrl or gasUrl is handled in submitExamPayload
+idx = api_ts.find('submitExamPayload')
+print(api_ts[idx+1800:idx+4500])
+
+
+```
+
+```text
+Traceback (most recent call last):
+  File "<xbox-string>", line 1, in <module>
+    with zipfile.ZipFile('longlalonglinh/ielts-app', 'r') as z:
+NameError: name 'zipfile' is not defined
+
+
+```
+
+```python
+import zipfile
+
+with zipfile.ZipFile('longlalonglinh/ielts-app', 'r') as z:
+    api_ts = z.read('ielts-app-bff2f27c8b559763793f33628941c7c14c130659/src/services/api.ts').decode('utf-8', errors='ignore')
+
+idx = api_ts.find('submitExamPayload')
+print(api_ts[idx+1500:idx+4000])
+
+
+```
+
+```text
+atedGrading = gradeExamAnswers(examData || defaultExamFallback, userAnswers);
+    return {
+      success: true,
+      submission_id: submissionId,
+      sbd: payload.sbd || 'PREVIEW_TEACHER',
+      exam_code: payload.exam_code || 'PREVIEW',
+      submission_type: submissionType,
+      listening_raw_score: simulatedGrading.listening_raw,
+      listening_max_score: simulatedGrading.listening_max,
+      listening_band: simulatedGrading.listening_band,
+      reading_raw_score: simulatedGrading.reading_raw,
+      reading_max_score: simulatedGrading.reading_max,
+      reading_band: simulatedGrading.reading_band,
+      overall_band: simulatedGrading.listening_band && simulatedGrading.reading_band
+        ? Math.round(((simulatedGrading.listening_band + simulatedGrading.reading_band) / 2) * 2) / 2
+        : simulatedGrading.reading_band || simulatedGrading.listening_band || 0,
+      detailed_results: simulatedGrading.results as any,
+      writing_status: 'PENDING_TEACHER',
+      submitted_at: timestamp,
+      is_offline_pending: false,
+      message: 'Preview simulation completed in RAM sandbox.'
+    };
+  }
+
+  // 0. Attempt Authoritative Server-Side Grading & Certified Submission first
+  try {
+    const serverGradeRes = await fetch(getApiUrl('/api/submissions/grade-and-submit'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...payload,
+        answers: userAnswers,
+        submission_id: submissionId,
+        submission_type: submissionType,
+        sealed_token: sealedToken,
+        offline_receipt_code: receiptCode,
+        expected_answers_hash: answersChecksum
+      })
+    });
+    if (serverGradeRes.ok) {
+      const serverData = await serverGradeRes.json();
+      if (serverData.success && serverData.submission) {
+        const sub = serverData.submission;
+        
+        // Save authoritative submission to IndexedDB and LocalStorage
+        await saveSubmissionToIndexedDB({
+          ...sub,
+          is_offline_pending: false,
+          is_server_certified: true,
+          sync_status: 'CERTIFIED_ONLINE',
+          sealed_token: sub.sealed_token || sealedToken,
+          offline_receipt_code: sub.offline_receipt_code || receiptCode
+        });
+
+        await removePendingSubmissionFromIndexedDB(sub.submission_id);
+
+        try {
+          const existing = localStorage.getItem('ielts_student_submissions');
+          const subsArr: SubmissionRecord[] = existing ? JSON.parse(existing) : [];
+
+
+
+```
+
+```python
+idx2 = api_ts.find('// 1. Direct Gas Submission')
+if idx2 == -1:
+    idx2 = api_ts.find('catch')
+    print("Next catch block:")
+    print(api_ts[idx+3500:idx+6500])
+else:
+    print(api_ts[idx2:idx2+2000])
+
+
+```
+
+```text
+Next catch block:
+   is_offline_pending: false,
+          is_server_certified: true,
+          sync_status: 'CERTIFIED_ONLINE',
+          sealed_token: sub.sealed_token || sealedToken,
+          offline_receipt_code: sub.offline_receipt_code || receiptCode
+        });
+
+        await removePendingSubmissionFromIndexedDB(sub.submission_id);
+
+        try {
+          const existing = localStorage.getItem('ielts_student_submissions');
+          const subsArr: SubmissionRecord[] = existing ? JSON.parse(existing) : [];
+          if (!subsArr.some(s => s.submission_id === sub.submission_id)) {
+            subsArr.unshift(sub);
+          }
+          localStorage.setItem('ielts_student_submissions', JSON.stringify(deduplicateSubmissions(subsArr)));
+        } catch (e) {}
+
+        return {
+          success: true,
+          submission_id: sub.submission_id,
+          sbd: sub.sbd,
+          exam_code: sub.exam_code,
+          submission_type: sub.submission_type,
+          listening_raw_score: sub.listening_raw_score,
+          listening_max_score: sub.listening_max_score,
+          listening_band: sub.listening_band,
+          reading_raw_score: sub.reading_raw_score,
+          reading_max_score: sub.reading_max_score,
+          reading_band: sub.reading_band,
+          overall_band: sub.overall_band,
+          detailed_results: sub.detailed_results,
+          writing_status: sub.writing_status || 'PENDING_TEACHER',
+          submitted_at: sub.submitted_at,
+          is_offline_pending: false,
+          is_server_certified: true,
+          sync_status: 'CERTIFIED_ONLINE',
+          sealed_token: sub.sealed_token || sealedToken,
+          offline_receipt_code: sub.offline_receipt_code || receiptCode,
+          message: submissionType === 'TIMEOUT_FORCED' 
+            ? 'Exam automatically submitted and certified by server due to session timeout.'
+            : 'Exam officially submitted and graded authoritatively by server.'
+        };
+      }
+    }
+  } catch (serverErr) {
+    console.warn('[Server Authoritative Scoring unavailable, continuing with local vault]:', serverErr);
+  }
+
+  let listeningRaw = 0;
+  let readingRaw = 0;
+  let listeningMax = 0;
+  let readingMax = 0;
+  let listeningBand = 0;
+  let readingBand = 0;
+  let detailedResults: Record<string, any> | undefined = undefined;
+
+  // Grade using Answer Normalization Engine if examData is available
+  if (examData) {
+    const grading = gradeExamAnswers(examData, userAnswers);
+    listeningRaw = grading.listening_raw;
+    readingRaw = grading.reading_raw;
+    listeningMax = grading.listening_max;
+    readingMax = grading.reading_max;
+    listeningBand = grading.listening_band;
+    readingBand = grading.reading_band;
+    detailedResults = grading.results;
+  } else {
+    // Count filled answers as reasonable fallback
+    Object.keys(payload.listening_answers || {}).forEach(k => {
+      if (payload.listening_answers && payload.listening_answers[k] && payload.listening_answers[k].trim() !== '') {
+        listeningRaw += 1;
+
+
+
+```
+
+```python
+print(api_ts[idx+6500:idx+9500])
+
+
+```
+
+```text
+      }
+    });
+    Object.keys(payload.reading_answers || {}).forEach(k => {
+      if (payload.reading_answers && payload.reading_answers[k] && payload.reading_answers[k].trim() !== '') {
+        readingRaw += 1;
+      }
+    });
+    listeningMax = examData?.listening_questions?.length ?? 40;
+    readingMax = examData?.reading_questions?.length ?? 40;
+    listeningBand = Math.min(9, Math.max(1, Math.round((listeningRaw / 3) * 2) / 2 || 4.5));
+    readingBand = Math.min(9, Math.max(1, Math.round((readingRaw / 3) * 2) / 2 || 4.5));
+  }
+
+  // Calculate overall estimated band for completed receptive skills
+  let overallBand: number | undefined = undefined;
+  if (listeningMax > 0 && readingMax > 0) {
+    overallBand = Math.round(((listeningBand + readingBand) / 2) * 2) / 2;
+  } else if (readingMax > 0) {
+    overallBand = readingBand;
+  } else if (listeningMax > 0) {
+    overallBand = listeningBand;
+  }
+
+  const isRetake = Boolean(payload.retakeMode || examData?.retakeMode || (examData?.exam_type === 'one_skill' && examData?.skills?.length === 1));
+  const retakeSkill = payload.targetSkill || examData?.targetSkill || (examData?.skills?.length === 1 ? examData.skills[0] : undefined);
+
+  // If this is a Writing One-Skill Retake session, skipped receptive skills are excluded from scoring
+  if (isRetake && retakeSkill === 'writing') {
+    listeningRaw = 0;
+    readingRaw = 0;
+    listeningMax = 0;
+    readingMax = 0;
+    listeningBand = 0;
+    readingBand = 0;
+    detailedResults = {};
+    overallBand = undefined;
+  } else if (isRetake && retakeSkill === 'listening') {
+    readingRaw = 0;
+    readingMax = 0;
+    readingBand = 0;
+    overallBand = listeningBand;
+  } else if (isRetake && retakeSkill === 'reading') {
+    listeningRaw = 0;
+    listeningMax = 0;
+    listeningBand = 0;
+    overallBand = readingBand;
+  }
+
+  const responseObj: SubmissionResponse = {
+    success: true,
+    submission_id: submissionId,
+    sbd: payload.sbd,
+    exam_code: payload.exam_code,
+    test_mode: payload.test_mode,
+    retakeMode: isRetake,
+    targetSkill: retakeSkill,
+    submission_type: submissionType,
+    listening_raw_score: listeningRaw,
+    listening_max_score: listeningMax,
+    listening_band: listeningBand,
+    reading_raw_score: readingRaw,
+    reading_max_score: readingMax,
+    reading_band: readingBand,
+    overall_band: overallBand,
+    detailed_results: detailedResults,
+    writing_status: 'PENDING_TEACHER',
+    submitted_at: timestamp,
+    is_offline_pending: true,
+    is_server_certified: false,
+    sync_status: 'QUEUED_OFFLINE',
+    sealed_token: sealedToken,
+    offline_receipt_code: receiptCode,
+    message: submissionType === 'TIMEOUT_FORCED' 
+      ? 'Exam automatically and securely sealed offline into IndexedDB (Time expired). Awaiting reconnection to obtain server certificate.'
+      : 'Exam has been securely sealed offline into IndexedDB. Awaiting network reconnection to auto-sync.'
+  };
+
+  const record: SubmissionRecord = {
+    submission_id: subm
+
+
+```
+
+```python
+print(api_ts[idx+9500:idx+13000])
+
+
+```
+
+```text
+issionId,
+    sbd: payload.sbd,
+    exam_code: payload.exam_code,
+    test_mode: payload.test_mode,
+    retakeMode: isRetake,
+    targetSkill: retakeSkill,
+    submission_type: submissionType,
+    listening_answers: payload.listening_answers || userAnswers,
+    reading_answers: payload.reading_answers || userAnswers,
+    writing_task1_text: payload.writing_task1_text || payload.writing_task1,
+    writing_task2_text: payload.writing_task2_text || payload.writing_task2,
+    listening_raw_score: listeningRaw,
+    listening_max_score: listeningMax,
+    listening_band: listeningBand,
+    reading_raw_score: readingRaw,
+    reading_max_score: readingMax,
+    reading_band: readingBand,
+    overall_band: overallBand,
+    detailed_results: detailedResults,
+    writing_status: 'PENDING_TEACHER',
+    submitted_at: timestamp,
+    violations_count: payload.violations_count,
+    cumulative_off_screen_seconds: payload.cumulative_off_screen_seconds,
+    switch_count: payload.switch_count,
+    is_offline_pending: true,
+    is_server_certified: false,
+    sync_status: 'QUEUED_OFFLINE',
+    sealed_token: sealedToken,
+    offline_receipt_code: receiptCode
+  };
+
+  // 1. Immediate persistence to IndexedDB
+  await saveSubmissionToIndexedDB(record);
+
+  // 1.5. Queue to IndexedDB Background Sync Queue
+  await savePendingSubmissionToIndexedDB({
+    ...payload,
+    submission_id: submissionId,
+    submission_type: submissionType,
+    answers: userAnswers,
+    sealed_token: sealedToken,
+    offline_receipt_code: receiptCode,
+    is_offline_pending: true,
+    submitted_at: timestamp
+  });
+
+  // 2. Persistence to LocalStorage
+  try {
+    const existing = localStorage.getItem('ielts_student_submissions');
+    const subsArr: SubmissionRecord[] = existing ? JSON.parse(existing) : [];
+    if (!subsArr.some(s => s.submission_id === record.submission_id)) {
+      subsArr.unshift(record);
+    }
+    localStorage.setItem('ielts_student_submissions', JSON.stringify(deduplicateSubmissions(subsArr)));
+  } catch (e) {
+    console.warn('LocalStorage save failed, IndexedDB preserved:', e);
+  }
+
+  // 2.5. Centralized Server Database Submission Sync (/api/submissions)
+  try {
+    fetch(getApiUrl('/api/submissions'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record)
+    }).catch(e => console.warn('Server submission push failed:', e));
+  } catch (err) {}
+
+  // If cheat logs present in payload, persist to IndexedDB & Server DB
+  const rawLogs = (payload.violation_logs || payload.cheat_logs || []) as CheatLog[];
+  if (Array.isArray(rawLogs) && rawLogs.length > 0) {
+    rawLogs.forEach(log => {
+      saveCheatLogToIndexedDB(log).catch(() => {});
+      fetch(getApiUrl('/api/cheat-logs'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(log)
+      }).catch(() => {});
+    });
+  }
+
+  if (!apiUrl || apiUrl.includes('mock_ielts_exam_system_gas_url') || apiUrl.includes('AKfycbx_mock')) {
+    return responseObj;
+  }
+
+  // 3. Send to Google Apps Script with exponential backoff retry
+  try {
+    const postData = {
+      action: 'submitExam',
+      ...payload,
+      submission_id: submissionId,
+      submission_type: submissionType,
+      listening_raw_score: listeningRaw,
+      reading_raw_score: readingRaw,
+      listening_band: listeningBand,
+      reading_band: readingBand,
+      submitted_at: timestamp
+    };
+
+    const serverRes = await postToGasWithLockRetry(apiUrl, p
+
+
+```
+
+```python
+idx_gas = api_ts.find('postToGasWithLockRetry')
+print(api_ts[idx_gas:idx_gas+1500])
+
+
+```
+
+```text
+postToGasWithLockRetry(
+  apiUrl: string, 
+  payload: any, 
+  maxRetries: number = 3
+): Promise<any> {
+  // Isolated sandbox preview: do not send any network request to Google Sheets
+  if (payload && (payload.isPreview || payload.is_preview)) {
+    console.log('[Isolated Sandbox Preview] Bypassing Google Sheets Webhook delivery.');
+    return { status: 'success', message: 'Preview sandboxed: no network request sent to Google Sheets.' };
+  }
+
+  const retryDelays = [2000, 4000, 8000];
+  const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutMs = 25000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      // Attempt 1: Standard fetch with text/plain (avoids CORS preflight OPTIONS request)
+      let res: Response;
+      let usedNoCors = false;
+
+      try {
+        res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: payloadString,
+          redirect: 'follow',
+          signal: controller.signal
+        });
+      } catch (fetchErr: any) {
+        // GAS doPost returns a 302 redirect. If browser blocks the redirect due to CORS,
+        // fallback to mode: 'no-cors' to guarantee delivery to Google Sheets without failing!
+        console.warn(`[GAS CORS/Redirect Handshake Notice]: Attempting opaque deliver
+
+
+```
+
+```python
+print(api_ts[idx_gas+1500:idx_gas+3000])
+
+
+```
+
+```text
+y via mode: 'no-cors'`, fetchErr?.message);
+        res = await fetch(apiUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: payloadString,
+          signal: controller.signal
+        });
+        usedNoCors = true;
+      }
+      clearTimeout(timeoutId);
+
+      // In no-cors mode, type is 'opaque' and status is 0 (browser doesn't expose headers),
+      // but Google Apps Script receives and persists the POST data perfectly!
+      if (usedNoCors || res.type === 'opaque') {
+        console.log(`[GAS Submission Handshake] Payload successfully delivered via opaque channel.`);
+        return { 
+          status: 'success', 
+          message: 'Submission successfully received by Google Apps Script (no-cors mode).',
+          is_opaque: true 
+        };
+      }
+
+      if (!res.ok && res.status !== 302) {
+        throw new Error(`GAS HTTP error ${res.status}`);
+      }
+
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        // If GAS redirected to HTML or plain text, consider delivered
+        data = { status: 'success', raw: text };
+      }
+
+      // Check if GAS returned a concurrency lock error or busy state
+      if (data && (data.status === 'ERROR' || data.status === 'error')) {
+        const errorMsg = data.message || 'Concurrent write lock busy in Google Sheets';
+        console.warn(`[GAS Concurren
+
+
+```
+
+```python
+idx_gau = api_ts.find('function getApiUrl')
+print(api_ts[idx_gau:idx_gau+600])
+
+
+```
+
+```text
+
+
+
+```
+
+```python
+for line in api_ts.split('\n'):
+    if 'getApiUrl' in line:
+        print(line)
+
+
+```
+
+```text
+export const getApiUrl = (path: string): string => {
+    const serverRes = await fetch(getApiUrl('/api/submissions'));
+    const sRes = await fetch(getApiUrl('/api/cheat-logs'));
+    const serverRes = await fetch(getApiUrl('/api/submissions/grade-writing'), {
+    const serverGradeRes = await fetch(getApiUrl('/api/submissions/grade-and-submit'), {
+    fetch(getApiUrl('/api/submissions'), {
+      fetch(getApiUrl('/api/cheat-logs'), {
+      let serverRes = await fetch(getApiUrl('/api/submit'), {
+        serverRes = await fetch(getApiUrl('/api/submissions/grade-and-submit'), {
+    const res = await fetch(getApiUrl('/api/exams'), {
+    const res = await fetch(getApiUrl('/api/config'));
+    const res = await fetch(getApiUrl('/api/upload-image'), {
+    const res = await fetch(getApiUrl('/api/config'), {
+    const res = await fetch(getApiUrl('/api/sync-sheet'), {
+    const res = await fetch(getApiUrl('/api/admin/apps-script-webhook'));
+    const res = await fetch(getApiUrl('/api/admin/flush-submissions-queue'), { method: 'POST' });
+    const res = await fetch(getApiUrl('/api/sync/pull-from-gas'), {
+    const res = await fetch(getApiUrl(`/api/exams/${encodeURIComponent(cleanCode)}`), {
+    const res = await fetch(getApiUrl('/api/admin/seed-starter'), {
+  const response = await fetch(getApiUrl('/api/admin/parse-pdf'), {
+    const res = await fetch(getApiUrl('/api/admin/submissions/stats'));
+  const url = getApiUrl(`/api/admin/submissions/export?${query.toString()}`);
+  const url = getApiUrl(`/api/admin/submissions/export?${query.toString()}`);
+    const res = await fetch(getApiUrl('/api/admin/submissions/import'), {
+    const res = await fetch(getApiUrl('/api/admin/submissions/sync-to-sheets'), {
+    const res = await fetch(getApiUrl(`/api/admin/submissions/${encodeURIComponent(submissionId)}`), {
+
+
+```
+
+```python
+idx = api_ts.find('export const getApiUrl')
+print(api_ts[idx:idx+500])
+
+
+```
+
+```text
+export const getApiUrl = (path: string): string => {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return API_BASE_URL ? `${API_BASE_URL}${cleanPath}` : cleanPath;
+};
+
+/**
+ * Check connection status to internet and Google Apps Script API endpoint
+ */
+export async function checkConnection(apiUrl: string = DEFAULT_API_URL): Promise<{
+  isOnline: boolean;
+  isGasReachable: boolean;
+  latencyMs?: number;
+  message: string;
+}> {
+  const isOnline = typeof navigator !== 'undefined' ? 
+
+
+```
+
+```python
+for line in api_ts.split('\n')[:50]:
+    print(line)
+
+
+```
+
+```text
+import { 
+  SubmissionRecord, 
+  CheatLog, 
+  GradingForm, 
+  SubmissionPayload, 
+  SubmissionResponse, 
+  ExamData,
+  ReadingPassageItem,
+  Question
+} from '../types';
+import { extractQuestionsFromRawResponse } from './dbDiagnostics';
+import { CustomPracticeDeck, StudentProgressRecord } from '../types/practice';
+import { 
+  saveExamToIndexedDB, 
+  getExamFromIndexedDB, 
+  getAllExamsFromIndexedDB,
+  deleteExamFromIndexedDB,
+  saveSubmissionToIndexedDB, 
+  getAllSubmissionsFromIndexedDB, 
+  savePendingSubmissionToIndexedDB,
+  getPendingSubmissionsFromIndexedDB,
+  removePendingSubmissionFromIndexedDB,
+  saveCheatLogToIndexedDB, 
+  getAllCheatLogsFromIndexedDB,
+  savePracticeDecksToIndexedDB,
+  getPracticeDecksFromIndexedDB
+} from './indexedDb';
+import { gradeExamAnswers, computeAnswersChecksum } from './answerScoring';
+import { DEFAULT_EXAMS } from '../data/defaultExams';
+import { 
+  fetchExamViaGviz, 
+  getStoredSpreadsheetId, 
+  setStoredSpreadsheetId, 
+  extractSpreadsheetId, 
+  testGvizConnection 
+} from './gvizService';
+
+export { 
+  fetchExamViaGviz, 
+  getStoredSpreadsheetId, 
+  setStoredSpreadsheetId, 
+  extractSpreadsheetId, 
+  testGvizConnection
+};
+
+export const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbySNk5foVr4UMC5ZVP1YTlxjxT9qFgdI85cH5nyQ63ffqXdYVZ7SJKbmD0B3xNO3DEe/exec";
+
+/**
+ * Dual Deployment Architecture Support:
+ * When frontend is statically hosted (GitHub Pages, Vercel), backend Express server
+
+
+```
+
+CÓ. VỚI QUY MÔ DƯỚI 5 HỌC SINH CHO BÀI TẬP HỌC PHẦN, GIẢI PHÁP TỐI ƯU NHẤT LÀ LOẠI BỎ HOÀN TOÀN TƯ DUY MÁY CHỦ RIÊNG, SỬ DỤNG MÔ HÌNH **CLIENT-SIDE TĨNH TRÊN GITHUB PAGES** KẾT HỢP VỚI **1 WEBHOOK GOOGLE APPS SCRIPT DUY NHẤT** VÀ BẬT DỰ PHÒNG BẰNG **XUẤT TỆP JSON CỨU HỘ TRỰC TIẾP TRÊN TRÌNH DUYỆT**.
+
+---
+
+### LUẬN ĐIỂM VÀ BẰNG CHỨNG KỸ THUẬT
+
+**1. HỆ THỐNG KHÔNG HỎNG VÌ QUÁ TẢI MÀ HỎNG VÌ CODE GỌI MÁY CHỦ ẢO**
+
+* **BẰNG CHỨNG**: Quy mô dưới 5 thí sinh không thể làm nghẽn hạn ngạch 30 tiến trình đồng thời của **GOOGLE APPS SCRIPT** hay giới hạn 10 triệu ô của **GOOGLE SHEETS**. Trong tệp `src/services/api.ts`, hàm nộp bài đang cố gắng gửi dữ liệu đến `/api/submissions/grade-and-submit` và `/api/submissions`. Trên **GITHUB PAGES**, hai đường dẫn nội bộ này hoàn toàn không tồn tại, khiến trình duyệt rơi vào trạng thái chờ phản hồi mạng (**NETWORK TIMEOUT**) từ 15 đến 25 giây. Học sinh thấy màn hình đếm lùi hết giờ hoặc giao diện bị treo nên chủ động tắt tab, dẫn đến việc mất trắng dữ liệu bài thi đang lưu tạm trên bộ nhớ **RAM**.
+
+
+
+**2. LỖI PHÂN QUYỀN TRÊN GOOGLE APPS SCRIPT KHIẾN YÊU CẦU MẠNG BỊ CHẶN ÂM THẦM**
+
+* **BẰNG CHỨNG**: Khi trình duyệt gửi yêu cầu `POST` dạng chuỗi ký tự sang đường dẫn Web App của Google, máy chủ Google sẽ chuyển hướng mã **HTTP 302**. Nếu bản triển khai Apps Script không được cấp quyền cho **BẤT KỲ AI (ANYONE)**, trình duyệt của học sinh sẽ nhận mã lỗi **CORS** hoặc yêu cầu đăng nhập tài khoản sở hữu kịch bản. Client lúc này tự động rơi vào cơ chế `mode: 'no-cors'` mù (opaque), thông báo trên màn hình là đã gửi nhưng thực tế Google Sheets chưa bao giờ ghi nhận dòng mới.
+
+
+
+**3. KHẢ NĂNG TỰ CHẤM ĐIỂM ĐÃ NẰM SẴN Ở PHÍA CLIENT**
+
+* **BẰNG CHỨNG**: Trong mã nguồn `src/services/api.ts`, hàm `gradeExamAnswers` kết hợp với thuật toán tính band điểm đã được đóng gói hoàn chỉnh bằng JavaScript chạy ngay trên trình duyệt. Không cần bất kỳ backend Node/Bun nào để tính điểm trắc nghiệm Listening và Reading.
+
+
+
+---
+
+### QUY TRÌNH TỐI ƯU HÓA RÚT GỌN CHO BÀI TẬP HỌC PHẦN
+
+**BƯỚC 1: CẮT BỎ CÁC TIẾN TRÌNH GỌI SERVER ẢO TRONG `src/services/api.ts**`
+
+1. Mở file `src/services/api.ts`.
+
+
+2. Trong hàm `submitExamPayload`, xóa bỏ hoặc vô hiệu hóa toàn bộ khối lệnh `try...catch` gọi `fetch(getApiUrl('/api/submissions/grade-and-submit'))`.
+
+
+3. Xóa bỏ dòng gọi ngầm `fetch(getApiUrl('/api/submissions'))`.
+
+
+4. Cho luồng xử lý chạy thẳng từ việc tính điểm bằng `gradeExamAnswers` sang bước lưu vào **INDEXEDDB** và gửi thẳng tới `postToGasWithLockRetry(apiUrl, postData)`.
+
+
+
+**BƯỚC 2: CẤP QUYỀN CHUẨN XÁC CHO GOOGLE APPS SCRIPT WEB APP**
+
+1. Mở Google Sheet chứa bài thi, vào **EXTENSIONS** > **APPS SCRIPT**.
+2. Bấm nút **DEPLOY** (Triển khai) > **MANAGE DEPLOYMENTS** (Quản lý bản triển khai).
+3. Bấm vào biểu tượng cây bút chỉnh sửa phiên bản hiện tại:
+* **EXECUTE AS**: Chọn **ME (TÔI)**.
+* **WHO HAS ACCESS**: Bắt buộc chọn **ANYONE (BẤT KỲ AI)**. Nếu chọn "Anyone with Google account" hoặc "Only myself", học sinh làm bài không thuộc cùng tổ chức sẽ bị từ chối truy cập.
+
+
+4. Bấm **DEPLOY**, sao chép đường dẫn kết thúc bằng `/exec` và gán vào biến `DEFAULT_API_URL` trong file `src/services/api.ts`.
+
+
+
+**BƯỚC 3: KÍCH HOẠT PHƯƠNG ÁN NỘP BÀI CỨU HỘ BẰNG FILE DỰ PHÒNG**
+
+1. Tại màn hình thông báo hoàn thành bài thi (`ResultPage.tsx` hoặc `SubmissionProgressModal.tsx`), bổ sung một nút bấm cố định: **TẢI MÃ NỘP BÀI DỰ PHÒNG (.JSON)**.
+
+
+2. Nút này trích xuất trực tiếp bản ghi vừa lưu trong **INDEXEDDB** bằng hàm `saveSubmissionToIndexedDB` và đẩy ra file dạng `SBD_EXAMCODE.json`.
+
+
+3. Hướng dẫn 5 học sinh: Nếu mạng chập chờn hoặc không thấy thông báo nộp bài thành công, chỉ cần bấm nút tải tệp `.json` về máy và nộp qua kênh chat/email của lớp. Giáo viên vào giao diện Admin, dùng tính năng import dữ liệu để đọc file JSON là có đủ điểm trắc nghiệm và văn bản bài viết để chấm điểm.
+
+---
+
+COUNTER-ARGUMENT: Câu hỏi ngộ nhận rằng số lượng học sinh ít thì lỗi hệ thống sẽ tự biến mất mà không cần can thiệp mã nguồn. Kể cả khi triển khai cho 1 học sinh duy nhất, việc ứng dụng chạy trên **GITHUB PAGES** nhưng vẫn giữ mã nguồn chờ phản hồi từ máy chủ cục bộ không tồn tại (`/api/...`) hoặc phân quyền Web App của **GOOGLE APPS SCRIPT** bị giới hạn nội bộ thì tỷ lệ thất bại khi nộp bài vẫn là 100%. Bản chất vấn đề nằm ở lỗi kiến trúc định tuyến mạng (routing), không nằm ở quy mô người dùng lớn hay nhỏ.

@@ -144,9 +144,14 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
-      const items = Array.isArray(parsed) ? parsed : parsed?.submissions;
+      const items = Array.isArray(parsed) 
+        ? parsed 
+        : Array.isArray(parsed?.submissions) 
+        ? parsed.submissions 
+        : (parsed && (parsed.sbd || parsed.submission_id || parsed.user_answers) ? [parsed] : null);
+
       if (!Array.isArray(items) || items.length === 0) {
-        showToast('error', 'Invalid JSON file or missing submissions array.');
+        showToast('error', 'Invalid JSON file: missing candidate submission data.');
         return;
       }
 
