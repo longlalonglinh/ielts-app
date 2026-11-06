@@ -58,6 +58,7 @@ export interface PracticeCard {
   prompt_suffix?: string;
   min_selections?: number;
   max_selections?: number;
+  categories?: Array<{ id: string; name: string }>;
 }
 
 export interface CustomPracticeDeck {
