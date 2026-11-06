@@ -69,9 +69,18 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
 }) => {
   const currentInitial = initialExamData || BLANK_TEMPLATE;
   const [exam, setExam] = useState<ExamData>(currentInitial);
+  const [builderInitialExam, setBuilderInitialExam] = useState<ExamData>(currentInitial);
   const [activeTab, setActiveTab] = useState<'builder' | 'cbt_preview' | 'vault' | 'preview'>('builder');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [copied, setCopied] = useState(false);
+
+  // Sync if prop initialExamData changes externally
+  useEffect(() => {
+    if (initialExamData && initialExamData.exam_code !== builderInitialExam.exam_code) {
+      setExam(initialExamData);
+      setBuilderInitialExam(initialExamData);
+    }
+  }, [initialExamData?.exam_code]);
 
   // Local Exam Repository / Vault States
   const [vaultExams, setVaultExams] = useState<ExamData[]>([]);
@@ -227,6 +236,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
       updated_at: new Date().toISOString()
     };
     setExam(blank);
+    setBuilderInitialExam(blank);
     setActiveTab('builder');
   };
 
@@ -427,7 +437,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
       {/* ACTIVE TAB 1: VISUAL EXAM BUILDER (Preserve Form State via CSS hidden) */}
       <div className={activeTab === 'builder' ? 'block' : 'hidden'}>
         <VisualExamBuilder
-          initialExamData={exam}
+          initialExamData={builderInitialExam}
           onSaveExam={handleSaveExam}
           onDraftChange={(liveDraft) => setExam(liveDraft)}
           isSaving={saveStatus === 'saving'}
@@ -649,6 +659,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
                         type="button"
                         onClick={() => {
                           setExam(vExam);
+                          setBuilderInitialExam(vExam);
                           setActiveTab('builder');
                         }}
                         className="flex-1 py-1.5 px-3 bg-[#6B51A5] hover:bg-[#583F8F] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"

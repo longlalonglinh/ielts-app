@@ -109,6 +109,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
 
   // Sync and skill preservation refs
   const lastExternalCodeRef = useRef<string>(initialExamData.exam_code);
+  const lastEmittedCodeRef = useRef<string>('');
   const skillStashRef = useRef<{
     passages?: any[];
     listening_questions?: any[];
@@ -288,7 +289,12 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
 
   // Synchronize when parent passes a different exam (e.g. from local exam vault or server)
   useEffect(() => {
-    if (initialExamData && initialExamData.exam_code && initialExamData.exam_code !== lastExternalCodeRef.current) {
+    if (
+      initialExamData &&
+      initialExamData.exam_code &&
+      initialExamData.exam_code !== lastExternalCodeRef.current &&
+      initialExamData.exam_code.trim().toUpperCase() !== lastEmittedCodeRef.current
+    ) {
       lastExternalCodeRef.current = initialExamData.exam_code;
       reset(formatInitialData(initialExamData));
     }
@@ -825,6 +831,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     const timer = setTimeout(() => {
       const formData = getValues();
       if (formData.exam_code && formData.exam_code.trim().length >= 1) {
+        lastEmittedCodeRef.current = formData.exam_code.trim().toUpperCase();
         const liveExam = buildExamFromForm(formData, 'draft');
         onDraftChange(liveExam);
       }

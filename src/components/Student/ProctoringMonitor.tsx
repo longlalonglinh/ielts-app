@@ -32,12 +32,39 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
 
   const lockTimerRef = useRef<NodeJS.Timeout | null>(null);
   const blurGraceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const lastBlurViolationTimeRef = useRef<number>(0);
   const lastRapidSwitchWarningTimeRef = useRef<number>(0);
   const lastCumulativeWarningTimeRef = useRef<number>(0);
   const offScreenStartTimeRef = useRef<number>(0);
   const cumulativeOffScreenMsRef = useRef<number>(0);
   const rapidSwitchTimestampsRef = useRef<number[]>([]);
+
+  // Stop and release camera / audio MediaStream tracks safely to prevent hardware memory leaks
+  const cleanupMediaStreams = () => {
+    if (mediaStreamRef.current) {
+      try {
+        mediaStreamRef.current.getTracks().forEach((track) => {
+          track.stop();
+        });
+      } catch (err) {
+        console.warn('Error stopping proctoring media tracks:', err);
+      }
+      mediaStreamRef.current = null;
+    }
+  };
+
+  // Immediate cleanup when switching away from TEST mode (e.g. to PRACTICE) or on testMode changes
+  useEffect(() => {
+    if (testMode !== 'TEST') {
+      cleanupMediaStreams();
+      return;
+    }
+
+    return () => {
+      cleanupMediaStreams();
+    };
+  }, [testMode]);
 
   // Restore cumulative data from IndexedDB / Storage on mount
   useEffect(() => {
@@ -135,9 +162,10 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
     }
   }, [violationCount]);
 
-  // Clean up lock, blur timers, and release fullscreen on unmount (e.g. when submitted)
+  // Clean up lock, blur timers, media streams, and release fullscreen on unmount (e.g. when submitted)
   useEffect(() => {
     return () => {
+      cleanupMediaStreams();
       if (lockTimerRef.current) {
         clearInterval(lockTimerRef.current);
       }
