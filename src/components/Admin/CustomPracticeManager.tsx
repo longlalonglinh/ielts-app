@@ -64,6 +64,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
   // Modal States
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deckToDelete, setDeckToDelete] = useState<CustomPracticeDeck | null>(null);
+  const [showClearAllModal, setShowClearAllModal] = useState(false);
   const [showSchemaModal, setShowSchemaModal] = useState(false);
 
   // Sheets Database Management State
@@ -312,6 +313,19 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
     } else {
       setErrorMsg('Lỗi khi xóa bộ đề.');
     }
+  };
+
+  // Confirm Clear All Decks
+  const handleClearAllDecks = () => {
+    practiceService.clearAllPracticeDecks();
+    setDecks([]);
+    setSelectedDeck(null);
+    setCards([]);
+    setIsEditing(false);
+    setShowClearAllModal(false);
+    setSuccessMsg('Đã xóa sạch tất cả mã đề practice hiện có. Kho câu hỏi hiện trống để giáo viên làm lại từ đầu!');
+    setDbStatus(practiceService.getDatabaseStatus());
+    setTimeout(() => setSuccessMsg(null), 4000);
   };
 
   // Card Management Functions
@@ -709,6 +723,15 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
           >
             <Plus className="w-4 h-4" />
             <span>Tạo Bộ Đề Mới</span>
+          </button>
+
+          <button
+            onClick={() => setShowClearAllModal(true)}
+            className="px-3.5 py-2.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 font-bold rounded-xl text-xs flex items-center space-x-1.5 transition cursor-pointer"
+            title="Xóa toàn bộ mã đề practice hiện có để làm lại câu hỏi từ đầu"
+          >
+            <Trash2 className="w-4 h-4 text-rose-400" />
+            <span>Xóa sạch bộ đề (Reset)</span>
           </button>
         </div>
       </div>
@@ -1680,6 +1703,44 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition shadow-md shadow-rose-900/30"
               >
                 Đồng Ý Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear All Practice Decks Modal */}
+      {showClearAllModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-slate-900 border border-rose-500/40 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center space-x-3 text-rose-400">
+              <div className="p-2.5 bg-rose-500/10 rounded-2xl border border-rose-500/20">
+                <Trash2 className="w-5 h-5 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Xóa Sạch Tất Cả Bộ Đề</h3>
+                <p className="text-xs text-rose-300">Khởi tạo lại từ đầu cho giáo viên</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Hành động này sẽ xóa hoàn toàn tất cả các bộ đề luyện tập hiện có trong bộ nhớ máy (cả bộ đề mặc định và bộ đề tự tạo). Kho bài tập sẽ trở về trạng thái trống (0 câu hỏi) để quý Thầy/Cô biên soạn lại từ đầu.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowClearAllModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition cursor-pointer"
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleClearAllDecks}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition shadow-md shadow-rose-900/30 cursor-pointer"
+              >
+                Đồng Ý Xóa Sạch
               </button>
             </div>
           </div>

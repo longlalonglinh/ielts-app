@@ -257,6 +257,24 @@ export async function getPracticeDecksFromIndexedDB(): Promise<CustomPracticeDec
 }
 
 /**
+ * Clear all practice decks from IndexedDB
+ */
+export async function clearPracticeDecksInIndexedDB(): Promise<void> {
+  try {
+    const db = await openIndexedDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('practice_decks', 'readwrite');
+      const store = tx.objectStore('practice_decks');
+      const req = store.clear();
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch (err) {
+    console.warn('clearPracticeDecksInIndexedDB failed:', err);
+  }
+}
+
+/**
  * Generic Key-Value Storage
  */
 export async function saveKeyValue(key: string, value: any): Promise<void> {

@@ -89,12 +89,14 @@ export type ExamFormValues = z.infer<typeof examZodSchema>;
 interface VisualExamBuilderProps {
   initialExamData: ExamData;
   onSaveExam: (exam: ExamData) => void;
+  onDraftChange?: (liveDraft: ExamData) => void;
   isSaving?: boolean;
 }
 
 export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
   initialExamData,
   onSaveExam,
+  onDraftChange,
   isSaving = false
 }) => {
   const [activeSection, setActiveSection] = useState<'reading' | 'listening' | 'writing' | 'settings'>('reading');
@@ -104,6 +106,18 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
   const [tokenizerToast, setTokenizerToast] = useState<string | null>(null);
   const [previewAnswers, setPreviewAnswers] = useState<Record<string, string>>({});
   const passageTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Sync and skill preservation refs
+  const lastExternalCodeRef = useRef<string>(initialExamData.exam_code);
+  const skillStashRef = useRef<{
+    passages?: any[];
+    listening_questions?: any[];
+    writing_task1_prompt?: string;
+    writing_task1_image?: string;
+    writing_task2_prompt?: string;
+    audio_url?: string;
+    audio_title?: string;
+  }>({});
 
   // Auto-Save Draft States
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -272,6 +286,14 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     mode: 'onChange'
   });
 
+  // Synchronize when parent passes a different exam (e.g. from local exam vault or server)
+  useEffect(() => {
+    if (initialExamData && initialExamData.exam_code && initialExamData.exam_code !== lastExternalCodeRef.current) {
+      lastExternalCodeRef.current = initialExamData.exam_code;
+      reset(formatInitialData(initialExamData));
+    }
+  }, [initialExamData?.exam_code, reset]);
+
   // Manage dynamic questions inside current selected passage
   const currentPassageQuestionsArray = useFieldArray({
     control,
@@ -395,6 +417,68 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [historyIndex, history]);
 
+  // Non-destructive skill preset switching: caches unselected skills in skillStashRef
+  // instead of permanently wiping passages or questions
+  const handleSwitchSkillPreset = (
+    examType: 'one_skill' | 'two_skills' | 'full_test',
+    skills: ('listening' | 'reading' | 'writing')[],
+    duration: number,
+    targetSection: 'reading' | 'listening' | 'writing'
+  ) => {
+    // 1. Stash current fields before switching
+    const currentPassages = getValues('passages');
+    const currentListening = getValues('listening_questions');
+    const currentTask1 = getValues('writing_task1_prompt');
+    const currentTask1Img = getValues('writing_task1_image');
+    const currentTask2 = getValues('writing_task2_prompt');
+    const currentAudio = getValues('audio_url');
+    const currentAudioTitle = getValues('audio_title');
+
+    if (currentPassages && currentPassages.length > 0) skillStashRef.current.passages = currentPassages;
+    if (currentListening && currentListening.length > 0) skillStashRef.current.listening_questions = currentListening;
+    if (currentTask1) skillStashRef.current.writing_task1_prompt = currentTask1;
+    if (currentTask1Img) skillStashRef.current.writing_task1_image = currentTask1Img;
+    if (currentTask2) skillStashRef.current.writing_task2_prompt = currentTask2;
+    if (currentAudio) skillStashRef.current.audio_url = currentAudio;
+    if (currentAudioTitle) skillStashRef.current.audio_title = currentAudioTitle;
+
+    // 2. Set new exam type & skills & duration
+    setValue('exam_type', examType, { shouldDirty: true });
+    setValue('skills', skills as any, { shouldDirty: true });
+    setValue('duration_mins', duration, { shouldDirty: true });
+
+    // 3. Restore stashed skills if current form value is empty
+    if (skills.includes('reading')) {
+      if ((!currentPassages || currentPassages.length === 0) && skillStashRef.current.passages && skillStashRef.current.passages.length > 0) {
+        setValue('passages', skillStashRef.current.passages, { shouldDirty: true });
+      }
+    }
+    if (skills.includes('listening')) {
+      if ((!currentListening || currentListening.length === 0) && skillStashRef.current.listening_questions && skillStashRef.current.listening_questions.length > 0) {
+        setValue('listening_questions', skillStashRef.current.listening_questions, { shouldDirty: true });
+      }
+      if (!currentAudio && skillStashRef.current.audio_url) {
+        setValue('audio_url', skillStashRef.current.audio_url, { shouldDirty: true });
+      }
+      if (!currentAudioTitle && skillStashRef.current.audio_title) {
+        setValue('audio_title', skillStashRef.current.audio_title, { shouldDirty: true });
+      }
+    }
+    if (skills.includes('writing')) {
+      if (!currentTask1 && skillStashRef.current.writing_task1_prompt) {
+        setValue('writing_task1_prompt', skillStashRef.current.writing_task1_prompt, { shouldDirty: true });
+      }
+      if (!currentTask1Img && skillStashRef.current.writing_task1_image) {
+        setValue('writing_task1_image', skillStashRef.current.writing_task1_image, { shouldDirty: true });
+      }
+      if (!currentTask2 && skillStashRef.current.writing_task2_prompt) {
+        setValue('writing_task2_prompt', skillStashRef.current.writing_task2_prompt, { shouldDirty: true });
+      }
+    }
+
+    setActiveSection(targetSection);
+  };
+
   // Real-time Pre-Publish Readiness Checklist Audit
   const watchedValues = watch();
   const targetSkills = watchedValues.skills || ['listening', 'reading', 'writing'];
@@ -430,6 +514,36 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
   const totalDuration = watchedValues.duration_mins || 0;
   const durationCheck = totalDuration > 0 ? 'pass' : 'fail';
 
+  // Check for duplicate question IDs across the entire exam
+  const seenIds = new Set<string>();
+  const duplicateIds: string[] = [];
+  allQs.forEach(q => {
+    const raw = (q.question_id || '').trim().toUpperCase();
+    if (raw) {
+      if (seenIds.has(raw)) {
+        if (!duplicateIds.includes(raw)) duplicateIds.push(raw);
+      } else {
+        seenIds.add(raw);
+      }
+    }
+  });
+  const duplicateIdCheck = duplicateIds.length === 0 ? 'pass' : 'fail';
+
+  // Check for passage blank token mismatches
+  let tokenMismatchCount = 0;
+  (watchedValues.passages || []).forEach(p => {
+    const pTokens = (p.text?.match(/\[blank_\d+\]/gi) || []);
+    const pBlankQs = (p.questions || []).filter(q => 
+      q.question_type?.includes('fill') || 
+      q.question_type?.includes('blank') || 
+      q.question_text?.includes('[blank_')
+    );
+    if (pTokens.length > 0 && pBlankQs.length === 0) {
+      tokenMismatchCount += pTokens.length;
+    }
+  });
+  const tokenCheck = tokenMismatchCount === 0 ? 'pass' : 'warn';
+
   const auditItems = [
     {
       id: 'audio',
@@ -444,6 +558,20 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       status: answerKeyCheck,
       desc: answerKeyCheck === 'pass' ? `All ${totalQuestionsCount} questions have valid answer keys` : answerKeyCheck === 'fail' ? `${missingAnswerKeyQs.length} question(s) missing correct answer key` : 'No questions created yet',
       tab: (allReadingQs.length > 0 ? 'reading' : 'listening') as any
+    },
+    {
+      id: 'duplicates',
+      title: 'Question ID Uniqueness',
+      status: duplicateIdCheck,
+      desc: duplicateIdCheck === 'pass' ? 'All question IDs are unique' : `Duplicate question ID(s) detected: ${duplicateIds.join(', ')}`,
+      tab: 'reading' as const
+    },
+    {
+      id: 'tokens',
+      title: 'Passage Gap-Fill Tokens',
+      status: tokenCheck,
+      desc: tokenCheck === 'pass' ? 'Tokens in passage match question set' : `${tokenMismatchCount} [blank_X] token(s) without corresponding questions`,
+      tab: 'reading' as const
     },
     {
       id: 'writing',
@@ -689,6 +817,31 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     watch('writing_task1_prompt'),
     watch('writing_task2_prompt'),
     watch('listening_questions')
+  ]);
+
+  // Debounced live draft sync to parent PreviewModule (250ms)
+  useEffect(() => {
+    if (!onDraftChange) return;
+    const timer = setTimeout(() => {
+      const formData = getValues();
+      if (formData.exam_code && formData.exam_code.trim().length >= 1) {
+        const liveExam = buildExamFromForm(formData, 'draft');
+        onDraftChange(liveExam);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [
+    watchedPassages,
+    watchedExamCode,
+    watchedTask1Image,
+    watch('audio_url'),
+    watch('skills'),
+    watch('title'),
+    watch('duration_mins'),
+    watch('writing_task1_prompt'),
+    watch('writing_task2_prompt'),
+    watch('listening_questions'),
+    onDraftChange
   ]);
 
   // Main Publish Form Submission (Published for students)
@@ -1143,53 +1296,21 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
             <span className="text-[10px] font-black text-purple-700 uppercase mr-1">One Skill:</span>
             <button
               type="button"
-              onClick={() => {
-                setValue('exam_type', 'one_skill');
-                setValue('skills', ['reading']);
-                setValue('duration_mins', 60);
-                setValue('reading_duration_mins', 60);
-                setValue('listening_questions', []);
-                setValue('audio_url', '');
-                setValue('audio_title', '');
-                setValue('writing_task1_prompt', '');
-                setValue('writing_task1_image', '');
-                setValue('writing_task2_prompt', '');
-                setActiveSection('reading');
-              }}
+              onClick={() => handleSwitchSkillPreset('one_skill', ['reading'], 60, 'reading')}
               className="px-2.5 py-1 text-[11px] font-bold bg-white text-[#503A7A] hover:bg-purple-100 rounded-lg border border-purple-200 transition cursor-pointer shadow-2xs"
             >
               📖 Reading (60m)
             </button>
             <button
               type="button"
-              onClick={() => {
-                setValue('exam_type', 'one_skill');
-                setValue('skills', ['listening']);
-                setValue('duration_mins', 35);
-                setValue('listening_duration_mins', 35);
-                setValue('passages', []);
-                setValue('writing_task1_prompt', '');
-                setValue('writing_task1_image', '');
-                setValue('writing_task2_prompt', '');
-                setActiveSection('listening');
-              }}
+              onClick={() => handleSwitchSkillPreset('one_skill', ['listening'], 35, 'listening')}
               className="px-2.5 py-1 text-[11px] font-bold bg-white text-[#503A7A] hover:bg-purple-100 rounded-lg border border-purple-200 transition cursor-pointer shadow-2xs"
             >
               🎧 Listening (35m)
             </button>
             <button
               type="button"
-              onClick={() => {
-                setValue('exam_type', 'one_skill');
-                setValue('skills', ['writing']);
-                setValue('duration_mins', 60);
-                setValue('writing_duration_mins', 60);
-                setValue('passages', []);
-                setValue('listening_questions', []);
-                setValue('audio_url', '');
-                setValue('audio_title', '');
-                setActiveSection('writing');
-              }}
+              onClick={() => handleSwitchSkillPreset('one_skill', ['writing'], 60, 'writing')}
               className="px-2.5 py-1 text-[11px] font-bold bg-white text-[#503A7A] hover:bg-purple-100 rounded-lg border border-purple-200 transition cursor-pointer shadow-2xs"
             >
               ✍️ Writing (60m)
@@ -1198,43 +1319,21 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
             <span className="text-[10px] font-black text-indigo-700 uppercase ml-2 mr-1">Two Skills:</span>
             <button
               type="button"
-              onClick={() => {
-                setValue('exam_type', 'two_skills');
-                setValue('skills', ['listening', 'reading']);
-                setValue('duration_mins', 95);
-                setValue('writing_task1_prompt', '');
-                setValue('writing_task1_image', '');
-                setValue('writing_task2_prompt', '');
-                setActiveSection('listening');
-              }}
+              onClick={() => handleSwitchSkillPreset('two_skills', ['listening', 'reading'], 95, 'listening')}
               className="px-2.5 py-1 text-[11px] font-bold bg-indigo-50 text-indigo-900 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition cursor-pointer shadow-2xs"
             >
               🎧+📖 Listening &amp; Reading (95m)
             </button>
             <button
               type="button"
-              onClick={() => {
-                setValue('exam_type', 'two_skills');
-                setValue('skills', ['reading', 'writing']);
-                setValue('duration_mins', 120);
-                setValue('listening_questions', []);
-                setValue('audio_url', '');
-                setValue('audio_title', '');
-                setActiveSection('reading');
-              }}
+              onClick={() => handleSwitchSkillPreset('two_skills', ['reading', 'writing'], 120, 'reading')}
               className="px-2.5 py-1 text-[11px] font-bold bg-indigo-50 text-indigo-900 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition cursor-pointer shadow-2xs"
             >
               📖+✍️ Reading &amp; Writing (120m)
             </button>
             <button
               type="button"
-              onClick={() => {
-                setValue('exam_type', 'two_skills');
-                setValue('skills', ['listening', 'writing']);
-                setValue('duration_mins', 95);
-                setValue('passages', []);
-                setActiveSection('listening');
-              }}
+              onClick={() => handleSwitchSkillPreset('two_skills', ['listening', 'writing'], 95, 'listening')}
               className="px-2.5 py-1 text-[11px] font-bold bg-indigo-50 text-indigo-900 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition cursor-pointer shadow-2xs"
             >
               🎧+✍️ Listening &amp; Writing (95m)
@@ -1243,12 +1342,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
             <span className="text-[10px] font-black text-purple-900 uppercase ml-2 mr-1">Full:</span>
             <button
               type="button"
-              onClick={() => {
-                setValue('exam_type', 'full_test');
-                setValue('skills', ['listening', 'reading', 'writing']);
-                setValue('duration_mins', 155);
-                setActiveSection('reading');
-              }}
+              onClick={() => handleSwitchSkillPreset('full_test', ['listening', 'reading', 'writing'], 155, 'reading')}
               className="px-2.5 py-1 text-[11px] font-bold bg-purple-100 text-[#3C2A63] hover:bg-purple-200 rounded-lg border border-purple-300 transition cursor-pointer shadow-2xs"
             >
               ✨ Full 3 Skills (155m)

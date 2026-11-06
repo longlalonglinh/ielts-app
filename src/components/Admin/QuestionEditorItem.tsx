@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UseFormRegister, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { 
   Trash2, 
@@ -57,6 +57,35 @@ export const QuestionEditorItem: React.FC<QuestionEditorItemProps> = ({
   const currentWordBank: WordBankItem[] = watch(`${prefix}.word_bank`) || [];
   const currentFlowChartSteps: FlowChartStep[] = watch(`${prefix}.flowchart_steps`) || [];
 
+  // Auto-populate actual options in form state when switching to Multiple Choice or Matching Features
+  // preventing ghost arrays where UI displays dummy options but form value is empty []
+  useEffect(() => {
+    if (
+      (qType === IELTSQuestionType.MULTIPLE_CHOICE || qType === IELTSQuestionType.MULTIPLE_CHOICE_MULTIPLE_ANSWERS) &&
+      (!currentOptions || currentOptions.length === 0)
+    ) {
+      setValue(`${prefix}.options`, [
+        'A. Option 1',
+        'B. Option 2',
+        'C. Option 3',
+        'D. Option 4'
+      ], { shouldDirty: true });
+    }
+  }, [qType]);
+
+  useEffect(() => {
+    if (
+      qType === IELTSQuestionType.MATCHING_FEATURES &&
+      (!currentMatchingOptions || currentMatchingOptions.length === 0)
+    ) {
+      setValue(`${prefix}.matching_options`, [
+        { id: 'A', text: 'Dr. John Harrison' },
+        { id: 'B', text: 'Prof. Marie Curie' },
+        { id: 'C', text: 'Dr. Alexander Bell' }
+      ], { shouldDirty: true });
+    }
+  }, [qType]);
+
   // Options manager helper for Multiple Choice
   const handleAddOption = () => {
     const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
@@ -66,9 +95,11 @@ export const QuestionEditorItem: React.FC<QuestionEditorItemProps> = ({
   };
 
   const handleUpdateOption = (optIdx: number, val: string) => {
-    const updated = [...currentOptions];
-    updated[optIdx] = val;
-    setValue(`${prefix}.options`, updated, { shouldDirty: true });
+    const base = currentOptions && currentOptions.length > 0 
+      ? [...currentOptions] 
+      : ['A. Option 1', 'B. Option 2', 'C. Option 3', 'D. Option 4'];
+    base[optIdx] = val;
+    setValue(`${prefix}.options`, base, { shouldDirty: true });
   };
 
   const handleRemoveOption = (optIdx: number) => {

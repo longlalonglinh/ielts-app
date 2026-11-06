@@ -1,6 +1,7 @@
 import { CustomPracticeDeck, PracticeUserStats, SentenceGrammarAnalysis, CardReviewState, PracticeCard, LearnerProfile, StudentProgressRecord } from '../types/practice';
 import { STARTER_PRACTICE_DECKS } from '../data/practiceDecks';
 import { fetchPracticeDecksFromGAS, initPracticeDatabaseInGAS, savePracticeDeckToGAS, syncStudentProgressToGAS, fetchStudentProgressFromGAS, getApiUrl } from './api';
+import { clearPracticeDecksInIndexedDB } from './indexedDb';
 
 const STORAGE_CUSTOM_DECKS = 'custom_practice_decks_repo';
 const STORAGE_USER_STATS = 'custom_practice_user_stats';
@@ -8,6 +9,7 @@ const STORAGE_SHEETS_DECKS = 'ielts_practice_sheets_synced_decks';
 const STORAGE_DB_STATUS = 'ielts_practice_db_status';
 const STORAGE_LEARNERS = 'ielts_practice_3_learners_list';
 const STORAGE_CURRENT_LEARNER = 'ielts_practice_current_learner_id';
+const STORAGE_WIPE_FLAG = 'ielts_practice_wipe_v2_blank_slate';
 
 const DEFAULT_3_LEARNERS: LearnerProfile[] = [
   { student_id: 'HV01', student_name: 'Learner 1', avatar_color: 'bg-[#6B51A5]', slot_index: 1, joined_at: new Date().toISOString() },
@@ -16,6 +18,28 @@ const DEFAULT_3_LEARNERS: LearnerProfile[] = [
 ];
 
 export const practiceService = {
+  // One-time automatic reset of legacy practice decks so teacher starts with a clean slate
+  ensureCleanSlate(): void {
+    try {
+      if (!localStorage.getItem(STORAGE_WIPE_FLAG)) {
+        this.clearAllPracticeDecks();
+        localStorage.setItem(STORAGE_WIPE_FLAG, 'true');
+      }
+    } catch (e) {}
+  },
+
+  // Clear all practice decks across localStorage & IndexedDB
+  clearAllPracticeDecks(): void {
+    try {
+      localStorage.removeItem(STORAGE_CUSTOM_DECKS);
+      localStorage.removeItem(STORAGE_SHEETS_DECKS);
+      localStorage.removeItem(STORAGE_DB_STATUS);
+      clearPracticeDecksInIndexedDB().catch(() => {});
+    } catch (e) {
+      console.warn('clearAllPracticeDecks warning:', e);
+    }
+  },
+
   // 3 Learners Profile Management
   getLearners(): LearnerProfile[] {
     try {
@@ -65,6 +89,7 @@ export const practiceService = {
 
   // Get all available decks (Google Sheets / Starter + Custom)
   getAllDecks(): CustomPracticeDeck[] {
+    this.ensureCleanSlate();
     try {
       // 1. Check if we have decks synced from Google Sheets
       const sheetsRaw = localStorage.getItem(STORAGE_SHEETS_DECKS);

@@ -22,13 +22,18 @@ import {
   Save as SaveIcon,
   Play,
   Lock,
-  ArrowRight
+  ArrowRight,
+  FolderArchive,
+  Copy,
+  Plus,
+  Trash2,
+  Edit3
 } from 'lucide-react';
 import { VisualExamBuilder } from './VisualExamBuilder';
 import { ReadingModule } from '../Student/ReadingModule';
 import { ListeningModule } from '../Student/ListeningModule';
 import { WritingModule } from '../Student/WritingModule';
-import { saveExamToIndexedDB } from '../../services/indexedDb';
+import { saveExamToIndexedDB, getAllExamsFromIndexedDB, deleteExamFromIndexedDB } from '../../services/indexedDb';
 import { saveExamToServerDb, saveServerConfig, fetchServerConfig } from '../../services/api';
 import { 
   getStoredSpreadsheetId, 
@@ -64,9 +69,13 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
 }) => {
   const currentInitial = initialExamData || BLANK_TEMPLATE;
   const [exam, setExam] = useState<ExamData>(currentInitial);
-  const [activeTab, setActiveTab] = useState<'builder' | 'cbt_preview' | 'preview'>('builder');
+  const [activeTab, setActiveTab] = useState<'builder' | 'cbt_preview' | 'vault' | 'preview'>('builder');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [copied, setCopied] = useState(false);
+
+  // Local Exam Repository / Vault States
+  const [vaultExams, setVaultExams] = useState<ExamData[]>([]);
+  const [deleteConfirmExamCode, setDeleteConfirmExamCode] = useState<string | null>(null);
 
   // Live CBT Preview States
   const [previewSkillTab, setPreviewSkillTab] = useState<'reading' | 'listening' | 'writing'>('reading');
@@ -157,6 +166,68 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
     } finally {
       setIsTestingGviz(false);
     }
+  };
+
+  // Vault Management
+  const loadVaultExams = async () => {
+    try {
+      const idbExams = await getAllExamsFromIndexedDB();
+      const localRaw = localStorage.getItem('ielts_saved_exams');
+      let localList: ExamData[] = localRaw ? JSON.parse(localRaw) : [];
+      if (!Array.isArray(localList)) localList = [];
+
+      const map = new Map<string, ExamData>();
+      localList.forEach(e => { if (e && e.exam_code) map.set(e.exam_code.toUpperCase(), e); });
+      idbExams.forEach(e => { if (e && e.exam_code) map.set(e.exam_code.toUpperCase(), e); });
+
+      setVaultExams(Array.from(map.values()));
+    } catch (e) {
+      console.warn('loadVaultExams error:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadVaultExams();
+  }, []);
+
+  const handleDuplicateExamInVault = async (targetExam: ExamData) => {
+    const cloneCode = `${targetExam.exam_code}_COPY`;
+    const clonedExam: ExamData = {
+      ...JSON.parse(JSON.stringify(targetExam)),
+      exam_code: cloneCode,
+      title: `${targetExam.title} (Copy)`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    await handleSaveExam(clonedExam);
+    await loadVaultExams();
+  };
+
+  const handleDeleteExamInVault = async (codeToDelete: string) => {
+    await deleteExamFromIndexedDB(codeToDelete);
+    try {
+      const existingRaw = localStorage.getItem('ielts_saved_exams');
+      let existingList: ExamData[] = existingRaw ? JSON.parse(existingRaw) : [];
+      if (Array.isArray(existingList)) {
+        const filtered = existingList.filter(e => e.exam_code?.toUpperCase() !== codeToDelete.toUpperCase());
+        localStorage.setItem('ielts_saved_exams', JSON.stringify(filtered));
+      }
+    } catch (e) {}
+    setDeleteConfirmExamCode(null);
+    await loadVaultExams();
+  };
+
+  const handleCreateNewBlankExam = () => {
+    const newCode = `EXAM_${Date.now().toString().slice(-4)}`;
+    const blank: ExamData = {
+      ...BLANK_TEMPLATE,
+      exam_code: newCode,
+      title: `IELTS Test Paper ${newCode}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    setExam(blank);
+    setActiveTab('builder');
   };
 
   // Handle save from VisualExamBuilder
@@ -251,7 +322,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
 
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Tabs: Visual Builder Form vs Preview */}
-          <div className="bg-[#E2DDEC] p-1 rounded-2xl flex items-center gap-1">
+          <div className="bg-[#E2DDEC] p-1 rounded-2xl flex items-center gap-1 flex-wrap">
             <button
               type="button"
               onClick={() => setActiveTab('builder')}
@@ -276,6 +347,22 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
             >
               <Play className="w-3.5 h-3.5" />
               <span>Student CBT Preview</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                loadVaultExams();
+                setActiveTab('vault');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'vault'
+                  ? 'bg-[#6B51A5] text-white shadow-md'
+                  : 'text-[#3C2A63] hover:text-[#503A7A]'
+              }`}
+            >
+              <FolderArchive className="w-3.5 h-3.5" />
+              <span>Exam Vault ({vaultExams.length})</span>
             </button>
 
             <button
@@ -337,14 +424,15 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
         </div>
       </div>
 
-      {/* ACTIVE TAB 1: VISUAL EXAM BUILDER */}
-      {activeTab === 'builder' && (
+      {/* ACTIVE TAB 1: VISUAL EXAM BUILDER (Preserve Form State via CSS hidden) */}
+      <div className={activeTab === 'builder' ? 'block' : 'hidden'}>
         <VisualExamBuilder
           initialExamData={exam}
           onSaveExam={handleSaveExam}
+          onDraftChange={(liveDraft) => setExam(liveDraft)}
           isSaving={saveStatus === 'saving'}
         />
-      )}
+      </div>
 
       {/* ACTIVE TAB 2: LIVE CBT STUDENT PREVIEW */}
       {activeTab === 'cbt_preview' && (
@@ -440,18 +528,195 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
 
             {previewSkillTab === 'writing' && (
               <WritingModule
-                writingTask1Prompt={exam.writing_task1_prompt}
-                writingTask1Image={exam.writing_task1_image}
-                writingTask2Prompt={exam.writing_task2_prompt}
-                userTask1Answer={previewTask1}
-                userTask2Answer={previewTask2}
+                task1Prompt={exam.writing_task1_prompt || exam.writing_prompt}
+                task1Image={exam.writing_task1_image || exam.image_url}
+                image_url={exam.writing_task1_image || exam.image_url}
+                imageUrl={exam.writing_task1_image || exam.image_url}
+                task2Prompt={exam.writing_task2_prompt}
+                tasks={exam.writing_tasks}
+                task1Text={previewTask1}
+                task2Text={previewTask2}
                 onTask1Change={setPreviewTask1}
                 onTask2Change={setPreviewTask2}
                 examCode={exam.exam_code}
                 candidateId="TEACHER_PREVIEW"
-                isPreview={true}
+                testMode="PRACTICE"
               />
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ACTIVE TAB 3: LOCAL EXAM VAULT / REPOSITORY */}
+      {activeTab === 'vault' && (
+        <div className="space-y-5">
+          <div className="bg-white border border-purple-100 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-black text-[#3C2A63] flex items-center gap-2">
+                <FolderArchive className="w-4 h-4 text-[#6B51A5]" />
+                <span>Local Exam Vault &amp; Repository</span>
+              </h3>
+              <p className="text-xs text-[#7C68A5] font-medium mt-0.5">
+                All test papers stored offline in IndexedDB and LocalStorage across all skills.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCreateNewBlankExam}
+                className="px-4 py-2 bg-[#6B51A5] hover:bg-[#583F8F] text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-purple-900/10"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Blank Exam Paper</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={loadVaultExams}
+                className="p-2 bg-[#F8F6FC] hover:bg-[#E2DDEC] text-[#503A7A] rounded-xl border border-purple-200 transition cursor-pointer"
+                title="Refresh exam list"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Exam Grid Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {vaultExams.length === 0 ? (
+              <div className="col-span-full p-8 text-center bg-white rounded-3xl border border-dashed border-purple-200 text-xs text-[#7C68A5] italic">
+                No exams found in offline storage. Click "New Blank Exam Paper" to create one.
+              </div>
+            ) : (
+              vaultExams.map((vExam) => {
+                const isCurrent = vExam.exam_code?.toUpperCase() === exam.exam_code?.toUpperCase();
+                const vReadingCount = (vExam.passages || []).reduce((acc, p) => acc + (p.questions?.length || 0), 0) || (vExam.questions || []).filter(q => q.section === 'reading').length;
+                const vListeningCount = vExam.listening_questions?.length || (vExam.questions || []).filter(q => q.section === 'listening').length;
+
+                return (
+                  <div
+                    key={vExam.exam_code}
+                    className={`bg-white rounded-3xl border p-5 space-y-4 transition shadow-xs flex flex-col justify-between ${
+                      isCurrent
+                        ? 'border-[#6B51A5] ring-2 ring-purple-300/40 bg-purple-50/20'
+                        : 'border-purple-100/90 hover:border-purple-300'
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs font-extrabold px-2.5 py-1 rounded-xl bg-purple-100 text-[#503A7A]">
+                          {vExam.exam_code}
+                        </span>
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                          vExam.status === 'published' && !vExam.is_draft
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-amber-50 text-amber-800 border-amber-200'
+                        }`}>
+                          {vExam.status === 'published' && !vExam.is_draft ? 'PUBLISHED' : 'DRAFT'}
+                        </span>
+                      </div>
+
+                      <h4 className="text-sm font-black text-[#3C2A63] line-clamp-1">
+                        {vExam.title}
+                      </h4>
+
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-[#7C68A5]">
+                        <span className="bg-[#FAF8FE] px-2 py-0.5 rounded-lg border border-purple-100">
+                          ⏱️ {vExam.duration_mins || 150}m
+                        </span>
+                        {(!vExam.skills || vExam.skills.includes('reading')) && (
+                          <span className="bg-[#FAF8FE] px-2 py-0.5 rounded-lg border border-purple-100">
+                            📖 {vReadingCount} Qs
+                          </span>
+                        )}
+                        {(!vExam.skills || vExam.skills.includes('listening')) && (
+                          <span className="bg-[#FAF8FE] px-2 py-0.5 rounded-lg border border-purple-100">
+                            🎧 {vListeningCount} Qs
+                          </span>
+                        )}
+                        {(!vExam.skills || vExam.skills.includes('writing')) && (
+                          <span className="bg-[#FAF8FE] px-2 py-0.5 rounded-lg border border-purple-100">
+                            ✍️ Task 1 &amp; 2
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="pt-2 border-t border-purple-100 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setExam(vExam);
+                          setActiveTab('builder');
+                        }}
+                        className="flex-1 py-1.5 px-3 bg-[#6B51A5] hover:bg-[#583F8F] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDuplicateExamInVault(vExam)}
+                        className="p-1.5 bg-[#FAF8FE] hover:bg-purple-100 text-[#503A7A] rounded-xl border border-purple-200 transition cursor-pointer"
+                        title="Duplicate exam paper"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirmExamCode(vExam.exam_code)}
+                        className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl border border-rose-200 transition cursor-pointer"
+                        title="Delete exam paper"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal for Exam Vault */}
+      {deleteConfirmExamCode && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-purple-200 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-2.5 bg-rose-100 rounded-2xl">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-[#3C2A63]">Delete Exam Paper</h4>
+                <p className="text-xs text-[#7C68A5] font-mono">{deleteConfirmExamCode}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-[#503A7A] leading-relaxed">
+              Are you sure you want to delete exam <strong>{deleteConfirmExamCode}</strong> from offline storage? This action cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmExamCode(null)}
+                className="px-4 py-2 bg-[#F5F2F9] text-[#503A7A] rounded-xl text-xs font-bold hover:bg-[#E2DDEC] transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteExamInVault(deleteConfirmExamCode)}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-sm shadow-rose-900/20"
+              >
+                Delete Exam
+              </button>
+            </div>
           </div>
         </div>
       )}

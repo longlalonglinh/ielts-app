@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { SubmissionRecord, GradingForm, ExamData } from '../../types';
 import { fetchSubmissions, saveWritingScore, deduplicateSubmissions, DEFAULT_API_URL, fetchExam } from '../../services/api';
+import { saveKeyValue, getKeyValue } from '../../services/indexedDb';
 import { DEFAULT_EXAMS } from '../../data/defaultExams';
 import { formatSubmissionTime } from '../../utils/dateFormatter';
 import { normalizeScoreInput, calculateIeltsOverallBand } from '../../services/answerScoring';
@@ -65,14 +66,60 @@ export const ManualGrading: React.FC<ManualGradingProps> = ({ apiUrl, gasUrl }) 
         const pending = clean.find((s) => s.writing_status === 'PENDING_TEACHER');
         if (pending) {
           setSelectedSub(pending);
+          loadDraftOrExistingScore(pending);
         } else if (clean.length > 0) {
           setSelectedSub(clean[0]);
+          loadDraftOrExistingScore(clean[0]);
         }
       }
     } catch (err) {
       console.error('Error fetching submissions:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDraftOrExistingScore = async (sub: SubmissionRecord) => {
+    if (!sub || !sub.submission_id) return;
+    const draftKey = `WRITING_GRADE_DRAFT_${sub.submission_id}`;
+    let loadedDraft: GradingForm | null = null;
+    
+    try {
+      const idbDraft = await getKeyValue<GradingForm>(draftKey);
+      if (idbDraft && typeof idbDraft.tr === 'number') {
+        loadedDraft = idbDraft;
+      } else {
+        const localRaw = localStorage.getItem(draftKey);
+        if (localRaw) {
+          loadedDraft = JSON.parse(localRaw);
+        }
+      }
+    } catch (e) {}
+
+    if (loadedDraft && typeof loadedDraft.tr === 'number') {
+      setGradingForm(loadedDraft);
+      return;
+    }
+
+    // Fallback to candidate's existing score if already graded
+    if (sub.writing_scores) {
+      setGradingForm({
+        tr: (sub.writing_scores as any).task_response || (sub.writing_scores as any).tr || 6.0,
+        cc: (sub.writing_scores as any).coherence_cohesion || (sub.writing_scores as any).cc || 6.0,
+        lr: (sub.writing_scores as any).lexical_resource || (sub.writing_scores as any).lr || 6.0,
+        gra: (sub.writing_scores as any).grammatical_accuracy || (sub.writing_scores as any).gra || 6.0,
+        overall_writing: (sub.writing_scores as any).overall || sub.writing_band || 6.0,
+        feedback: sub.writing_feedback || ''
+      });
+    } else {
+      setGradingForm({
+        tr: 6.0,
+        cc: 6.0,
+        lr: 6.0,
+        gra: 6.0,
+        overall_writing: 6.0,
+        feedback: ''
+      });
     }
   };
 
@@ -109,6 +156,22 @@ export const ManualGrading: React.FC<ManualGradingProps> = ({ apiUrl, gasUrl }) 
     setGradingForm((prev) => ({ ...prev, overall_writing: rounded }));
   }, [gradingForm.tr, gradingForm.cc, gradingForm.lr, gradingForm.gra]);
 
+  // Auto-save grading draft whenever form values change
+  useEffect(() => {
+    if (!selectedSub?.submission_id) return;
+    const subId = selectedSub.submission_id;
+    const draftKey = `WRITING_GRADE_DRAFT_${subId}`;
+
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify(gradingForm));
+        saveKeyValue(draftKey, gradingForm).catch(() => {});
+      } catch (e) {}
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [selectedSub?.submission_id, gradingForm]);
+
   const handleSaveGrading = async () => {
     if (!selectedSub) return;
     setLoading(true);
@@ -129,6 +192,11 @@ export const ManualGrading: React.FC<ManualGradingProps> = ({ apiUrl, gasUrl }) 
       });
 
       if (res.success) {
+        // Clear saved draft on successful submission
+        const draftKey = `WRITING_GRADE_DRAFT_${selectedSub.submission_id}`;
+        try {
+          localStorage.removeItem(draftKey);
+        } catch (e) {}
         alert(`✅ Writing score for candidate ${selectedSub.sbd} saved successfully!`);
         loadSubmissions();
       } else {
@@ -190,6 +258,7 @@ ${gradingForm.feedback || 'The essay meets task requirements. Focus on incorpora
 
   const handleSelectCandidate = (sub: SubmissionRecord) => {
     setSelectedSub(sub);
+    loadDraftOrExistingScore(sub);
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setMobileTab('grading');
     }
@@ -372,8 +441,10 @@ ${gradingForm.feedback || 'The essay meets task requirements. Focus on incorpora
                 const t1Image = currentExam?.writing_task1_image || currentExam?.writing_task1_image_url || task1Obj?.image_url || task1Obj?.imageUrl || currentExam?.image_url || '';
                 const t2Prompt = currentExam?.writing_task2_prompt || task2Obj?.prompt || '';
 
-                const t1WordCount = countWords(selectedSub.writing_task1);
-                const t2WordCount = countWords(selectedSub.writing_task2);
+                const t1Text = selectedSub.writing_task1 || selectedSub.writing_task1_text || '';
+                const t2Text = selectedSub.writing_task2 || selectedSub.writing_task2_text || '';
+                const t1WordCount = countWords(t1Text);
+                const t2WordCount = countWords(t2Text);
 
                 return (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
@@ -472,7 +543,7 @@ ${gradingForm.feedback || 'The essay meets task requirements. Focus on incorpora
                             Candidate Essay Response:
                           </span>
                           <div className="p-4 bg-[#F8F6FC] border border-purple-100 rounded-2xl text-xs sm:text-sm text-[#3C2A63] leading-relaxed font-sans whitespace-pre-wrap selection:bg-purple-200">
-                            {selectedSub.writing_task1 || (
+                            {t1Text || (
                               <span className="italic text-[#7C68A5]">(No response submitted for Task 1)</span>
                             )}
                           </div>
@@ -516,7 +587,7 @@ ${gradingForm.feedback || 'The essay meets task requirements. Focus on incorpora
                             Candidate Essay Response:
                           </span>
                           <div className="p-4 bg-[#F8F6FC] border border-purple-100 rounded-2xl text-xs sm:text-sm text-[#3C2A63] leading-relaxed font-sans whitespace-pre-wrap selection:bg-purple-200">
-                            {selectedSub.writing_task2 || (
+                            {t2Text || (
                               <span className="italic text-[#7C68A5]">(No response submitted for Task 2)</span>
                             )}
                           </div>
