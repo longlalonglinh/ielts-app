@@ -378,8 +378,20 @@ function doGet(e) {
           hints: String(pRow[16] || ''),
           explanation: String(pRow[17] || ''),
           accepted_answers: [String(pRow[14] || '')].filter(Boolean),
-          options_data: Array.isArray(optionsParsed) && optionsParsed.length > 0 && typeof optionsParsed[0] === 'object' ? optionsParsed : undefined,
-          options: Array.isArray(optionsParsed) && optionsParsed.length > 0 && typeof optionsParsed[0] === 'string' ? optionsParsed : undefined,
+          options_data: Array.isArray(optionsParsed) && optionsParsed.length > 0 && typeof optionsParsed[0] === 'object'
+            ? optionsParsed
+            : Array.isArray(optionsParsed) && optionsParsed.length > 0
+              ? optionsParsed.map(function(s, sIdx) {
+                  var sClean = String(s).trim();
+                  var isCor = sClean.toLowerCase() === String(pRow[14] || '').trim().toLowerCase();
+                  return { id: 'opt_' + (sIdx + 1), text: sClean, isCorrect: isCor };
+                })
+              : undefined,
+          options: Array.isArray(optionsParsed) && optionsParsed.length > 0
+            ? (typeof optionsParsed[0] === 'string'
+                ? optionsParsed
+                : optionsParsed.map(function(o) { return String(o.text || o.label || o.value || ''); }))
+            : undefined,
           updated_at: String(pRow[18] || '')
         };
         
@@ -916,8 +928,20 @@ function doPost(e) {
             hints: String(pRow[16] || ''),
             explanation: String(pRow[17] || ''),
             accepted_answers: [String(pRow[14] || '')].filter(Boolean),
-            options_data: Array.isArray(optionsParsed) && optionsParsed.length > 0 && typeof optionsParsed[0] === 'object' ? optionsParsed : undefined,
-            options: Array.isArray(optionsParsed) && optionsParsed.length > 0 && typeof optionsParsed[0] === 'string' ? optionsParsed : undefined,
+            options_data: Array.isArray(optionsParsed) && optionsParsed.length > 0 && typeof optionsParsed[0] === 'object'
+              ? optionsParsed
+              : Array.isArray(optionsParsed) && optionsParsed.length > 0
+                ? optionsParsed.map(function(s, sIdx) {
+                    var sClean = String(s).trim();
+                    var isCor = sClean.toLowerCase() === String(pRow[14] || '').trim().toLowerCase();
+                    return { id: 'opt_' + (sIdx + 1), text: sClean, isCorrect: isCor };
+                  })
+                : undefined,
+            options: Array.isArray(optionsParsed) && optionsParsed.length > 0
+              ? (typeof optionsParsed[0] === 'string'
+                  ? optionsParsed
+                  : optionsParsed.map(function(o) { return String(o.text || o.label || o.value || ''); }))
+              : undefined,
             updated_at: String(pRow[18] || '')
           };
           
