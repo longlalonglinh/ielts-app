@@ -23,7 +23,9 @@ import {
   saveCheatLogToIndexedDB, 
   getAllCheatLogsFromIndexedDB,
   savePracticeDecksToIndexedDB,
-  getPracticeDecksFromIndexedDB
+  getPracticeDecksFromIndexedDB,
+  safeSaveCurrentExamToLocalStorage,
+  safeSaveExamListToLocalStorage
 } from './indexedDb';
 import { gradeExamAnswers, computeAnswersChecksum } from './answerScoring';
 import { DEFAULT_EXAMS } from '../data/defaultExams';
@@ -409,24 +411,20 @@ export async function saveWritingScore(
   }
 
   try {
-    const response = await fetchWithRetry(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({
-        action: 'gradeWriting',
-        submission_id: submissionId,
-        writing_scores: {
-          TR: form.tr,
-          CC: form.cc,
-          LR: form.lr,
-          GRA: form.gra
-        },
-        writing_band: form.overall_writing,
-        writing_feedback: form.feedback
-      })
-    }, 3, 1000);
-
-    if (response.ok) {
+    const payload = {
+      action: 'gradeWriting',
+      submission_id: submissionId,
+      writing_scores: {
+        TR: form.tr,
+        CC: form.cc,
+        LR: form.lr,
+        GRA: form.gra
+      },
+      writing_band: form.overall_writing,
+      writing_feedback: form.feedback
+    };
+    const result = await postToGasWithLockRetry(apiUrl, payload, 2);
+    if (result && (result.status === 'success' || result.success || result.is_opaque)) {
       return { success: true, message: 'Writing scores updated on Google Sheets successfully!' };
     }
   } catch (err) {
@@ -1196,9 +1194,7 @@ export function triggerBackgroundRevalidation(apiUrl: string, cleanCode: string)
           const fresh = standardizeExamData(rawExamObj, cleanCode);
           examMemoryCache.set(cleanCode, fresh);
           saveExamToIndexedDB(fresh).catch(() => {});
-          try {
-            localStorage.setItem('ielts_current_exam', JSON.stringify(fresh));
-          } catch (e) {}
+          safeSaveCurrentExamToLocalStorage(fresh);
 
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('ielts:exam-revalidated', { detail: fresh }));
@@ -1336,9 +1332,7 @@ export function prefetchExam(
             const standardized = standardizeExamData(rawExamObj, cleanCode);
             examMemoryCache.set(cleanCode, standardized);
             saveExamToIndexedDB(standardized).catch(() => {});
-            try {
-              localStorage.setItem('ielts_current_exam', JSON.stringify(standardized));
-            } catch (e) {}
+            safeSaveCurrentExamToLocalStorage(standardized);
             return { success: true, exam: standardized };
           }
         }
@@ -1395,7 +1389,7 @@ export async function clearExamCache(examCode: string): Promise<void> {
       const arr = JSON.parse(localRaw);
       if (Array.isArray(arr)) {
         const filtered = arr.filter((ex: any) => (ex?.exam_code || '').toUpperCase() !== cleanCode);
-        localStorage.setItem('ielts_saved_exams', JSON.stringify(filtered));
+        safeSaveExamListToLocalStorage(filtered);
       }
     }
   } catch (e) {}
@@ -1476,9 +1470,7 @@ export async function fetchExam(
         const standardized = standardizeExamData(serverJson.exam, cleanCode);
         examMemoryCache.set(cleanCode, standardized);
         saveExamToIndexedDB(standardized).catch(() => {});
-        try {
-          localStorage.setItem('ielts_current_exam', JSON.stringify(standardized));
-        } catch (e) {}
+        safeSaveCurrentExamToLocalStorage(standardized);
         return { success: true, exam: standardized, source: 'server' as any };
       }
     }
@@ -1548,9 +1540,7 @@ export async function fetchExam(
         const standardized = standardizeExamData(gvizRes.exam, cleanCode);
         examMemoryCache.set(cleanCode, standardized);
         saveExamToIndexedDB(standardized).catch(() => {});
-        try {
-          localStorage.setItem('ielts_current_exam', JSON.stringify(standardized));
-        } catch (e) {}
+        safeSaveCurrentExamToLocalStorage(standardized);
         saveExamToServerDb(standardized).catch(() => {});
         return { success: true, exam: standardized, source: 'gviz' };
       }
@@ -1618,9 +1608,7 @@ export async function fetchExam(
             const standardized = standardizeExamData(rawExamObj, cleanCode);
             examMemoryCache.set(cleanCode, standardized);
             await saveExamToIndexedDB(standardized);
-            try {
-              localStorage.setItem('ielts_current_exam', JSON.stringify(standardized));
-            } catch (e) {}
+            safeSaveCurrentExamToLocalStorage(standardized);
 
             // Save to centralized server database if server is available
             saveExamToServerDb(standardized).catch(() => {});
@@ -2097,7 +2085,7 @@ export async function deleteExam(examCode: string): Promise<boolean> {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         const filtered = parsed.filter((e: any) => (e.exam_code || '').trim().toUpperCase() !== cleanCode);
-        localStorage.setItem('ielts_saved_exams', JSON.stringify(filtered));
+        safeSaveExamListToLocalStorage(filtered);
       }
     }
   } catch (e) {}

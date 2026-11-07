@@ -257,4 +257,47 @@ describe('IELTS CBT Writing Task 1 Image & Fallback Verification (One Skill, Two
     });
   });
 
+  /* =========================================================================
+   * 6. LOCALSTORAGE 5MB QUOTA PROTECTION & BASE64 ASSET SANITIZATION
+   * ========================================================================= */
+  describe('6. LocalStorage 5MB Quota Protection & Base64 Asset Sanitization', () => {
+    it('strips heavy base64 images from ExamData before storing in LocalStorage', async () => {
+      const { sanitizeExamForLocalStorage, safeSaveCurrentExamToLocalStorage } = await import('../services/indexedDb');
+
+      const heavyBase64 = 'data:image/png;base64,' + 'A'.repeat(500000); // 500KB fake base64
+      const examWithLargeImage: any = {
+        exam_code: 'WT_HEAVY',
+        title: 'Heavy Image Test',
+        writing_task1_image: heavyBase64,
+        writing_task2_image: heavyBase64,
+        listening_audio_url: 'data:audio/mp3;base64,AAAA'
+      };
+
+      const sanitized = sanitizeExamForLocalStorage(examWithLargeImage);
+      expect(sanitized.writing_task1_image).toBe('[IMAGE_STORED_IN_INDEXEDDB]');
+      expect((sanitized as any).writing_task2_image).toBe('[IMAGE_STORED_IN_INDEXEDDB]');
+      expect((sanitized as any).listening_audio_url).toBe('[AUDIO_STORED_IN_INDEXEDDB]');
+      expect(sanitized.exam_code).toBe('WT_HEAVY');
+
+      // Setup mock localStorage if running in Node
+      const store: Record<string, string> = {};
+      const mockStorage = {
+        getItem: (k: string) => store[k] || null,
+        setItem: (k: string, v: string) => { store[k] = String(v); },
+        removeItem: (k: string) => { delete store[k]; },
+        clear: () => {}
+      };
+      (globalThis as any).window = globalThis;
+      (globalThis as any).localStorage = mockStorage;
+
+      // Test saving without throwing error
+      safeSaveCurrentExamToLocalStorage(examWithLargeImage);
+      const stored = mockStorage.getItem('ielts_current_exam');
+      expect(stored).toBeTruthy();
+      const parsed = JSON.parse(stored!);
+      expect(parsed.writing_task1_image).toBe('[IMAGE_STORED_IN_INDEXEDDB]');
+    });
+  });
+
 });
+

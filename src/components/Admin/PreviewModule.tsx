@@ -33,7 +33,13 @@ import { VisualExamBuilder } from './VisualExamBuilder';
 import { ReadingModule } from '../Student/ReadingModule';
 import { ListeningModule } from '../Student/ListeningModule';
 import { WritingModule } from '../Student/WritingModule';
-import { saveExamToIndexedDB, getAllExamsFromIndexedDB, deleteExamFromIndexedDB } from '../../services/indexedDb';
+import { 
+  saveExamToIndexedDB, 
+  getAllExamsFromIndexedDB, 
+  deleteExamFromIndexedDB, 
+  safeSaveExamListToLocalStorage, 
+  safeSaveCurrentExamToLocalStorage 
+} from '../../services/indexedDb';
 import { saveExamToServerDb, saveServerConfig, fetchServerConfig } from '../../services/api';
 import { 
   getStoredSpreadsheetId, 
@@ -219,7 +225,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
       let existingList: ExamData[] = existingRaw ? JSON.parse(existingRaw) : [];
       if (Array.isArray(existingList)) {
         const filtered = existingList.filter(e => e.exam_code?.toUpperCase() !== codeToDelete.toUpperCase());
-        localStorage.setItem('ielts_saved_exams', JSON.stringify(filtered));
+        safeSaveExamListToLocalStorage(filtered);
       }
     } catch (e) {}
     setDeleteConfirmExamCode(null);
@@ -252,7 +258,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
     // Save to Centralized Server Database so all devices can access immediately
     await saveExamToServerDb(sanitizedExam);
 
-    // Dual persist in localStorage
+    // Dual persist in localStorage (stripped of heavy base64 to avoid 5MB quota limit)
     try {
       const existingRaw = localStorage.getItem('ielts_saved_exams');
       let existingList: ExamData[] = existingRaw ? JSON.parse(existingRaw) : [];
@@ -263,8 +269,8 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
       } else {
         existingList.push(sanitizedExam);
       }
-      localStorage.setItem('ielts_saved_exams', JSON.stringify(existingList));
-      localStorage.setItem('ielts_current_exam', JSON.stringify(sanitizedExam));
+      safeSaveExamListToLocalStorage(existingList);
+      safeSaveCurrentExamToLocalStorage(sanitizedExam);
     } catch (err) {
       console.warn('Could not save exam to localStorage:', err);
     }

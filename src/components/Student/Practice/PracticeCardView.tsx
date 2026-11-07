@@ -93,8 +93,17 @@ function normalizeToCardItem(input: PracticeCard | PracticeCardItem): PracticeCa
   let type: PracticeQuestionType = legacy.type || (legacy.item?.type) || 'multiple-choice';
 
   // 4. Normalize every option into a complete PracticeOption object with non-empty id, text, and isCorrect
+  const seenOptionIds = new Set<string>();
   const normalizedOptions: PracticeOption[] = rawOptions.map((rawOpt: any, idx: number) => {
-    const defaultId = `opt_${idx + 1}`;
+    let optId = (typeof rawOpt === 'object' && rawOpt !== null && rawOpt.id && String(rawOpt.id).trim().length > 0)
+      ? String(rawOpt.id).trim()
+      : `opt_auto_${idx + 1}`;
+    
+    // Guarantee 100% strict uniqueness across all options
+    if (seenOptionIds.has(optId)) {
+      optId = `${optId}_${idx + 1}`;
+    }
+    seenOptionIds.add(optId);
 
     if (typeof rawOpt === 'string') {
       const cleanText = rawOpt.trim();
@@ -117,7 +126,7 @@ function normalizeToCardItem(input: PracticeCard | PracticeCardItem): PracticeCa
       }
 
       return {
-        id: defaultId,
+        id: optId,
         text: cleanText || `Option ${idx + 1}`,
         isCorrect,
         distractorRationale: rationale
@@ -125,8 +134,7 @@ function normalizeToCardItem(input: PracticeCard | PracticeCardItem): PracticeCa
     }
 
     if (rawOpt && typeof rawOpt === 'object') {
-      const optId = String(rawOpt.id || defaultId);
-      const text = String(rawOpt.text || rawOpt.label || rawOpt.value || `Option ${idx + 1}`).trim();
+      const text = String(rawOpt.text || rawOpt.label || rawOpt.value || rawOpt.content || rawOpt.title || `Option ${idx + 1}`).trim();
       const cleanLower = text.toLowerCase();
 
       let isCorrect: boolean;
@@ -149,7 +157,7 @@ function normalizeToCardItem(input: PracticeCard | PracticeCardItem): PracticeCa
 
       return {
         id: optId,
-        text,
+        text: text || `Option ${idx + 1}`,
         isCorrect,
         distractorRationale: rationale,
         category: rawOpt.category
@@ -157,7 +165,7 @@ function normalizeToCardItem(input: PracticeCard | PracticeCardItem): PracticeCa
     }
 
     return {
-      id: defaultId,
+      id: optId,
       text: `Option ${idx + 1}`,
       isCorrect: false
     };
@@ -314,7 +322,7 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
       } else {
         // Enforce max selections if configured
         if (item.maxSelections && next.size >= item.maxSelections) {
-          return next;
+          return prev;
         }
         next.add(optId);
       }
@@ -352,7 +360,10 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
     if (item.type === 'multiple-choice') {
       if (item.options.length > 0) {
         if (!selectedSingleId) return;
-        const selectedOpt = item.options.find((o, idx) => (o.id || `opt_${idx + 1}`) === selectedSingleId);
+        const selectedOpt = item.options.find((o, idx) => {
+          const oId = (typeof o === 'object' && o !== null && o.id) ? String(o.id) : `opt_auto_${idx + 1}`;
+          return oId === selectedSingleId;
+        });
         itemCorrect = Boolean(selectedOpt?.isCorrect);
       } else {
         // Cloze gap text input fallback
@@ -383,7 +394,7 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
       const keys = Object.keys(categorizedMap);
       if (keys.length === 0) return;
       itemCorrect = item.options.every((opt, idx) => {
-        const optId = opt.id || `opt_${idx + 1}`;
+        const optId = (typeof opt === 'object' && opt !== null && opt.id) ? String(opt.id) : `opt_auto_${idx + 1}`;
         if (!opt.category) return true;
         return categorizedMap[optId] === opt.category;
       });
@@ -393,7 +404,7 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
     setIsSubmitted(true);
 
     // Expand all rationale micro-explanations upon submit
-    const allOptIds = new Set(item.options.map((o, idx) => o.id || `opt_${idx + 1}`));
+    const allOptIds = new Set(item.options.map((o, idx) => (typeof o === 'object' && o !== null && o.id) ? String(o.id) : `opt_auto_${idx + 1}`));
     setExpandedRationaleIds(allOptIds);
   };
 
@@ -437,8 +448,10 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
 
           <div className="space-y-2.5">
             {item.options.map((opt, idx) => {
-              const optId = opt.id || `opt_${idx + 1}`;
-              const optText = typeof opt === 'string' ? opt : (opt.text || `Option ${idx + 1}`);
+              const optId = (typeof opt === 'object' && opt !== null && opt.id) 
+                ? String(opt.id) 
+                : `opt_auto_${idx + 1}`;
+              const optText = (typeof opt === 'string' ? opt : (opt.text || '')).trim() || `Option ${idx + 1}`;
               const isSelected = selectedSingleId === optId;
               
               // Pedagogy Tier 1: Multi-layered colored border
@@ -565,8 +578,10 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
 
           <div className="space-y-2.5">
             {item.options.map((opt, idx) => {
-              const optId = opt.id || `opt_${idx + 1}`;
-              const optText = typeof opt === 'string' ? opt : (opt.text || `Option ${idx + 1}`);
+              const optId = (typeof opt === 'object' && opt !== null && opt.id) 
+                ? String(opt.id) 
+                : `opt_auto_${idx + 1}`;
+              const optText = (typeof opt === 'string' ? opt : (opt.text || '')).trim() || `Option ${idx + 1}`;
               const isSelected = selectedMultipleIds.has(optId);
 
               // Pedagogy Tier 1: Multi-layered colored border
@@ -795,8 +810,10 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
 
           <div className="space-y-3">
             {item.options.map((opt, idx) => {
-              const optId = opt.id || `opt_${idx + 1}`;
-              const optText = typeof opt === 'string' ? opt : (opt.text || `Option ${idx + 1}`);
+              const optId = (typeof opt === 'object' && opt !== null && opt.id) 
+                ? String(opt.id) 
+                : `opt_auto_${idx + 1}`;
+              const optText = (typeof opt === 'string' ? opt : (opt.text || '')).trim() || `Option ${idx + 1}`;
               const assignedCat = categorizedMap[optId];
               const isCorrectCat = opt.category ? assignedCat === opt.category : true;
 

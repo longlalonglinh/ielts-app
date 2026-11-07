@@ -377,21 +377,39 @@ function doGet(e) {
           phonetic: String(pRow[15] || ''),
           hints: String(pRow[16] || ''),
           explanation: String(pRow[17] || ''),
-          accepted_answers: [String(pRow[14] || '')].filter(Boolean),
-          options_data: Array.isArray(optionsParsed) && optionsParsed.length > 0 && typeof optionsParsed[0] === 'object'
-            ? optionsParsed
-            : Array.isArray(optionsParsed) && optionsParsed.length > 0
-              ? optionsParsed.map(function(s, sIdx) {
-                  var sClean = String(s).trim();
-                  var isCor = sClean.toLowerCase() === String(pRow[14] || '').trim().toLowerCase();
-                  return { id: 'opt_' + (sIdx + 1), text: sClean, isCorrect: isCor };
-                })
-              : undefined,
-          options: Array.isArray(optionsParsed) && optionsParsed.length > 0
-            ? (typeof optionsParsed[0] === 'string'
-                ? optionsParsed
-                : optionsParsed.map(function(o) { return String(o.text || o.label || o.value || ''); }))
-            : undefined,
+          options_data: (function() {
+            if (!Array.isArray(optionsParsed) || optionsParsed.length === 0) return undefined;
+            var targetClean = String(pRow[14] || '').trim().toLowerCase();
+            return optionsParsed.map(function(item, idx) {
+              var oId = (typeof item === 'object' && item !== null && item.id) ? String(item.id) : ('opt_' + (idx + 1));
+              var oText = typeof item === 'string' ? item.trim() : String(item.text || item.label || item.value || ('Option ' + (idx + 1))).trim();
+              var isCor = false;
+              if (typeof item === 'object' && item !== null) {
+                if (typeof item.isCorrect === 'boolean') isCor = item.isCorrect;
+                else if (typeof item.is_correct === 'boolean') isCor = item.is_correct;
+                else if (typeof item.correct === 'boolean') isCor = item.correct;
+              }
+              if (!isCor && targetClean) {
+                var lowText = oText.toLowerCase();
+                if (lowText === targetClean || targetClean.indexOf(lowText) !== -1 || lowText.indexOf(targetClean) !== -1) {
+                  isCor = true;
+                }
+              }
+              return {
+                id: oId,
+                text: oText || ('Option ' + (idx + 1)),
+                isCorrect: isCor,
+                distractorRationale: (typeof item === 'object' && item !== null && (item.distractorRationale || item.explanation)) ? String(item.distractorRationale || item.explanation) : ''
+              };
+            });
+          })(),
+          options: (function() {
+            if (!Array.isArray(optionsParsed) || optionsParsed.length === 0) return undefined;
+            return optionsParsed.map(function(item, idx) {
+              if (typeof item === 'string') return item.trim();
+              return String(item.text || item.label || item.value || ('Option ' + (idx + 1))).trim();
+            });
+          })(),
           updated_at: String(pRow[18] || '')
         };
         
@@ -445,8 +463,14 @@ function doGet(e) {
  */
 function doPost(e) {
   var lock = LockService.getScriptLock();
-  // Wait up to 10 seconds for script lock to prevent race condition row corruptions
-  var hasLock = lock.tryLock(10000);
+  // Wait up to 30 seconds for script lock to prevent concurrency collisions during simultaneous submissions
+  var hasLock = false;
+  try {
+    lock.waitLock(30000);
+    hasLock = true;
+  } catch (lockErr) {
+    hasLock = lock.tryLock(5000);
+  }
   
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -928,20 +952,39 @@ function doPost(e) {
             hints: String(pRow[16] || ''),
             explanation: String(pRow[17] || ''),
             accepted_answers: [String(pRow[14] || '')].filter(Boolean),
-            options_data: Array.isArray(optionsParsed) && optionsParsed.length > 0 && typeof optionsParsed[0] === 'object'
-              ? optionsParsed
-              : Array.isArray(optionsParsed) && optionsParsed.length > 0
-                ? optionsParsed.map(function(s, sIdx) {
-                    var sClean = String(s).trim();
-                    var isCor = sClean.toLowerCase() === String(pRow[14] || '').trim().toLowerCase();
-                    return { id: 'opt_' + (sIdx + 1), text: sClean, isCorrect: isCor };
-                  })
-                : undefined,
-            options: Array.isArray(optionsParsed) && optionsParsed.length > 0
-              ? (typeof optionsParsed[0] === 'string'
-                  ? optionsParsed
-                  : optionsParsed.map(function(o) { return String(o.text || o.label || o.value || ''); }))
-              : undefined,
+            options_data: (function() {
+              if (!Array.isArray(optionsParsed) || optionsParsed.length === 0) return undefined;
+              var targetClean = String(pRow[14] || '').trim().toLowerCase();
+              return optionsParsed.map(function(item, idx) {
+                var oId = (typeof item === 'object' && item !== null && item.id) ? String(item.id) : ('opt_' + (idx + 1));
+                var oText = typeof item === 'string' ? item.trim() : String(item.text || item.label || item.value || ('Option ' + (idx + 1))).trim();
+                var isCor = false;
+                if (typeof item === 'object' && item !== null) {
+                  if (typeof item.isCorrect === 'boolean') isCor = item.isCorrect;
+                  else if (typeof item.is_correct === 'boolean') isCor = item.is_correct;
+                  else if (typeof item.correct === 'boolean') isCor = item.correct;
+                }
+                if (!isCor && targetClean) {
+                  var lowText = oText.toLowerCase();
+                  if (lowText === targetClean || targetClean.indexOf(lowText) !== -1 || lowText.indexOf(targetClean) !== -1) {
+                    isCor = true;
+                  }
+                }
+                return {
+                  id: oId,
+                  text: oText || ('Option ' + (idx + 1)),
+                  isCorrect: isCor,
+                  distractorRationale: (typeof item === 'object' && item !== null && (item.distractorRationale || item.explanation)) ? String(item.distractorRationale || item.explanation) : ''
+                };
+              });
+            })(),
+            options: (function() {
+              if (!Array.isArray(optionsParsed) || optionsParsed.length === 0) return undefined;
+              return optionsParsed.map(function(item, idx) {
+                if (typeof item === 'string') return item.trim();
+                return String(item.text || item.label || item.value || ('Option ' + (idx + 1))).trim();
+              });
+            })(),
             updated_at: String(pRow[18] || '')
           };
           
@@ -982,7 +1025,9 @@ function doPost(e) {
     return createJsonResponse({ status: 'error', success: false, message: err.toString() });
   } finally {
     if (hasLock) {
-      lock.releaseLock();
+      try {
+        lock.releaseLock();
+      } catch (relErr) {}
     }
   }
 }

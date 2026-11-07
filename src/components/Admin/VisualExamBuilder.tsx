@@ -27,7 +27,7 @@ import {
   Eye
 } from 'lucide-react';
 import { ExamData, Question, ReadingPassageItem, QuestionType, IELTSQuestionType, canonicalizeQuestionType, SkillType, ExamType } from '../../types';
-import { saveExamToIndexedDB } from '../../services/indexedDb';
+import { saveExamToIndexedDB, safeSaveExamListToLocalStorage, safeSaveCurrentExamToLocalStorage } from '../../services/indexedDb';
 import { saveExamToServerDb } from '../../services/api';
 import { Task1ImageUploader } from './Task1ImageUploader';
 import { QuestionEditorItem } from './QuestionEditorItem';
@@ -774,7 +774,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       // 2. Save to Server DB with draft flag (Students are blocked via 403 API)
       await saveExamToServerDb(draftExam).catch(() => {});
 
-      // 3. Dual save to localStorage safely
+      // 3. Dual save to localStorage safely (stripped of heavy base64 to avoid 5MB quota limit)
       try {
         const existingRaw = localStorage.getItem('ielts_saved_exams');
         let existingList: ExamData[] = existingRaw ? JSON.parse(existingRaw) : [];
@@ -782,8 +782,8 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
         const idx = existingList.findIndex(e => e.exam_code === draftExam.exam_code);
         if (idx >= 0) existingList[idx] = draftExam;
         else existingList.push(draftExam);
-        localStorage.setItem('ielts_saved_exams', JSON.stringify(existingList));
-        localStorage.setItem('ielts_current_exam', JSON.stringify(draftExam));
+        safeSaveExamListToLocalStorage(existingList);
+        safeSaveCurrentExamToLocalStorage(draftExam);
       } catch (e) {}
 
       const timeStr = new Date().toLocaleTimeString();
@@ -865,7 +865,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       console.warn('Could not auto-save to server DB:', serverErr);
     }
 
-    // 3. Dual save to localStorage safely
+    // 3. Dual save to localStorage safely (stripped of heavy base64 to avoid 5MB quota limit)
     try {
       const existingRaw = localStorage.getItem('ielts_saved_exams');
       let existingList: ExamData[] = existingRaw ? JSON.parse(existingRaw) : [];
@@ -876,8 +876,8 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
       } else {
         existingList.push(completeExam);
       }
-      localStorage.setItem('ielts_saved_exams', JSON.stringify(existingList));
-      localStorage.setItem('ielts_current_exam', JSON.stringify(completeExam));
+      safeSaveExamListToLocalStorage(existingList);
+      safeSaveCurrentExamToLocalStorage(completeExam);
     } catch (e) {
       console.warn('LocalStorage save warning:', e);
     }

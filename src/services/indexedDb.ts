@@ -641,5 +641,47 @@ export async function clearCandidateAllDrafts(
   } catch (e) {}
 }
 
+/**
+ * Strips heavy Base64 image and audio payloads before storing in LocalStorage
+ * preventing QuotaExceededError (5MB browser limit). Full fidelity remains preserved in IndexedDB.
+ */
+export function sanitizeExamForLocalStorage(exam: ExamData): ExamData {
+  if (!exam) return exam;
+  const clone: any = { ...exam };
+  if (clone.writing_task1_image && String(clone.writing_task1_image).length > 256) {
+    clone.writing_task1_image = '[IMAGE_STORED_IN_INDEXEDDB]';
+  }
+  if (clone.writing_task2_image && String(clone.writing_task2_image).length > 256) {
+    clone.writing_task2_image = '[IMAGE_STORED_IN_INDEXEDDB]';
+  }
+  if (clone.audio_url && String(clone.audio_url).startsWith('data:')) {
+    clone.audio_url = '[AUDIO_STORED_IN_INDEXEDDB]';
+  }
+  if (clone.listening_audio_url && String(clone.listening_audio_url).startsWith('data:')) {
+    clone.listening_audio_url = '[AUDIO_STORED_IN_INDEXEDDB]';
+  }
+  return clone as ExamData;
+}
+
+export function safeSaveExamListToLocalStorage(exams: ExamData[]): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  try {
+    const lightweightList = exams.map(ex => sanitizeExamForLocalStorage(ex));
+    localStorage.setItem('ielts_saved_exams', JSON.stringify(lightweightList));
+  } catch (err) {
+    console.warn('[LocalStorage Safe Save] Quota limit reached when saving ielts_saved_exams:', err);
+  }
+}
+
+export function safeSaveCurrentExamToLocalStorage(exam: ExamData): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  try {
+    const lightweightExam = sanitizeExamForLocalStorage(exam);
+    localStorage.setItem('ielts_current_exam', JSON.stringify(lightweightExam));
+  } catch (err) {
+    console.warn('[LocalStorage Safe Save] Quota limit reached when saving ielts_current_exam:', err);
+  }
+}
+
 
 

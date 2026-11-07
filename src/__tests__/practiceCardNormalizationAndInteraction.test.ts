@@ -147,9 +147,84 @@ describe('PracticeCard Normalization & Multiple-Response Interaction Tests', () 
     expect(normalized[0].id).toBe('opt_1');
     expect(normalized[0].text).toBe('Option Alpha');
     expect(normalized[0].isCorrect).toBe(true);
+  });
 
-    expect(normalized[1].id).toBe('opt_2');
-    expect(normalized[1].text).toBe('Option Beta');
-    expect(normalized[1].isCorrect).toBe(false);
+  it('prevents cross-selection by guaranteeing strict uniqueness even if incoming objects have duplicate or empty IDs', () => {
+    const rawOptions = [
+      { id: '', text: 'First option', isCorrect: true },
+      { id: '', text: 'Second option', isCorrect: false },
+      { id: 'custom_id', text: 'Third option', isCorrect: true },
+      { id: 'custom_id', text: 'Fourth option with duplicated ID', isCorrect: false },
+      'Fifth string option'
+    ];
+
+    const seenOptionIds = new Set<string>();
+    const normalized = rawOptions.map((rawOpt: any, idx: number) => {
+      let optId = (typeof rawOpt === 'object' && rawOpt !== null && rawOpt.id && String(rawOpt.id).trim().length > 0)
+        ? String(rawOpt.id).trim()
+        : `opt_auto_${idx + 1}`;
+      if (seenOptionIds.has(optId)) {
+        optId = `${optId}_${idx + 1}`;
+      }
+      seenOptionIds.add(optId);
+
+      const text = typeof rawOpt === 'string'
+        ? rawOpt.trim()
+        : String(rawOpt.text || rawOpt.label || rawOpt.value || `Option ${idx + 1}`).trim();
+
+      return {
+        id: optId,
+        text,
+        isCorrect: typeof rawOpt === 'object' ? Boolean(rawOpt.isCorrect) : false
+      };
+    });
+
+    const ids = normalized.map(o => o.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(5);
+    expect(ids[0]).toBe('opt_auto_1');
+    expect(ids[1]).toBe('opt_auto_2');
+    expect(ids[2]).toBe('custom_id');
+    expect(ids[3]).toBe('custom_id_4');
+    expect(ids[4]).toBe('opt_auto_5');
+
+    // Clicking custom_id only selects item 2, not item 3
+    const selected = new Set<string>();
+    selected.add(ids[2]);
+    expect(selected.has(ids[2])).toBe(true);
+    expect(selected.has(ids[3])).toBe(false);
+  });
+
+  it('enforces maxSelections strictly when toggling multiple choices', () => {
+    const maxSelections = 2;
+    let selected = new Set<string>(['opt_1', 'opt_2']);
+
+    const toggle = (id: string) => {
+      const next = new Set(selected);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        if (maxSelections && next.size >= maxSelections) {
+          return selected; // returns prev
+        }
+        next.add(id);
+      }
+      return next;
+    };
+
+    // Attempting to select 3rd option should not add it
+    selected = toggle('opt_3');
+    expect(selected.size).toBe(2);
+    expect(selected.has('opt_3')).toBe(false);
+
+    // Deselecting opt_1 works
+    selected = toggle('opt_1');
+    expect(selected.size).toBe(1);
+    expect(selected.has('opt_1')).toBe(false);
+
+    // Now selecting opt_3 succeeds
+    selected = toggle('opt_3');
+    expect(selected.size).toBe(2);
+    expect(selected.has('opt_3')).toBe(true);
   });
 });

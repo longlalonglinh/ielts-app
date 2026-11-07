@@ -40,6 +40,8 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
   const cumulativeOffScreenMsRef = useRef<number>(0);
   const rapidSwitchTimestampsRef = useRef<number[]>([]);
 
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
   // Stop and release camera / audio MediaStream tracks safely to prevent hardware memory leaks
   const cleanupMediaStreams = () => {
     if (mediaStreamRef.current) {
@@ -51,6 +53,18 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
         console.warn('Error stopping proctoring media tracks:', err);
       }
       mediaStreamRef.current = null;
+    }
+
+    if (videoRef.current && videoRef.current.srcObject) {
+      try {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach((track) => {
+          track.stop();
+        });
+        videoRef.current.srcObject = null;
+      } catch (err) {
+        console.warn('Error stopping videoRef tracks:', err);
+      }
     }
   };
 
@@ -65,6 +79,15 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
       cleanupMediaStreams();
     };
   }, [testMode]);
+
+  // Unconditional hardware & timer cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      cleanupMediaStreams();
+      if (lockTimerRef.current) clearInterval(lockTimerRef.current);
+      if (blurGraceTimerRef.current) clearTimeout(blurGraceTimerRef.current);
+    };
+  }, []);
 
   // Restore cumulative data from IndexedDB / Storage on mount
   useEffect(() => {
