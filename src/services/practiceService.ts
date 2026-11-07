@@ -145,15 +145,16 @@ export const practiceService = {
   // Fetch practice decks directly from Google Sheets tab PRACTICE_QUESTIONS
   async fetchFromSheets(gasUrl: string): Promise<{ success: boolean; decks?: CustomPracticeDeck[]; error?: string; is_initialized?: boolean }> {
     const res = await fetchPracticeDecksFromGAS(gasUrl);
-    if (res.success && res.decks && res.decks.length > 0) {
-      localStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(res.decks));
-      const totalCards = res.decks.reduce((acc, d) => acc + (d.cards?.length || 0), 0);
+    if (res.success) {
+      const decks = res.decks || [];
+      localStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(decks));
+      const totalCards = decks.reduce((acc, d) => acc + (d.cards?.length || 0), 0);
       localStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
         is_on_sheets: true,
         total_cards: totalCards,
         last_synced: new Date().toISOString()
       }));
-      return { success: true, decks: res.decks, is_initialized: true };
+      return { success: true, decks, is_initialized: true };
     }
     return { 
       success: res.success, 

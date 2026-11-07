@@ -152,15 +152,17 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
     setSuccessMsg(null);
     try {
       const res = await practiceService.fetchFromSheets(effectiveGasUrl);
-      if (res.success && res.decks && res.decks.length > 0) {
-        const totalCards = res.decks.reduce((acc, d) => acc + (d.cards?.length || 0), 0);
-        setSuccessMsg(`Đã tải thành công ${res.decks.length} bộ đề (${totalCards} câu hỏi) từ Google Sheets về máy!`);
+      if (res.success) {
+        const count = res.decks?.length || 0;
+        setSuccessMsg(
+          count > 0
+            ? `Đã tải thành công ${count} bộ đề từ tab PRACTICE_QUESTIONS!`
+            : `Tab PRACTICE_QUESTIONS đã kết nối thành công (hiện đang trống, hãy tạo bộ đề mới và bấm Lưu).`
+        );
         setDbStatus(practiceService.getDatabaseStatus());
-        refreshDecks(res.decks[0]?.deck_id);
-      } else if (res.is_initialized === false) {
-        setErrorMsg('Tab PRACTICE_QUESTIONS chưa tồn tại trên Google Sheets. Vui lòng nhấn "Khởi tạo DB trên Sheet" trước.');
+        refreshDecks();
       } else {
-        setErrorMsg(res.error || 'Không tìm thấy câu hỏi luyện tập nào trên Google Sheets.');
+        setErrorMsg(res.error || 'Chưa tìm thấy tab PRACTICE_QUESTIONS.');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Lỗi khi tải dữ liệu từ Google Sheets.');

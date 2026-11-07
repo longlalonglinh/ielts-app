@@ -759,7 +759,7 @@ function doPost(e) {
       } else if (mode === 'replace_all') {
         var lastRow = sheetP.getLastRow();
         if (lastRow > 1) {
-          sheetP.deleteRows(2, lastRow - 1);
+          sheetP.getRange(2, 1, lastRow - 1, headerRow.length).clearContent();
         }
       }
       

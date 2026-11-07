@@ -1779,43 +1779,28 @@ export async function initPracticeDatabaseInGAS(
   }
 
   try {
-    const res = await fetchWithRetry(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      redirect: 'follow',
-      body: JSON.stringify({
-        action: 'INIT_PRACTICE_DB',
-        mode,
-        decks
-      })
-    }, 2, 1000);
-
-    if (res.ok) {
-      const result = await res.json();
-      if (result && (result.success || result.status === 'success')) {
-        return {
-          success: true,
-          message: result.message || 'Practice database initialized on Google Sheets successfully!',
-          total_cards: result.total_cards
-        };
-      } else {
-        return {
-          success: false,
-          error: result?.error || result?.message || 'Database initialization failed on Google Apps Script.'
-        };
-      }
-    } else {
-      const errText = await res.text().catch(() => '');
+    const payload = {
+      action: 'INIT_PRACTICE_DB',
+      mode,
+      decks
+    };
+    const result = await postToGasWithLockRetry(apiUrl, payload, 2);
+    if (result && (result.status === 'success' || result.success || result.is_opaque)) {
       return {
-        success: false,
-        error: `Google Apps Script returned HTTP ${res.status}: ${errText.slice(0, 150)}`
+        success: true,
+        message: result.message || 'Đã khởi tạo và đồng bộ tab PRACTICE_QUESTIONS trên Google Sheets thành công!',
+        total_cards: result.total_cards ?? decks.reduce((acc, d) => acc + (d.cards?.length || 0), 0)
       };
     }
+    return {
+      success: false,
+      error: result?.message || result?.error || 'Lỗi khởi tạo từ Google Apps Script.'
+    };
   } catch (err: any) {
     console.warn('initPracticeDatabaseInGAS failed:', err);
     return { 
       success: false, 
-      error: `Database initialization failed (${err.message || 'Network error'}). Please verify Web App access permissions (Anyone) on Google Apps Script.` 
+      error: `Lỗi kết nối GAS: ${err.message || 'Network error'}` 
     };
   }
 }
@@ -1835,39 +1820,27 @@ export async function savePracticeDeckToGAS(
   }
 
   try {
-    const res = await fetchWithRetry(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      redirect: 'follow',
-      body: JSON.stringify({
-        action: 'SAVE_PRACTICE_DECK',
-        mode: 'append',
-        deck
-      })
-    }, 2, 800);
-
-    if (res.ok) {
-      const result = await res.json();
-      if (result && (result.success || result.status === 'success')) {
-        return { success: true, message: result.message || 'Practice deck saved to Google Sheets!' };
-      } else {
-        return {
-          success: false,
-          error: result?.error || result?.message || 'Unable to save practice deck to Google Sheets'
-        };
-      }
-    } else {
-      const errText = await res.text().catch(() => '');
+    const payload = {
+      action: 'SAVE_PRACTICE_DECK',
+      mode: 'append',
+      deck
+    };
+    const result = await postToGasWithLockRetry(apiUrl, payload, 2);
+    if (result && (result.status === 'success' || result.success || result.is_opaque)) {
       return {
-        success: false,
-        error: `Google Apps Script returned HTTP ${res.status}: ${errText.slice(0, 150)}`
+        success: true,
+        message: result.message || 'Đã lưu bộ đề lên Google Sheets thành công!'
       };
     }
+    return {
+      success: false,
+      error: result?.message || result?.error || 'Không thể lưu bộ đề lên Google Sheets'
+    };
   } catch (err: any) {
     console.warn('savePracticeDeckToGAS failed:', err);
     return { 
       success: false, 
-      error: `Unable to save practice deck to Google Sheets: ${err.message || 'Network error'}` 
+      error: `Lỗi kết nối GAS: ${err.message || 'Network error'}` 
     };
   }
 }
@@ -1884,31 +1857,26 @@ export async function syncStudentProgressToGAS(
   }
 
   try {
-    const res = await fetchWithRetry(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({
-        action: 'sync_student_progress',
-        progress_records: records
-      })
-    }, 2, 800);
-
-    if (res.ok) {
-      const result = await res.json();
-      if (result && result.success) {
-        return { 
-          success: true, 
-          message: result.message || 'Learner progress saved to Google Sheets successfully!',
-          updated_count: result.updated_count
-        };
-      }
+    const payload = {
+      action: 'sync_student_progress',
+      progress_records: records
+    };
+    const result = await postToGasWithLockRetry(apiUrl, payload, 2);
+    if (result && (result.status === 'success' || result.success || result.is_opaque)) {
+      return { 
+        success: true, 
+        message: result.message || 'Learner progress saved to Google Sheets successfully!',
+        updated_count: result.updated_count ?? records.length
+      };
     }
+    return {
+      success: false,
+      error: result?.message || result?.error || 'Unable to sync progress to Google Sheets'
+    };
   } catch (err: any) {
     console.warn('syncStudentProgressToGAS failed:', err);
     return { success: false, error: err.message };
   }
-
-  return { success: false, error: 'Unable to sync progress to Google Sheets' };
 }
 
 /**
