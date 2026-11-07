@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   FileEdit, 
   Copy, 
@@ -47,6 +47,7 @@ export const ManualGrading: React.FC<ManualGradingProps> = ({ apiUrl, gasUrl }) 
     overall_writing: 6.0,
     feedback: ''
   });
+  const activeSubIdRef = useRef<string | null>(null);
 
   const countWords = (text?: string): number => {
     if (!text || typeof text !== 'string') return 0;
@@ -66,9 +67,11 @@ export const ManualGrading: React.FC<ManualGradingProps> = ({ apiUrl, gasUrl }) 
         const pending = clean.find((s) => s.writing_status === 'PENDING_TEACHER');
         if (pending) {
           setSelectedSub(pending);
+          activeSubIdRef.current = pending.submission_id;
           loadDraftOrExistingScore(pending);
         } else if (clean.length > 0) {
           setSelectedSub(clean[0]);
+          activeSubIdRef.current = clean[0].submission_id;
           loadDraftOrExistingScore(clean[0]);
         }
       }
@@ -81,7 +84,10 @@ export const ManualGrading: React.FC<ManualGradingProps> = ({ apiUrl, gasUrl }) 
 
   const loadDraftOrExistingScore = async (sub: SubmissionRecord) => {
     if (!sub || !sub.submission_id) return;
-    const draftKey = `WRITING_GRADE_DRAFT_${sub.submission_id}`;
+    const currentId = sub.submission_id;
+    activeSubIdRef.current = currentId;
+
+    const draftKey = `WRITING_GRADE_DRAFT_${currentId}`;
     let loadedDraft: GradingForm | null = null;
     
     try {
@@ -95,6 +101,11 @@ export const ManualGrading: React.FC<ManualGradingProps> = ({ apiUrl, gasUrl }) 
         }
       }
     } catch (e) {}
+
+    // Concurrency / Race-Condition Guard: Discard stale async resolution if teacher already switched candidates
+    if (activeSubIdRef.current !== currentId) {
+      return;
+    }
 
     if (loadedDraft && typeof loadedDraft.tr === 'number') {
       setGradingForm(loadedDraft);
@@ -258,6 +269,7 @@ ${gradingForm.feedback || 'The essay meets task requirements. Focus on incorpora
 
   const handleSelectCandidate = (sub: SubmissionRecord) => {
     setSelectedSub(sub);
+    activeSubIdRef.current = sub.submission_id;
     loadDraftOrExistingScore(sub);
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setMobileTab('grading');

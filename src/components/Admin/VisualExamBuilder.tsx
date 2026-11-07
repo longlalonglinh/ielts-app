@@ -825,7 +825,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     watch('listening_questions')
   ]);
 
-  // Debounced live draft sync to parent PreviewModule (250ms)
+  // Debounced live draft sync to parent PreviewModule (800ms for smooth typing performance)
   useEffect(() => {
     if (!onDraftChange) return;
     const timer = setTimeout(() => {
@@ -835,7 +835,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
         const liveExam = buildExamFromForm(formData, 'draft');
         onDraftChange(liveExam);
       }
-    }, 250);
+    }, 800);
     return () => clearTimeout(timer);
   }, [
     watchedPassages,
