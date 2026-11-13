@@ -1238,44 +1238,204 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     });
   });
 
+  async function fetchExamFromGasBridge(gasUrl: string, code: string): Promise<any | null> {
+    if (!gasUrl || gasUrl.includes('AKfycbx_mock')) return null;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const fetchUrl = `${gasUrl}?action=get_exam&exam_code=${encodeURIComponent(code)}&_t=${Date.now()}`;
+      const gasRes = await fetch(fetchUrl, { signal: controller.signal, redirect: 'follow' });
+      clearTimeout(timeoutId);
+      if (!gasRes.ok) return null;
+
+      const gasData = await gasRes.json();
+      const questions = Array.isArray(gasData.questions)
+        ? gasData.questions
+        : (Array.isArray(gasData.data) ? gasData.data : []);
+      const meta = gasData.exam_meta || gasData.meta || {};
+      const rawPassage = String(meta.reading_passage || meta.passage_text || gasData.reading_passage || '').trim();
+      const task1Prompt = String(meta.writing_task1_prompt || gasData.writing_task1_prompt || '').trim();
+      const task2Prompt = String(meta.writing_task2_prompt || gasData.writing_task2_prompt || '').trim();
+      const task1Image = String(
+        meta.writing_task1_image || meta.writing_task1_image_url || meta.writing_task1_imageUrl || gasData.writing_task1_image || ''
+      ).trim();
+      const audioUrl = String(meta.audio_url || gasData.audio_url || '').trim();
+
+      if (questions.length > 0 || meta.title || rawPassage || task1Prompt || task2Prompt || task1Image || audioUrl) {
+        const listeningQs = questions.filter((q: any) => String(q.section || '').toLowerCase() === 'listening');
+        const readingQs = questions.filter((q: any) => String(q.section || '').toLowerCase() !== 'listening');
+
+        let passages: any[] = [];
+        if (rawPassage) {
+          if (rawPassage.includes('--- Passage Divider ---')) {
+            const chunks = rawPassage
+              .split(/\r?\n\s*---\s*Passage Divider\s*---\s*\r?\n|--- Passage Divider ---/i)
+              .map((c: string) => c.trim())
+              .filter(Boolean);
+            const totalReading = readingQs.length;
+            const chunkCount = Math.max(chunks.length, 1);
+            passages = chunks.map((chunkText: string, idx: number) => {
+              const pIndex = Math.min(idx + 1, 3);
+              const startIdx = Math.floor((idx * totalReading) / chunkCount);
+              const endIdx = Math.floor(((idx + 1) * totalReading) / chunkCount);
+              return {
+                passage_index: pIndex,
+                title: `Reading Passage ${pIndex}`,
+                text: chunkText,
+                questions: readingQs.slice(startIdx, endIdx).map((q: any) => ({ ...q, passage_index: pIndex }))
+              };
+            });
+          } else {
+            passages = [{
+              passage_index: 1,
+              title: 'Reading Passage 1',
+              text: rawPassage,
+              questions: readingQs.map((q: any) => ({ ...q, passage_index: 1 }))
+            }];
+          }
+        }
+
+        const detectedSkills: string[] = [];
+        if (listeningQs.length > 0 || audioUrl) detectedSkills.push('listening');
+        if (readingQs.length > 0 || rawPassage) detectedSkills.push('reading');
+        if (task1Prompt || task2Prompt || task1Image) detectedSkills.push('writing');
+        if (detectedSkills.length === 0) detectedSkills.push('reading');
+
+        const bridgeExam = {
+          exam_code: code,
+          title: meta.title || `IELTS Examination - ${code}`,
+          test_type: meta.test_type || 'TEST',
+          exam_type: detectedSkills.length === 1 ? 'one_skill' : detectedSkills.length === 2 ? 'two_skills' : 'full_test',
+          skills: detectedSkills,
+          duration_mins: Number(meta.duration_mins) || 120,
+          audio_url: audioUrl,
+          audio_title: meta.audio_title || '',
+          passage_title: 'Reading Passage 1',
+          passage_text: rawPassage,
+          reading_passage: rawPassage,
+          passages,
+          listening_questions: listeningQs,
+          reading_questions: readingQs,
+          writing_task1_prompt: task1Prompt,
+          writing_task1_image: task1Image,
+          writing_task1_image_url: task1Image,
+          writing_task1_imageUrl: task1Image,
+          writing_task2_prompt: task2Prompt,
+          questions,
+          status: 'published',
+          is_draft: false
+        };
+
+        const savedBridge = saveStoredExam(bridgeExam);
+        setCachedExam(code, savedBridge);
+        return savedBridge;
+      }
+    } catch (gasErr: any) {
+      console.warn(`[GAS Bridge Fetch Error for ${code}]:`, gasErr.message);
+    }
+    return null;
+  }
+
   // Google Sheets Webhook & Cache Sync Route (/api/sync-sheet and /api/admin/sync-sheet)
   const handleSyncSheet = async (req: express.Request, res: express.Response) => {
     try {
       const examCode = (req.body?.exam_code || req.query?.exam_code || '').toString().trim().toUpperCase();
       const spreadsheetId = (req.body?.spreadsheet_id || req.query?.spreadsheet_id || '').toString().trim();
+      const config = getStoredConfig();
+      const gasUrl = (req.body?.gas_url || req.query?.gas_url || config.gas_url || '').toString().trim();
 
       if (examCode) {
-        const syncResult = await syncExamFromGoogleSheets(examCode, spreadsheetId || undefined);
-        if (syncResult.success) {
+        if (isServiceAccountConfigured()) {
+          const syncResult = await syncExamFromGoogleSheets(examCode, spreadsheetId || undefined);
+          if (syncResult.success) {
+            return res.json({
+              success: true,
+              exam_code: examCode,
+              synced_at: new Date().toISOString(),
+              source: 'service_account_sheets_v4',
+              message: `Successfully updated server in-memory cache for exam [${examCode}].`
+            });
+          }
+          if (!gasUrl || gasUrl.includes('AKfycbx_mock')) {
+            return res.status(400).json({
+              success: false,
+              error: syncResult.error || `Failed to sync exam [${examCode}] from Google Sheets.`
+            });
+          }
+        }
+
+        // GAS Bridge fallback when Google Service Account is not configured
+        const gasExam = await fetchExamFromGasBridge(gasUrl, examCode);
+        if (gasExam) {
+          saveStoredConfig({ last_synced_at: new Date().toISOString() });
           return res.json({
             success: true,
             exam_code: examCode,
             synced_at: new Date().toISOString(),
-            source: 'service_account_sheets_v4',
-            message: `Successfully updated server in-memory cache for exam [${examCode}].`
-          });
-        } else {
-          return res.status(400).json({
-            success: false,
-            error: syncResult.error || `Failed to sync exam [${examCode}] from Google Sheets.`
+            source: 'gas_bridge',
+            message: `Successfully updated server in-memory cache for exam [${examCode}] via Google Apps Script.`
           });
         }
+
+        return res.status(400).json({
+          success: false,
+          error: `Failed to sync exam [${examCode}] from Google Sheets (Service Account & GAS fallback found no matching exam).`
+        });
       } else {
-        const syncAllRes = await syncAllExamsFromGoogleSheets(spreadsheetId || undefined);
-        if (syncAllRes.success) {
-          return res.json({
-            success: true,
-            synced_count: syncAllRes.count,
-            synced_at: new Date().toISOString(),
-            source: 'service_account_sheets_v4',
-            message: `Successfully synchronized ${syncAllRes.count} exams into Server In-Memory Cache (<20ms).`
-          });
-        } else {
-          return res.status(400).json({
-            success: false,
-            error: syncAllRes.error || 'Failed to sync exams from Google Sheets.'
-          });
+        if (isServiceAccountConfigured()) {
+          const syncAllRes = await syncAllExamsFromGoogleSheets(spreadsheetId || undefined);
+          if (syncAllRes.success) {
+            return res.json({
+              success: true,
+              synced_count: syncAllRes.count,
+              synced_at: new Date().toISOString(),
+              source: 'service_account_sheets_v4',
+              message: `Successfully synchronized ${syncAllRes.count} exams into Server In-Memory Cache (<20ms).`
+            });
+          }
+          if (!gasUrl || gasUrl.includes('AKfycbx_mock')) {
+            return res.status(400).json({
+              success: false,
+              error: syncAllRes.error || 'Failed to sync exams from Google Sheets.'
+            });
+          }
         }
+
+        // GAS Bridge fallback for sync-all (?action=get_exams -> hydrate each exam)
+        if (gasUrl && !gasUrl.includes('AKfycbx_mock')) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
+          const listRes = await fetch(`${gasUrl}?action=get_exams&_t=${Date.now()}`, {
+            signal: controller.signal,
+            redirect: 'follow'
+          });
+          clearTimeout(timeoutId);
+
+          if (listRes.ok) {
+            const listJson = await listRes.json();
+            const examMetas = Array.isArray(listJson?.exams) ? listJson.exams : [];
+            let syncedCount = 0;
+            for (const item of examMetas) {
+              const code = String(item?.exam_code || '').trim().toUpperCase();
+              if (!code) continue;
+              const hydrated = await fetchExamFromGasBridge(gasUrl, code);
+              if (hydrated) syncedCount++;
+            }
+            saveStoredConfig({ last_synced_at: new Date().toISOString() });
+            return res.json({
+              success: true,
+              synced_count: syncedCount,
+              synced_at: new Date().toISOString(),
+              source: 'gas_bridge',
+              message: `Successfully synchronized ${syncedCount} exams into Server In-Memory Cache via Google Apps Script.`
+            });
+          }
+        }
+
+        return res.status(400).json({
+          success: false,
+          error: 'Google Service Account / Spreadsheet ID or GAS Web App URL is not configured.'
+        });
       }
     } catch (err: any) {
       console.error('[Sync Sheet Error]:', err);
@@ -1354,100 +1514,9 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     // Tier 4: Fallback to Google Apps Script bridge if available
     if (!fullExam || forceFresh) {
       const config = getStoredConfig();
-      if (config.gas_url && !config.gas_url.includes('AKfycbx_mock')) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 12000);
-          const fetchUrl = `${config.gas_url}?action=get_exam&exam_code=${encodeURIComponent(code)}&_t=${Date.now()}`;
-          const gasRes = await fetch(fetchUrl, { signal: controller.signal });
-          clearTimeout(timeoutId);
-          if (gasRes.ok) {
-            const gasData = await gasRes.json();
-            const questions = Array.isArray(gasData.questions)
-              ? gasData.questions
-              : (Array.isArray(gasData.data) ? gasData.data : []);
-            const meta = gasData.exam_meta || gasData.meta || {};
-            const rawPassage = String(meta.reading_passage || meta.passage_text || gasData.reading_passage || '').trim();
-            const task1Prompt = String(meta.writing_task1_prompt || gasData.writing_task1_prompt || '').trim();
-            const task2Prompt = String(meta.writing_task2_prompt || gasData.writing_task2_prompt || '').trim();
-            const task1Image = String(
-              meta.writing_task1_image || meta.writing_task1_image_url || meta.writing_task1_imageUrl || gasData.writing_task1_image || ''
-            ).trim();
-            const audioUrl = String(meta.audio_url || gasData.audio_url || '').trim();
-
-            if (questions.length > 0 || meta.title || rawPassage || task1Prompt || task2Prompt || task1Image || audioUrl) {
-              const listeningQs = questions.filter((q: any) => String(q.section || '').toLowerCase() === 'listening');
-              const readingQs = questions.filter((q: any) => String(q.section || '').toLowerCase() !== 'listening');
-
-              let passages: any[] = [];
-              if (rawPassage) {
-                if (rawPassage.includes('--- Passage Divider ---')) {
-                  const chunks = rawPassage
-                    .split(/\r?\n\s*---\s*Passage Divider\s*---\s*\r?\n|--- Passage Divider ---/i)
-                    .map((c: string) => c.trim())
-                    .filter(Boolean);
-                  const totalReading = readingQs.length;
-                  const chunkCount = Math.max(chunks.length, 1);
-                  passages = chunks.map((chunkText: string, idx: number) => {
-                    const pIndex = Math.min(idx + 1, 3);
-                    const startIdx = Math.floor((idx * totalReading) / chunkCount);
-                    const endIdx = Math.floor(((idx + 1) * totalReading) / chunkCount);
-                    return {
-                      passage_index: pIndex,
-                      title: `Reading Passage ${pIndex}`,
-                      text: chunkText,
-                      questions: readingQs.slice(startIdx, endIdx).map((q: any) => ({ ...q, passage_index: pIndex }))
-                    };
-                  });
-                } else {
-                  passages = [{
-                    passage_index: 1,
-                    title: 'Reading Passage 1',
-                    text: rawPassage,
-                    questions: readingQs.map((q: any) => ({ ...q, passage_index: 1 }))
-                  }];
-                }
-              }
-
-              const detectedSkills: string[] = [];
-              if (listeningQs.length > 0 || audioUrl) detectedSkills.push('listening');
-              if (readingQs.length > 0 || rawPassage) detectedSkills.push('reading');
-              if (task1Prompt || task2Prompt || task1Image) detectedSkills.push('writing');
-              if (detectedSkills.length === 0) detectedSkills.push('reading');
-
-              const bridgeExam = {
-                exam_code: code,
-                title: meta.title || `IELTS Examination - ${code}`,
-                test_type: meta.test_type || 'TEST',
-                exam_type: detectedSkills.length === 1 ? 'one_skill' : detectedSkills.length === 2 ? 'two_skills' : 'full_test',
-                skills: detectedSkills,
-                duration_mins: Number(meta.duration_mins) || 120,
-                audio_url: audioUrl,
-                audio_title: meta.audio_title || '',
-                passage_title: 'Reading Passage 1',
-                passage_text: rawPassage,
-                reading_passage: rawPassage,
-                passages,
-                listening_questions: listeningQs,
-                reading_questions: readingQs,
-                writing_task1_prompt: task1Prompt,
-                writing_task1_image: task1Image,
-                writing_task1_image_url: task1Image,
-                writing_task1_imageUrl: task1Image,
-                writing_task2_prompt: task2Prompt,
-                questions,
-                status: 'published',
-                is_draft: false
-              };
-
-              const savedBridge = saveStoredExam(bridgeExam);
-              setCachedExam(code, savedBridge);
-              fullExam = savedBridge;
-            }
-          }
-        } catch (gasErr: any) {
-          console.warn(`[GAS Bridge Fetch Error for ${code}]:`, gasErr.message);
-        }
+      const bridged = await fetchExamFromGasBridge(config.gas_url || '', code);
+      if (bridged) {
+        fullExam = bridged;
       }
     }
 

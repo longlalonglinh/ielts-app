@@ -511,9 +511,26 @@ export default function App() {
       const freshExam = e.detail as ExamData;
       if (!freshExam || !freshExam.exam_code) return;
       if (isLoggedIn && examCode.toUpperCase() === freshExam.exam_code.toUpperCase()) {
+        const currentQCount =
+          (examData?.listening_questions?.length || 0) +
+          (examData?.reading_questions?.length || 0);
+        const freshQCount =
+          (freshExam.listening_questions?.length || 0) +
+          (freshExam.reading_questions?.length || 0);
+        if (currentQCount > 0 && freshQCount === 0) {
+          return;
+        }
+
         const answersCount = Object.keys(userAnswers).filter(k => userAnswers[k]?.trim()).length;
         if (answersCount === 0 && !writingTask1.trim() && !writingTask2.trim()) {
           handleSetExamData(freshExam);
+          const freshHasL = (freshExam.listening_questions?.length || 0) > 0;
+          const freshHasR = (freshExam.reading_questions?.length || 0) > 0 || (freshExam.passages?.some(p => (p.questions?.length ?? 0) > 0) ?? false);
+          if (currentModule === 'listening' && !freshHasL) {
+            setCurrentModule(freshHasR ? 'reading' : 'writing');
+          } else if (currentModule === 'reading' && !freshHasR) {
+            setCurrentModule(freshHasL ? 'listening' : 'writing');
+          }
           setSkillNotice(`⚡ Synchronized latest questions for [${freshExam.exam_code}] from Google Sheets.`);
           setTimeout(() => setSkillNotice(null), 5000);
         }
@@ -524,7 +541,7 @@ export default function App() {
     return () => {
       window.removeEventListener('ielts:exam-revalidated', handleRevalidated);
     };
-  }, [isLoggedIn, examCode, userAnswers, writingTask1, writingTask2]);
+  }, [isLoggedIn, examCode, examData, currentModule, userAnswers, writingTask1, writingTask2]);
 
   // Handle Login & Load Exam with Ultra-Fast Instant Entry
   const handleLogin = async (

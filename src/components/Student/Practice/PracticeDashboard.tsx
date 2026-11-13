@@ -141,20 +141,33 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
 
   // Sync Questions with Google Sheets tab PRACTICE_QUESTIONS
   const handleSyncWithSheets = async () => {
-    if (!gasUrl) return;
+    if (!gasUrl) {
+      setSyncFeedback('Google Apps Script URL is not configured.');
+      setTimeout(() => setSyncFeedback(null), 3500);
+      return;
+    }
     setIsSyncingWithSheets(true);
+    setLoadError(null);
     try {
       const res = await practiceService.fetchFromSheets(gasUrl);
       if (res.success && res.decks && res.decks.length > 0) {
-        setAllDecks(practiceService.getAllDecks());
+        const refreshedDecks = practiceService.getAllDecks();
+        setAllDecks(refreshedDecks);
         setDbStatus(practiceService.getDatabaseStatus());
         const current = await practiceService.getDeckById(activeDeck?.deck_id || initialDeckId, gasUrl);
-        if (current) setActiveDeck(current);
+        setActiveDeck(current || refreshedDecks[0] || null);
+        setSyncFeedback(`✓ Synced ${res.decks.length} practice deck(s) from Google Sheets.`);
+      } else if (res.success) {
+        setSyncFeedback('ℹ️ Google Sheets PRACTICE_QUESTIONS currently has 0 practice decks. Create a new deck or upload via Admin.');
+      } else {
+        setLoadError(res.error || 'Unable to sync practice decks from Google Sheets.');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error syncing practice questions from Sheets:', e);
+      setLoadError(e?.message || 'Error syncing practice questions from Google Sheets.');
     } finally {
       setIsSyncingWithSheets(false);
+      setTimeout(() => setSyncFeedback(null), 4500);
     }
   };
 
@@ -169,8 +182,11 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
       const deck = await practiceService.getDeckById(targetId, gasUrl);
       if (deck) {
         setActiveDeck(deck);
+      } else if (decks.length > 0) {
+        setActiveDeck(decks[0]);
+        setLoadError(`Practice deck "${targetId}" was not found. Loaded "${decks[0].title}" instead.`);
       } else {
-        setLoadError(`Practice deck not found with ID: "${targetId}".`);
+        setActiveDeck(null);
       }
     } catch (e: any) {
       console.error('Error loading deck:', e);
@@ -188,8 +204,12 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
     if (gasUrl) {
       practiceService.fetchFromSheets(gasUrl).then(res => {
         if (res.success && res.decks && res.decks.length > 0) {
-          setAllDecks(practiceService.getAllDecks());
+          const updatedDecks = practiceService.getAllDecks();
+          setAllDecks(updatedDecks);
           setDbStatus(practiceService.getDatabaseStatus());
+          setLoadError(null);
+          const matched = updatedDecks.find(d => d.deck_id.toUpperCase() === initialDeckId.toUpperCase()) || updatedDecks[0];
+          if (matched) setActiveDeck(prev => prev || matched);
         }
       }).catch(err => console.debug('Initial sheets fetch note:', err));
     }
@@ -432,18 +452,6 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
             <RefreshCw className="w-8 h-8 text-[#6B51A5] animate-spin mx-auto" />
             <p className="text-sm font-medium text-[#503A7A]">Loading practice deck...</p>
           </div>
-        ) : loadError ? (
-          <div className="max-w-md mx-auto p-6 bg-white border border-purple-100 rounded-3xl text-center space-y-4 shadow-md">
-            <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
-            <h3 className="text-base font-bold text-[#3C2A63]">{loadError}</h3>
-            <p className="text-xs text-[#7C68A5]">Please check the deck code or select an available deck below.</p>
-            <button
-              onClick={() => loadDeckData('ON_TAP_01')}
-              className="px-5 py-2 bg-[#6B51A5] text-white rounded-xl text-xs font-bold transition hover:bg-[#503A7A] cursor-pointer"
-            >
-              Retry Default Deck (ON_TAP_01)
-            </button>
-          </div>
         ) : isPracticing && activeDeck ? (
           
           /* ACTIVE PRACTICE SESSION */
@@ -538,52 +546,110 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
           /* DASHBOARD VIEW */
           <div className="space-y-6">
 
+            {loadError && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3 text-xs text-amber-900">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="font-semibold">{loadError}</span>
+                </div>
+                <button
+                  onClick={() => setLoadError(null)}
+                  className="text-amber-700 hover:text-amber-950 font-bold px-2 py-0.5 rounded-lg cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
             {/* Top Row: Hero Deck + 4 Metric Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               
               {/* Left: Active Deck Preview (5 Cols) */}
               <div className="lg:col-span-5 bg-white border border-purple-100 rounded-3xl p-6 shadow-sm flex flex-col justify-between space-y-6 relative overflow-hidden">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs px-3 py-1 bg-purple-50 border border-purple-200 text-[#6B51A5] rounded-xl font-bold uppercase tracking-wider">
-                      Selected Deck
-                    </span>
-                    <span className="text-xs font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 font-bold">
-                      {activeDeck?.level || 'B1-B2'}
-                    </span>
-                  </div>
+                {activeDeck ? (
+                  <>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs px-3 py-1 bg-purple-50 border border-purple-200 text-[#6B51A5] rounded-xl font-bold uppercase tracking-wider">
+                          Selected Deck
+                        </span>
+                        <span className="text-xs font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 font-bold">
+                          {activeDeck.level || 'B1-B2'}
+                        </span>
+                      </div>
 
-                  <div>
-                    <h2 className="text-xl md:text-2xl font-black text-[#3C2A63] tracking-tight">
-                      {activeDeck?.title || 'Practice Deck'}
-                    </h2>
-                    <p className="text-xs text-[#503A7A] mt-2 leading-relaxed">
-                      {activeDeck?.description || 'Interactive flashcard set designed to boost vocabulary and grammar mastery.'}
-                    </p>
-                  </div>
+                      <div>
+                        <h2 className="text-xl md:text-2xl font-black text-[#3C2A63] tracking-tight">
+                          {activeDeck.title}
+                        </h2>
+                        <p className="text-xs text-[#503A7A] mt-2 leading-relaxed">
+                          {activeDeck.description || 'Interactive flashcard set designed to boost vocabulary and grammar mastery.'}
+                        </p>
+                      </div>
 
-                  <div className="flex items-center space-x-4 text-xs text-[#7C68A5]">
-                    <div className="flex items-center space-x-1.5">
-                      <Layers className="w-4 h-4 text-[#6B51A5]" />
-                      <span>{activeDeck?.cards.length || 0} questions</span>
+                      <div className="flex items-center space-x-4 text-xs text-[#7C68A5]">
+                        <div className="flex items-center space-x-1.5">
+                          <Layers className="w-4 h-4 text-[#6B51A5]" />
+                          <span>{activeDeck.cards.length} questions</span>
+                        </div>
+                        <div className="flex items-center space-x-1.5">
+                          <Sparkles className="w-4 h-4 text-amber-500" />
+                          <span>AI Sentence Analysis</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-1.5">
-                      <Sparkles className="w-4 h-4 text-amber-500" />
-                      <span>AI Sentence Analysis</span>
+
+                    <div className="pt-4 border-t border-purple-100">
+                      <button
+                        onClick={() => handleStartPractice()}
+                        disabled={activeDeck.cards.length === 0}
+                        className="w-full py-3 bg-[#6B51A5] hover:bg-[#503A7A] disabled:opacity-50 text-white font-bold rounded-2xl shadow-md shadow-[#6B51A5]/20 flex items-center justify-center space-x-2 transition cursor-pointer text-sm"
+                      >
+                        <Play className="w-4 h-4 fill-white" />
+                        <span>Start Practice Session</span>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-4 flex flex-col justify-between h-full">
+                    <div className="space-y-3">
+                      <span className="inline-block text-xs px-3 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl font-bold uppercase tracking-wider">
+                        Empty Practice Library
+                      </span>
+                      <h2 className="text-xl font-black text-[#3C2A63] tracking-tight">
+                        No Practice Decks Loaded Yet
+                      </h2>
+                      <p className="text-xs text-[#503A7A] leading-relaxed">
+                        Your practice repository does not contain any local decks yet. Sync questions from Google Sheets or create a custom practice deck in Admin Mode.
+                      </p>
+                    </div>
+                    <div className="pt-4 border-t border-purple-100 flex flex-wrap gap-2">
+                      <button
+                        onClick={handleSyncWithSheets}
+                        disabled={isSyncingWithSheets}
+                        className="flex-1 py-2.5 px-3 bg-[#6B51A5] hover:bg-[#503A7A] disabled:opacity-50 text-white font-bold rounded-2xl flex items-center justify-center gap-1.5 transition cursor-pointer text-xs"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isSyncingWithSheets ? 'animate-spin' : ''}`} />
+                        <span>{isSyncingWithSheets ? 'Syncing...' : 'Sync from Sheets'}</span>
+                      </button>
+                      {onOpenDeckManager && (
+                        <button
+                          onClick={onOpenDeckManager}
+                          className="flex-1 py-2.5 px-3 bg-purple-50 hover:bg-purple-100 text-[#503A7A] border border-purple-200 font-bold rounded-2xl flex items-center justify-center gap-1.5 transition cursor-pointer text-xs"
+                        >
+                          <FolderOpen className="w-3.5 h-3.5" />
+                          <span>Create / Manage Decks</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={onExitToLogin}
+                        className="w-full py-2 px-3 bg-white hover:bg-slate-50 text-[#7C68A5] border border-purple-100 font-semibold rounded-xl transition cursor-pointer text-xs"
+                      >
+                        Back to Login
+                      </button>
                     </div>
                   </div>
-                </div>
-
-                <div className="pt-4 border-t border-purple-100">
-                  <button
-                    onClick={() => handleStartPractice()}
-                    disabled={!activeDeck || activeDeck.cards.length === 0}
-                    className="w-full py-3 bg-[#6B51A5] hover:bg-[#503A7A] disabled:opacity-50 text-white font-bold rounded-2xl shadow-md shadow-[#6B51A5]/20 flex items-center justify-center space-x-2 transition cursor-pointer text-sm"
-                  >
-                    <Play className="w-4 h-4 fill-white" />
-                    <span>Start Practice Session</span>
-                  </button>
-                </div>
+                )}
               </div>
 
               {/* Right: 4 Metrics Grid (7 Cols) */}

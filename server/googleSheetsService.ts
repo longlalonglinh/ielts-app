@@ -444,14 +444,16 @@ export async function syncExamFromGoogleSheets(
       writing_task1_image_url: examMeta.writing_task1_image,
       writing_task1_imageUrl: examMeta.writing_task1_image,
       writing_task2_prompt: examMeta.writing_task2_prompt,
+      status: 'published',
+      is_draft: false,
       last_synced_at: new Date().toISOString()
     };
 
     // Store in RAM Cache (Sub-millisecond access) & persistent JSON file
-    serverExamMemoryCache.set(cleanCode, fullExam);
-    saveStoredExam(fullExam);
+    const savedExam = saveStoredExam(fullExam);
+    serverExamMemoryCache.set(cleanCode, savedExam);
 
-    return { success: true, exam: fullExam };
+    return { success: true, exam: savedExam };
   } catch (err: any) {
     console.error(`[Google Sheets Sync Error for ${cleanCode}]:`, err.message);
     return { success: false, error: err.message };
@@ -559,12 +561,14 @@ export async function syncAllExamsFromGoogleSheets(
         writing_task1_image_url: examMeta.writing_task1_image,
         writing_task1_imageUrl: examMeta.writing_task1_image,
         writing_task2_prompt: examMeta.writing_task2_prompt,
+        status: 'published',
+        is_draft: false,
         last_synced_at: new Date().toISOString()
       };
 
-      serverExamMemoryCache.set(code, fullExam);
-      saveStoredExam(fullExam);
-      syncedList.push(fullExam);
+      const savedExam = saveStoredExam(fullExam);
+      serverExamMemoryCache.set(code, savedExam);
+      syncedList.push(savedExam);
     }
 
     saveStoredConfig({ last_synced_at: new Date().toISOString() });

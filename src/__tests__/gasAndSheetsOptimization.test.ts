@@ -180,4 +180,71 @@ describe('GAS V3.0 & Google Sheets Storage Optimization Verification', () => {
       globalThis.fetch = prevFetch;
     }
   });
+
+  it('7. Server /api/sync-sheet supports GAS fallback and Google Sheets sync explicitly marks exams published', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const serverSrc = fs.readFileSync(path.resolve(process.cwd(), 'server.ts'), 'utf-8');
+    const sheetsSrc = fs.readFileSync(path.resolve(process.cwd(), 'server/googleSheetsService.ts'), 'utf-8');
+
+    expect(serverSrc).toContain('async function fetchExamFromGasBridge(');
+    expect(serverSrc).toContain("source: 'gas_bridge'");
+    expect(sheetsSrc).toContain("status: 'published'");
+    expect(sheetsSrc).toContain('is_draft: false');
+  });
+
+  it('8. buildExamFromGasRawResponse rejects empty GAS responses even when existingCached has a Task 1 diagram', () => {
+    const existingCached = {
+      exam_code: 'TEST01',
+      title: 'Cached Exam',
+      writing_task1_image: 'https://example.com/cached-chart.png',
+      listening_questions: [{ question_id: 'L1', section: 'listening', question_text: 'Q1', question_type: 'multiple_choice', correct_answer: 'A', max_score: 1 }],
+      reading_questions: []
+    } as any;
+
+    const emptyDataArray = buildExamFromGasRawResponse({ success: true, data: [] }, 'TEST01', existingCached);
+    expect(emptyDataArray).toBeNull();
+
+    const emptyMetaNull = buildExamFromGasRawResponse(
+      { status: 'success', success: true, exam_code: 'TEST01', exam_meta: null, questions: [] },
+      'TEST01',
+      existingCached
+    );
+    expect(emptyMetaNull).toBeNull();
+  });
+
+  it('9. fetchExam does not re-hit /api/exams/:code in Tier 8 when Tier 2 returned authoritative 404', async () => {
+    const calledUrls: string[] = [];
+    const fakeGasUrl = 'https://script.google.com/macros/s/AKfycbzLiveTestDeployment/exec';
+    const prevFetch = globalThis.fetch;
+
+    globalThis.fetch = vi.fn(async (input: any) => {
+      const url = typeof input === 'string' ? input : input.url;
+      calledUrls.push(url);
+      if (url.includes('/api/exams/MISSING999')) {
+        return new Response(JSON.stringify({ success: false, error: 'Exam not found' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      if (url.startsWith(fakeGasUrl)) {
+        return new Response(JSON.stringify({ success: true, data: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    }) as any;
+
+    try {
+      await clearExamCache('MISSING999');
+      const res = await fetchExam(fakeGasUrl, 'MISSING999', false);
+      expect(res.success).toBe(false);
+      const apiExamCalls = calledUrls.filter(u => u.includes('/api/exams/MISSING999'));
+      expect(apiExamCalls.length).toBe(1);
+    } finally {
+      await clearExamCache('MISSING999');
+      globalThis.fetch = prevFetch;
+    }
+  });
 });

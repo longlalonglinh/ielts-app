@@ -1186,16 +1186,13 @@ export function buildExamFromGasRawResponse(
   const writingTask2Prompt = String(
     meta.writing_task2_prompt || raw.writing_task2_prompt || raw.exam?.writing_task2_prompt || ''
   ).trim();
-  const rawTask1Image = String(
+  const rawPayloadTask1Image = String(
     meta.writing_task1_image || meta.writing_task1_image_url || meta.writing_task1_imageUrl ||
     raw.writing_task1_image || raw.writing_task1_image_url || raw.writing_task1_imageUrl ||
     raw.exam?.writing_task1_image || raw.exam?.writing_task1_image_url || raw.exam?.writing_task1_imageUrl ||
     meta.imageUrl || meta.image_url || raw.imageUrl || raw.image_url ||
     raw.sections?.find((s: any) => s.skill === 'writing')?.tasks?.[0]?.image_url ||
     raw.sections?.find((s: any) => s.skill === 'writing')?.tasks?.[0]?.imageUrl ||
-    existingCached?.writing_task1_image ||
-    existingCached?.writing_task1_image_url ||
-    existingCached?.writing_task1_imageUrl ||
     ''
   ).trim();
   const audioUrl = String(meta.audio_url || raw.audio_url || raw.exam?.audio_url || '').trim();
@@ -1211,11 +1208,20 @@ export function buildExamFromGasRawResponse(
   const hasContent =
     questions.length > 0 ||
     metaPassages.length > 0 ||
-    Boolean(rawPassage || audioUrl || writingTask1Prompt || writingTask2Prompt || rawTask1Image || hasMetaObject);
+    Boolean(rawPassage || audioUrl || writingTask1Prompt || writingTask2Prompt || rawPayloadTask1Image || hasMetaObject);
 
   if (!hasContent) {
     return null;
   }
+
+  // Only inherit existingCached Task 1 diagram AFTER confirming raw GAS payload actually carries exam content
+  const rawTask1Image = String(
+    rawPayloadTask1Image ||
+    existingCached?.writing_task1_image ||
+    existingCached?.writing_task1_image_url ||
+    existingCached?.writing_task1_imageUrl ||
+    ''
+  ).trim();
 
   const listeningQs = questions.filter((q: any) => String(q.section || '').toLowerCase() === 'listening');
   const readingQs = questions.filter((q: any) => String(q.section || '').toLowerCase() !== 'listening');
@@ -1315,6 +1321,18 @@ export function triggerBackgroundRevalidation(apiUrl: string, cleanCode: string)
         const existingCached = examMemoryCache.get(cleanCode);
         const fresh = buildExamFromGasRawResponse(raw, cleanCode, existingCached);
         if (fresh) {
+          const existingQuestionCount =
+            (existingCached?.listening_questions?.length || 0) +
+            (existingCached?.reading_questions?.length || 0) +
+            (existingCached?.questions?.length || 0);
+          const freshQuestionCount =
+            (fresh.listening_questions?.length || 0) +
+            (fresh.reading_questions?.length || 0) +
+            (fresh.questions?.length || 0);
+          if (existingQuestionCount > 0 && freshQuestionCount === 0) {
+            return;
+          }
+
           examMemoryCache.set(cleanCode, fresh);
           saveExamToIndexedDB(fresh).catch(() => {});
           safeSaveCurrentExamToLocalStorage(fresh);
@@ -1545,9 +1563,13 @@ export async function fetchExam(
 
   // Tier 2: Authoritative Centralized Server Cache (/api/exams/:code) - Instant <20ms & Private Sheet Guard
   // Clients fetch via Server API first; pass ?force=true when forceFresh is requested to bypass stale server caches.
+  let serverRespondedAuthoritatively = false;
   try {
     const serverUrl = getApiUrl(`/api/exams/${encodeURIComponent(cleanCode)}${forceFresh ? '?force=true' : ''}`);
     const serverRes = await fetch(serverUrl);
+    if (serverRes.status === 404) {
+      serverRespondedAuthoritatively = true;
+    }
     if (serverRes.status === 403) {
       const errJson = await serverRes.json().catch(() => ({}));
       return {
@@ -1556,6 +1578,7 @@ export async function fetchExam(
       };
     }
     if (serverRes.ok) {
+      serverRespondedAuthoritatively = true;
       const serverJson = await serverRes.json();
       if (serverJson && serverJson.success && serverJson.exam) {
         const standardized = standardizeExamData(serverJson.exam, cleanCode);
@@ -1686,19 +1709,21 @@ export async function fetchExam(
     }
   }
 
-  // Tier 8: Direct Server fallback check before giving up
-  try {
-    const sFallback = await fetch(getApiUrl(`/api/exams/${encodeURIComponent(cleanCode)}`));
-    if (sFallback.ok) {
-      const sJson = await sFallback.json();
-      if (sJson && sJson.success && sJson.exam) {
-        const standardized = standardizeExamData(sJson.exam, cleanCode);
-        examMemoryCache.set(cleanCode, standardized);
-        saveExamToIndexedDB(standardized).catch(() => {});
-        return { success: true, exam: standardized, source: 'server' as any };
+  // Tier 8: Direct Server fallback check before giving up (skip if Tier 2 already returned an authoritative HTTP status)
+  if (!serverRespondedAuthoritatively) {
+    try {
+      const sFallback = await fetch(getApiUrl(`/api/exams/${encodeURIComponent(cleanCode)}`));
+      if (sFallback.ok) {
+        const sJson = await sFallback.json();
+        if (sJson && sJson.success && sJson.exam) {
+          const standardized = standardizeExamData(sJson.exam, cleanCode);
+          examMemoryCache.set(cleanCode, standardized);
+          saveExamToIndexedDB(standardized).catch(() => {});
+          return { success: true, exam: standardized, source: 'server' as any };
+        }
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+  }
 
   // Tier 6.8: Check standard built-in exam package (DEFAULT_EXAMS)
   const foundDefault = DEFAULT_EXAMS.find(e => (e.exam_code || '').toUpperCase() === cleanCode);

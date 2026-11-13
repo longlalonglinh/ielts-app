@@ -280,7 +280,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     setValue,
     reset,
     getValues,
-    formState: { errors }
+    formState: { errors, isDirty }
   } = useForm<ExamFormValues>({
     resolver: zodResolver(examZodSchema) as any,
     defaultValues: formatInitialData(initialExamData),
@@ -755,7 +755,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     return sanitizeExamForSkills(unverifiedExam);
   };
 
-  // Explicit Save Draft handler (or automated debounced auto-save)
+  // Explicit Save Draft handler (or automated debounced auto-save when form is dirty)
   const handleSaveDraft = async (isSilent: boolean = false) => {
     const formData = getValues();
     const cleanCode = (formData.exam_code || '').trim().toUpperCase();
@@ -766,13 +766,23 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     setAutoSaveStatus('saving');
 
     try {
-      const draftExam = buildExamFromForm(formData, 'draft');
+      const isAlreadyPublished = formData.status === 'published' && !formData.is_draft;
+      // On explicit "Save Draft" click, unpublish to 'draft'; on silent auto-save, never downgrade an already published server exam
+      const targetStatus: 'draft' | 'published' = isSilent && isAlreadyPublished ? 'published' : 'draft';
+      if (!isSilent) {
+        setValue('status', 'draft', { shouldDirty: false });
+        setValue('is_draft', true, { shouldDirty: false });
+      }
+
+      const draftExam = buildExamFromForm(formData, targetStatus);
 
       // 1. Dual save to IndexedDB
       await saveExamToIndexedDB(draftExam);
 
-      // 2. Save to Server DB with draft flag (Students are blocked via 403 API)
-      await saveExamToServerDb(draftExam).catch(() => {});
+      // 2. Save to Server DB (only write draft lock on explicit Save Draft or when editing an existing draft)
+      if (!isSilent || targetStatus === 'draft') {
+        await saveExamToServerDb(draftExam).catch(() => {});
+      }
 
       // 3. Dual save to localStorage safely (stripped of heavy base64 to avoid 5MB quota limit)
       try {
@@ -802,8 +812,9 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     }
   };
 
-  // Debounced Auto-Save Draft Trigger (runs 2.5s after teacher stops typing)
+  // Debounced Auto-Save Draft Trigger (runs 2.5s after teacher actually edits the form)
   useEffect(() => {
+    if (!isDirty) return;
     const formData = getValues();
     if (!formData.exam_code || formData.exam_code.trim().length < 2) return;
 
@@ -813,6 +824,7 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
 
     return () => clearTimeout(timer);
   }, [
+    isDirty,
     watchedPassages,
     watchedExamCode,
     watchedTask1Image,
@@ -825,19 +837,22 @@ export const VisualExamBuilder: React.FC<VisualExamBuilderProps> = ({
     watch('listening_questions')
   ]);
 
-  // Debounced live draft sync to parent PreviewModule (800ms for smooth typing performance)
+  // Debounced live draft sync to parent PreviewModule (800ms after real edits, preserving current status)
   useEffect(() => {
-    if (!onDraftChange) return;
+    if (!onDraftChange || !isDirty) return;
     const timer = setTimeout(() => {
       const formData = getValues();
       if (formData.exam_code && formData.exam_code.trim().length >= 1) {
         lastEmittedCodeRef.current = formData.exam_code.trim().toUpperCase();
-        const liveExam = buildExamFromForm(formData, 'draft');
+        const preservedStatus: 'draft' | 'published' =
+          formData.status === 'published' && !formData.is_draft ? 'published' : 'draft';
+        const liveExam = buildExamFromForm(formData, preservedStatus);
         onDraftChange(liveExam);
       }
     }, 800);
     return () => clearTimeout(timer);
   }, [
+    isDirty,
     watchedPassages,
     watchedExamCode,
     watchedTask1Image,

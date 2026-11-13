@@ -13,6 +13,23 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { prefetchExam, DEFAULT_API_URL } from '../../services/api';
+import { practiceService } from '../../services/practiceService';
+
+const isPracticeDeckCode = (code: string): boolean => {
+  const upper = (code || '').trim().toUpperCase();
+  if (!upper) return false;
+  if (
+    upper.startsWith('ON_TAP') ||
+    upper.startsWith('VOCAB') ||
+    upper.startsWith('GRAMMAR') ||
+    upper.startsWith('COMMUNICATION') ||
+    upper.startsWith('DECK_') ||
+    upper.startsWith('PRAC_SET')
+  ) {
+    return true;
+  }
+  return practiceService.getAllDecks().some(d => d.deck_id.toUpperCase() === upper);
+};
 
 interface LoginInstructionsProps {
   onLogin: (sbd: string, code: string, mode: 'TEST' | 'PRACTICE', reviewPrevious: boolean) => void;
@@ -48,14 +65,14 @@ export const LoginInstructions: React.FC<LoginInstructionsProps> = ({
 
   // Prefetch exam when component mounts so data is ready in memory
   useEffect(() => {
-    if (activeCode) {
+    if (activeCode && !isPracticeDeckCode(activeCode)) {
       prefetchExam(gasUrl, activeCode).catch(() => {});
     }
   }, [gasUrl]);
 
   // Debounced prefetch whenever student types or updates the exam code
   useEffect(() => {
-    if (!activeCode) return;
+    if (!activeCode || isPracticeDeckCode(activeCode)) return;
     const timer = setTimeout(() => {
       prefetchExam(gasUrl, activeCode).catch(() => {});
     }, 350);
