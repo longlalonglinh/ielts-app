@@ -79,7 +79,6 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
   const [aiCategory, setAiCategory] = useState<'Vocabulary' | 'Grammar' | 'Communication' | 'IELTS Academic'>('Vocabulary');
   const [aiLevel, setAiLevel] = useState<'A1-A2' | 'B1-B2' | 'C1-C2'>('B1-B2');
   const [aiCount, setAiCount] = useState(8);
-  const [aiApiKey, setAiApiKey] = useState(() => localStorage.getItem('ielts_gemini_api_key') || '');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
   // Current deck form state
@@ -579,14 +578,10 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
     }
   };
 
-  // Generate Deck with AI Gemini
+  // Generate Deck with AI Gemini via server
   const handleGenerateAiDeck = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiTopic.trim() || isGeneratingAi) return;
-
-    if (aiApiKey.trim()) {
-      localStorage.setItem('ielts_gemini_api_key', aiApiKey.trim());
-    }
 
     setIsGeneratingAi(true);
     setErrorMsg(null);
@@ -595,8 +590,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
         aiTopic.trim(),
         aiCategory,
         aiLevel,
-        aiCount,
-        aiApiKey.trim()
+        aiCount
       );
 
       if (generated) {
@@ -611,7 +605,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
       }
     } catch (e: any) {
       console.error('AI Generator Error:', e);
-      setErrorMsg('Lỗi kết nối Gemini AI. Vui lòng kiểm tra lại API Key hoặc mạng.');
+      setErrorMsg('Lỗi kết nối dịch vụ AI trên máy chủ. Vui lòng thử lại.');
     } finally {
       setIsGeneratingAi(false);
     }
@@ -1838,20 +1832,6 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
                   value={aiCount}
                   onChange={(e) => setAiCount(parseInt(e.target.value, 10))}
                   className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                />
-              </div>
-
-              {/* Optional API Key Input */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                  Gemini API Key (Tùy chọn: nạp nếu chưa cấu hình biến môi trường)
-                </label>
-                <input
-                  type="password"
-                  value={aiApiKey}
-                  onChange={(e) => setAiApiKey(e.target.value)}
-                  placeholder="AIzaSy..."
-                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 text-xs focus:outline-none focus:border-purple-500 font-mono"
                 />
               </div>
 

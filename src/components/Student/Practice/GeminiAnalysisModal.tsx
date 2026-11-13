@@ -148,7 +148,7 @@ export const GeminiAnalysisModal: React.FC<GeminiAnalysisModalProps> = ({
               <div className="flex items-center space-x-2">
                 <h3 className="text-base font-bold text-[#3C2A63] tracking-tight">Ask AI Gemini • Sentence Analysis</h3>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-[#6B51A5] border border-purple-200 font-mono font-bold">
-                  Gemini 3.7 Flash
+                  Gemini 4 Hydrogen
                 </span>
               </div>
               <p className="text-xs text-[#7C68A5]">Deconstruct grammar, part of speech, collocations, and syntax</p>
@@ -563,7 +563,7 @@ export const GeminiAnalysisModal: React.FC<GeminiAnalysisModalProps> = ({
         {/* Footer */}
         <div className="p-4 bg-white border-t border-purple-100 flex items-center justify-between shrink-0">
           <span className="text-[11px] text-[#7C68A5]">
-            Powered by Google Gemini 3.7 Flash • In-depth linguistic analysis
+            Powered by Google Gemini 4 Hydrogen • In-depth linguistic analysis
           </span>
           <button
             onClick={onClose}

@@ -1,4 +1,4 @@
-import { ExamData, Question } from '../types';
+import { ExamData } from '../types';
 import { ExamTestReport, verifyAndOptimizeExam } from './examVerification';
 import { getApiUrl } from './api';
 import { parseExamFromDocumentText } from './documentExamParser';
@@ -24,24 +24,6 @@ export interface GenerateExamResponse {
   error?: string;
 }
 
-export function getGeminiApiKey(): string {
-  return (
-    (import.meta as any).env?.VITE_GEMINI_API_KEY ||
-    localStorage.getItem('ielts_gemini_api_key') ||
-    localStorage.getItem('gemini_api_key') ||
-    ''
-  );
-}
-
-export function saveGeminiApiKey(key: string): void {
-  const trimmed = key.trim();
-  if (trimmed) {
-    localStorage.setItem('ielts_gemini_api_key', trimmed);
-  } else {
-    localStorage.removeItem('ielts_gemini_api_key');
-  }
-}
-
 async function parseResponseSafely(response: Response, endpointDesc: string): Promise<any> {
   const rawText = await response.text();
   let json: any = null;
@@ -50,7 +32,7 @@ async function parseResponseSafely(response: Response, endpointDesc: string): Pr
     json = JSON.parse(rawText);
   } catch {
     if (rawText.trim().toLowerCase().startsWith('<!doctype') || rawText.includes('<html')) {
-      throw new Error(`Endpoint ${endpointDesc} returned 404/HTML (static hosting without backend server).`);
+      throw new Error(`Endpoint ${endpointDesc} returned an HTML response instead of JSON.`);
     }
     throw new Error(`Invalid response received from server (${rawText.slice(0, 100)}).`);
   }
@@ -63,66 +45,7 @@ async function parseResponseSafely(response: Response, endpointDesc: string): Pr
 }
 
 /**
- * Direct client-side call to Google Gemini REST API (gemini-2.5-flash)
- * Compatible with GitHub Pages static hosting.
- */
-async function callDirectClientGemini(prompt: string, inlinePdfBase64?: string): Promise<any> {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    throw new Error('Gemini API key is not configured. Please enter your API key in settings.');
-  }
-
-  const parts: any[] = [];
-  if (inlinePdfBase64) {
-    parts.push({
-      inline_data: {
-        mime_type: 'application/pdf',
-        data: inlinePdfBase64
-      }
-    });
-  }
-  parts.push({ text: prompt });
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 35000);
-
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.2
-          }
-        }),
-        signal: controller.signal
-      }
-    );
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      throw new Error(`Gemini API Error (${res.status}): ${errBody.slice(0, 200)}`);
-    }
-
-    const geminiData = await res.json();
-    const rawContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawContent) {
-      throw new Error('Empty response received from Gemini API.');
-    }
-
-    const clean = rawContent.replace(/```json/gi, '').replace(/```/g, '').trim();
-    return JSON.parse(clean);
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-/**
- * Client-side synthesized IELTS exam generator for instant offline/static fallback
+ * Client-side synthesized IELTS exam generator for offline resilience
  */
 function generateClientFallbackExam(options: GenerateExamOptions): ExamData {
   const codeNum = Date.now().toString().slice(-4);
@@ -243,13 +166,10 @@ function generateClientFallbackExam(options: GenerateExamOptions): ExamData {
 }
 
 /**
- * Generate a complete verified IELTS Exam
- * Primary: Server endpoint /api/gemini/generate-exam
- * Secondary (GitHub Pages): Direct Gemini REST API via VITE_GEMINI_API_KEY / localStorage
- * Tertiary: Client-side authentic IELTS generator
+ * Generate a complete verified IELTS Exam via server-side Gemini endpoint (/api/gemini/generate-exam)
+ * with resilient offline synthesis fallback.
  */
 export async function generateExamWithAI(options: GenerateExamOptions): Promise<GenerateExamResponse> {
-  // 1. Try server-side endpoint if available
   try {
     const response = await fetch(getApiUrl('/api/gemini/generate-exam'), {
       method: 'POST',
@@ -281,92 +201,10 @@ export async function generateExamWithAI(options: GenerateExamOptions): Promise<
       return { success: true, exam: verifiedExam, testReport };
     }
   } catch (serverErr: any) {
-    console.warn('Server endpoint /api/gemini/generate-exam unavailable, checking client fallback:', serverErr.message);
+    console.warn('Server endpoint /api/gemini/generate-exam unavailable, using local synthesizer fallback:', serverErr.message);
   }
 
-  // 2. Direct client-side Gemini REST API call (GitHub Pages compatibility)
-  const apiKey = getGeminiApiKey();
-  if (apiKey) {
-    try {
-      const skillsStr = (options.skills || ['reading', 'listening', 'writing']).join(', ');
-      const prompt = `You are a Senior Cambridge IELTS Assessment Specialist.
-Create a complete, authentic IELTS Exam paper on the topic: "${options.topic}".
-Exam Type: ${options.testType || 'ACADEMIC'}
-Skills required: ${skillsStr}
-Difficulty: ${options.difficulty || 'band_65_75'}
-Custom Instructions: ${options.customPrompt || 'Standard Cambridge IELTS formatting'}
-
-Return ONLY valid JSON matching this schema:
-{
-  "exam_code": "IELTS_${Date.now().toString().slice(-4)}",
-  "title": "IELTS Academic Test - ${options.topic}",
-  "test_type": "TEST",
-  "exam_type": "full_test",
-  "skills": ["reading", "listening", "writing"],
-  "duration_mins": ${options.durationMins || 120},
-  "passages": [
-    {
-      "passage_index": 1,
-      "title": "Academic Reading Passage Title",
-      "text": "Full academic text (approx 700-900 words) with clear paragraphs.",
-      "questions": [
-        {
-          "question_id": "R1_Q1",
-          "section": "reading",
-          "passage_index": 1,
-          "question_text": "Question text...",
-          "question_type": "multiple_choice",
-          "options": ["A. Option 1", "B. Option 2", "C. Option 3", "D. Option 4"],
-          "correct_answer": "A",
-          "explanation": "Detailed explanation of why A is correct based on the passage text.",
-          "max_score": 1
-        },
-        {
-          "question_id": "R1_Q2",
-          "section": "reading",
-          "passage_index": 1,
-          "question_text": "Statement for verification...",
-          "question_type": "true_false_not_given",
-          "options": ["TRUE", "FALSE", "NOT GIVEN"],
-          "correct_answer": "TRUE",
-          "explanation": "Detailed rationale.",
-          "max_score": 1
-        }
-      ]
-    }
-  ],
-  "listening_questions": [
-    {
-      "question_id": "L1_Q1",
-      "section": "listening",
-      "part": 1,
-      "question_text": "Listening question text...",
-      "question_type": "fill_in_the_blank",
-      "options": [],
-      "correct_answer": "answer keyword",
-      "explanation": "Rationale for answer.",
-      "max_score": 1
-    }
-  ],
-  "writing_task1_prompt": "Task 1 report prompt (150 words)...",
-  "writing_task2_prompt": "Task 2 essay prompt (250 words)..."
-}`;
-
-      const directJson = await callDirectClientGemini(prompt, options.pdfBase64);
-      if (directJson && (directJson.passages || directJson.questions || directJson.title)) {
-        const checkResult = verifyAndOptimizeExam(directJson);
-        return {
-          success: true,
-          exam: checkResult.exam,
-          testReport: checkResult.report
-        };
-      }
-    } catch (clientGeminiErr: any) {
-      console.warn('Direct Gemini API call failed:', clientGeminiErr.message);
-    }
-  }
-
-  // 3. Resilient client-side synthesis (ensures app never blocks on static host)
+  // Offline / unreachable server fallback
   const fallbackExam = generateClientFallbackExam(options);
   const verified = verifyAndOptimizeExam(fallbackExam);
   return {
@@ -377,26 +215,24 @@ Return ONLY valid JSON matching this schema:
 }
 
 /**
- * Parse an uploaded IELTS Exam PDF Base64 string into structured Exam JSON
+ * Parse an uploaded IELTS Exam PDF Base64 string into structured Exam JSON via server Gemini pipeline.
  */
-export async function parsePdfWithGemini(pdfBase64: string, customApiKey?: string): Promise<string> {
-  if (customApiKey) {
-    saveGeminiApiKey(customApiKey);
-  }
+export async function parsePdfWithGemini(pdfBase64: string): Promise<string> {
   const result = await parsePdfWithServerGemini(pdfBase64);
   return JSON.stringify(result.exam, null, 2);
 }
 
 /**
- * Robust PDF and document parser with automated pre-flight testing
- * Tries server /api/parse-exam first; on GitHub Pages (static 404), falls back to
- * direct Gemini multimodal API or client-side document parser.
+ * Robust PDF and document parser routed through server-side Gemini (/api/parse-exam)
+ * with local deterministic text parsing fallback when server is unreachable.
  */
 export async function parsePdfWithServerGemini(
   pdfBase64: string,
   text?: string
 ): Promise<{ success: boolean; exam: ExamData; testReport: ExamTestReport }> {
-  // 1. Try server-side endpoint if available
+  let serverErrorMessage = '';
+
+  // 1. Call server-side Gemini parser endpoint
   try {
     const response = await fetch(getApiUrl('/api/parse-exam'), {
       method: 'POST',
@@ -416,10 +252,11 @@ export async function parsePdfWithServerGemini(
       return { success: true, exam: verifiedExam, testReport };
     }
   } catch (serverErr: any) {
-    console.warn('Server endpoint /api/parse-exam unavailable on static host, falling back:', serverErr.message);
+    serverErrorMessage = serverErr?.message || '';
+    console.warn('Server endpoint /api/parse-exam failed or unavailable:', serverErrorMessage);
   }
 
-  // 2. If raw text is available, use client-side document exam parser
+  // 2. If raw text is available, fall back to deterministic client-side document exam parser
   if (text && text.trim().length > 20) {
     const parsed = parseExamFromDocumentText(text);
     const candidateExam: ExamData = {
@@ -446,59 +283,8 @@ export async function parsePdfWithServerGemini(
     };
   }
 
-  // 3. If PDF Base64 is provided and API key is set, call Gemini multimodal directly
-  const apiKey = getGeminiApiKey();
-  if (apiKey && pdfBase64) {
-    try {
-      const prompt = `You are a Cambridge IELTS exam document parser.
-Analyze this PDF document and convert it into structured IELTS exam JSON matching:
-{
-  "exam_code": "IELTS_PARSED_${Date.now().toString().slice(-4)}",
-  "title": "IELTS Academic Test",
-  "test_type": "TEST",
-  "exam_type": "full_test",
-  "skills": ["reading", "listening", "writing"],
-  "duration_mins": 120,
-  "passages": [
-    {
-      "passage_index": 1,
-      "title": "Passage Title",
-      "text": "Passage text content...",
-      "questions": [
-        {
-          "question_id": "R1_Q1",
-          "section": "reading",
-          "passage_index": 1,
-          "question_text": "...",
-          "question_type": "multiple_choice",
-          "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-          "correct_answer": "A",
-          "explanation": "..."
-        }
-      ]
-    }
-  ],
-  "listening_questions": [],
-  "writing_task1_prompt": "",
-  "writing_task2_prompt": ""
-}
-Return ONLY valid JSON.`;
-
-      const directJson = await callDirectClientGemini(prompt, pdfBase64);
-      if (directJson) {
-        const verified = verifyAndOptimizeExam(directJson);
-        return {
-          success: true,
-          exam: verified.exam,
-          testReport: verified.report
-        };
-      }
-    } catch (directErr: any) {
-      console.warn('Direct Gemini PDF parse failed:', directErr.message);
-    }
-  }
-
   throw new Error(
-    'Static hosting mode detected (GitHub Pages). Please enter your Google Gemini API Key in the settings or paste the exam text directly into the Text/Syllabus tab.'
+    serverErrorMessage ||
+      'Unable to parse the uploaded PDF document on the server. Please paste the exam text into the Text/Syllabus tab and try again.'
   );
 }

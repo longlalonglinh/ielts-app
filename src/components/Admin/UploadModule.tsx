@@ -25,15 +25,12 @@ import {
   Zap,
   CheckCircle,
   HelpCircle,
-  Eye,
-  Key
+  Eye
 } from 'lucide-react';
 import { ExamData, Question } from '../../types';
 import { 
   generateExamWithAI, 
-  parsePdfWithServerGemini,
-  getGeminiApiKey,
-  saveGeminiApiKey
+  parsePdfWithServerGemini
 } from '../../services/gemini';
 import { ExamTestReport, verifyAndOptimizeExam } from '../../services/examVerification';
 import { saveExamToServerDb, uploadAndParseIeltsPdf } from '../../services/api';
@@ -149,11 +146,6 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
   const [previewTab, setPreviewTab] = useState<'report' | 'passage' | 'questions' | 'writing' | 'listening' | 'json'>('report');
   const [expandedCheckId, setExpandedCheckId] = useState<string | null>(null);
 
-  // Gemini API Key Modal & State for GitHub Pages static hosting
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState(() => getGeminiApiKey());
-  const [isKeyConfigured, setIsKeyConfigured] = useState(() => Boolean(getGeminiApiKey()));
-
   // Handle PDF Drag & Drop
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -185,7 +177,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
     setLoading(true);
     setErrorMsg(null);
     setSaveSuccessMsg(null);
-    setCurrentStep('1/4 Connecting to Gemini 3.8 Flash model...');
+    setCurrentStep('1/4 Connecting to Gemini 4 Hydrogen model...');
 
     try {
       const skillsList: ('listening' | 'reading' | 'writing')[] = [];
@@ -277,7 +269,7 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
           candidateExam = res.exam;
           report = res.testReport;
         } else {
-          throw new Error('Could not parse PDF. On GitHub Pages, please configure your Gemini API Key or paste the exam text directly into the Text/Syllabus tab.');
+          throw new Error('Could not parse PDF. Please paste the exam text directly into the Text/Syllabus tab.');
         }
       } else {
         setCurrentStep('Analyzing document structure, passages, questions, and answer keys...');
@@ -421,26 +413,9 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setApiKeyInput(getGeminiApiKey());
-              setShowApiKeyModal(true);
-            }}
-            className={`flex items-center space-x-1.5 text-xs px-3.5 py-1.5 rounded-full font-extrabold border transition cursor-pointer shadow-xs ${
-              isKeyConfigured
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
-                : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
-            }`}
-            title="Configure Gemini API Key for client-side generation on GitHub Pages"
-          >
-            <Key className="w-3.5 h-3.5" />
-            <span>{isKeyConfigured ? 'Gemini Key: Active' : 'Cấu hình Gemini API Key'}</span>
-          </button>
-
           <div className="flex items-center space-x-2 text-xs bg-purple-100 text-[#503A7A] border border-purple-200 px-3.5 py-1.5 rounded-full font-extrabold shrink-0">
             <Sparkles className="w-4 h-4 text-[#6B51A5]" />
-            <span>Gemini 2.5 Flash</span>
+            <span>Gemini 4 Hydrogen</span>
           </div>
         </div>
       </div>
@@ -1249,98 +1224,6 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
         </div>
 
       </div>
-
-      {/* Gemini API Key Configuration Modal (GitHub Pages Support) */}
-      {showApiKeyModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-purple-200 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fadeIn">
-            <div className="flex items-center justify-between pb-2 border-b border-purple-100">
-              <div className="flex items-center gap-2 text-[#3C2A63]">
-                <div className="p-2 bg-purple-100 text-[#6B51A5] rounded-xl">
-                  <Key className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black">Cấu hình Google Gemini API Key</h3>
-                  <p className="text-[11px] text-[#7C68A5]">Hỗ trợ môi trường tĩnh (GitHub Pages)</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowApiKeyModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-[#503A7A] leading-relaxed">
-              Khi ứng dụng chạy trên GitHub Pages (không có máy chủ Node.js backend), trình duyệt sẽ kết nối trực tiếp đến Google Gemini REST API bằng khóa API này. Khóa được lưu an toàn trong trình duyệt của bạn (LocalStorage).
-            </p>
-
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-[#3C2A63] block">
-                Google AI Studio API Key (AIza...):
-              </label>
-              <input
-                type="text"
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                placeholder="AIzaSy..."
-                className="w-full px-3.5 py-2.5 bg-[#F8F6FC] border border-purple-200 rounded-xl text-xs font-mono text-[#3C2A63] focus:outline-none focus:ring-2 focus:ring-[#6B51A5]"
-              />
-              <div className="flex items-center justify-between text-[10px] text-[#7C68A5] pt-1">
-                <a
-                  href="https://aistudio.google.com/app/apikey"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#6B51A5] font-bold hover:underline"
-                >
-                  🔗 Lấy khóa API miễn phí từ Google AI Studio ↗
-                </a>
-                {isKeyConfigured && (
-                  <span className="text-emerald-700 font-bold">✓ Khóa đang lưu</span>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-purple-100">
-              {isKeyConfigured && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    saveGeminiApiKey('');
-                    setApiKeyInput('');
-                    setIsKeyConfigured(false);
-                  }}
-                  className="px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition cursor-pointer"
-                >
-                  Xóa khóa
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowApiKeyModal(false)}
-                className="px-4 py-2 bg-[#F8F6FC] hover:bg-[#E2DDEC] text-[#3C2A63] rounded-xl text-xs font-bold transition cursor-pointer"
-              >
-                Đóng
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  saveGeminiApiKey(apiKeyInput);
-                  setIsKeyConfigured(Boolean(apiKeyInput.trim()));
-                  setShowApiKeyModal(false);
-                  setSaveSuccessMsg('Đã lưu Google Gemini API Key thành công!');
-                  setTimeout(() => setSaveSuccessMsg(null), 4000);
-                }}
-                className="px-5 py-2 bg-[#6B51A5] hover:bg-[#583F8F] text-white rounded-xl text-xs font-extrabold shadow-md transition cursor-pointer"
-              >
-                Lưu cấu hình
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

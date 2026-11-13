@@ -510,81 +510,36 @@ export const practiceService = {
   },
 
 
-  // Client-side Gemini Grammar Analyzer (No virtual server call)
+  // Server-side Gemini Grammar Analyzer with offline structural fallback
   async analyzeSentence(sentence: string, targetWord?: string, userQuestion?: string, context?: string): Promise<SentenceGrammarAnalysis> {
-    const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
-                   localStorage.getItem('ielts_gemini_api_key') || 
-                   localStorage.getItem('gemini_api_key') || '';
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    if (apiKey) {
-      try {
-        const prompt = `You are an expert Cambridge IELTS grammar analyst. Analyze the following sentence and target word:
-Sentence: "${sentence}"
-Target word: "${targetWord || 'Keyword'}"
-User Question: "${userQuestion || 'Analyze sentence syntax and lexical usage'}"
-Context: "${context || 'IELTS Academic'}"
+      const res = await fetch(getApiUrl('/api/gemini/analyze-grammar'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sentence,
+          targetWord,
+          userQuestion,
+          context
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
 
-Return ONLY valid JSON matching this exact structure:
-{
-  "original_sentence": "${sentence}",
-  "target_word": "${targetWord || 'Keyword'}",
-  "sentence_translation_vi": "Vietnamese translation of the sentence",
-  "syntax_breakdown": {
-    "subject": "Subject clause/phrase",
-    "main_verb": "Main verb and tense",
-    "object_or_complement": "Object or complement",
-    "modifiers_or_clauses": "Modifiers or adverbials"
-  },
-  "word_analysis": {
-    "target_word": "${targetWord || 'Keyword'}",
-    "part_of_speech": "noun/verb/adjective/adverb",
-    "phonetic": "IPA phonetic",
-    "definition_vi": "Vietnamese definition",
-    "root_and_forms": ["form1", "form2"],
-    "synonyms": ["synonym1", "synonym2"],
-    "antonyms": ["antonym1"]
-  },
-  "key_grammar_rules": ["Rule 1", "Rule 2"],
-  "collocations_and_phrases": ["Collocation 1", "Collocation 2"],
-  "detailed_explanation_vi": "Detailed explanation in Vietnamese",
-  "common_pitfalls": "Common IELTS exam traps",
-  "example_sentences": [
-    {"en": "Example sentence 1", "vi": "Example translation 1"},
-    {"en": "Example sentence 2", "vi": "Example translation 2"}
-  ]
-}`;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
-
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: 'application/json' }
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const geminiData = await res.json();
-          const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (rawText) {
-            const cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-            const parsed = JSON.parse(cleanText);
-            if (parsed && parsed.syntax_breakdown) {
-              return parsed;
-            }
-          }
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success && data.analysis && data.analysis.syntax_breakdown) {
+          return data.analysis;
         }
-      } catch (err) {
-        console.warn('Direct Gemini grammar analysis skipped or timed out, utilizing local analyzer:', err);
       }
+    } catch (err) {
+      console.warn('Server Gemini grammar analysis skipped or timed out, utilizing local analyzer:', err);
     }
 
-    // High quality client-side structural fallback
+    // High quality client-side structural fallback when server is unreachable
     return {
       original_sentence: sentence,
       target_word: targetWord || 'Keyword',
@@ -622,8 +577,8 @@ Return ONLY valid JSON matching this exact structure:
     };
   },
 
-  // Client-side Gemini Practice Deck Generator (Direct API call or multi-format synthesis)
-  async generateDeck(topic: string, category: string, level: string, count: number, customApiKey?: string): Promise<CustomPracticeDeck> {
+  // Server-side Gemini Practice Deck Generator with multi-format synthesis fallback
+  async generateDeck(topic: string, category: string, level: string, count: number): Promise<CustomPracticeDeck> {
     const cleanTopic = topic.trim() || 'General Academic English';
     const cleanCategory = category || 'Vocabulary';
     const cleanLevel = level || 'B1-B2';
@@ -631,107 +586,49 @@ Return ONLY valid JSON matching this exact structure:
     const timestamp = Date.now();
     const newDeckId = `PRACTICE_${timestamp.toString().slice(-4)}`;
 
-    const apiKey = customApiKey?.trim() || 
-                   (import.meta as any).env?.VITE_GEMINI_API_KEY || 
-                   localStorage.getItem('ielts_gemini_api_key') || 
-                   localStorage.getItem('gemini_api_key') || '';
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-    if (apiKey) {
-      try {
-        const systemPrompt = `BẠN LÀ MỘT CHUYÊN GIA KHẢO THÍ VÀ THIẾT KẾ HỌC LIỆU NGÔN NGỮ TIẾNG ANH (EDUCATIONAL MEASUREMENT & ASSESSMENT SPECIALIST).
-NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG JSON THEO ĐÚNG CẤU TRÚC DƯỚI ĐÂY.
+      const res = await fetch(getApiUrl('/api/gemini/generate-practice-deck'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: cleanTopic,
+          category: cleanCategory,
+          level: cleanLevel,
+          cardCount: cleanCount
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
 
-1. NGUYÊN TẮC THIẾT KẾ ĐỀ:
-- CHỦ ĐỀ: ${cleanTopic}
-- DANH MỤC: ${cleanCategory}
-- CẤP ĐỘ: ${cleanLevel} (IELTS Academic)
-- SỐ CÂU HỎI: ${cleanCount} câu
-- ĐA DẠNG HÓA ĐỊNH DẠNG: Bộ bài tập PHẢI kết hợp cân bằng giữa 4 dạng:
-  1. multiple-choice: Chọn 1 đáp án chính xác trong 4 lựa chọn. Các phương án nhiễu (distractors) phải là từ cùng từ loại hoặc biến thể hậu tố/tiền tố dễ gây nhầm lẫn.
-  2. multiple-response: Chọn 2 đến 3 đáp án đúng. Phải chỉ định rõ min_selections và max_selections.
-  3. true-false-not-given: Đưa ra ngữ cảnh học thuật ngắn và một nhận định cần kiểm chứng.
-  4. category-matching: Phân loại danh sách từ vựng vào các nhóm chức năng/từ loại tương ứng.
-- PHÂN HÓA NHẬN THỨC (BLOOM'S TAXONOMY): Gán nhãn cognitive_level rõ ràng cho từng câu (remembering, understanding, applying, analyzing).
-- BẮT BUỘC GIẢI THÍCH CHI TIẾT: Mỗi phương án trong options_data bắt buộc phải có distractorRationale giải thích cặn kẽ tại sao đúng hoặc phân tích bẫy ngữ pháp/từ vựng nếu sai.
-
-2. CẤU TRÚC JSON ĐẦU RA BẮT BUỘC (CHỈ TRẢ VỀ RAW JSON, KHÔNG BỌC TRONG MARKDOWN):
-{
-  "deck_id": "${newDeckId}",
-  "title": "${cleanTopic} - Academic Mastery",
-  "category": "${cleanCategory}",
-  "description": "Luyện tập từ vựng và ngữ pháp học thuật chủ đề ${cleanTopic} theo chuẩn CEFR ${cleanLevel}.",
-  "target_language": "English",
-  "native_language": "Vietnamese",
-  "level": "${cleanLevel}",
-  "cards": [
-    {
-      "id": "c1",
-      "type": "multiple-choice",
-      "cognitive_level": "applying",
-      "sentence_en": "Sentence with cloze _____ target.",
-      "sentence_vi": "Vietnamese translation and context.",
-      "cloze_target": "targetWord",
-      "target_word": "targetWord",
-      "part_of_speech": "verb",
-      "phonetic": "/.../",
-      "hints": "hints here",
-      "accepted_answers": ["targetWord"],
-      "explanation": "Detailed explanation.",
-      "options_data": [
-        {"id": "opt_1", "text": "targetWord", "isCorrect": true, "distractorRationale": "Why correct"},
-        {"id": "opt_2", "text": "distractor1", "isCorrect": false, "distractorRationale": "Why incorrect"},
-        {"id": "opt_3", "text": "distractor2", "isCorrect": false, "distractorRationale": "Why incorrect"},
-        {"id": "opt_4", "text": "distractor3", "isCorrect": false, "distractorRationale": "Why incorrect"}
-      ]
-    }
-  ]
-}`;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
-
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: systemPrompt }] }],
-            generationConfig: { responseMimeType: 'application/json' }
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const geminiData = await res.json();
-          const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (rawText) {
-            const cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-            const parsed = JSON.parse(cleanText);
-            if (parsed && Array.isArray(parsed.cards) && parsed.cards.length > 0) {
-              const generated: CustomPracticeDeck = {
-                deck_id: (parsed.deck_id || newDeckId).toUpperCase(),
-                title: parsed.title || `${cleanTopic} Practice`,
-                category: (parsed.category || cleanCategory) as any,
-                description: parsed.description || `Practice questions for ${cleanTopic}`,
-                target_language: 'English',
-                native_language: 'Vietnamese',
-                level: (parsed.level || cleanLevel) as any,
-                cards: parsed.cards.map((c: any, idx: number) => ({
-                  ...c,
-                  id: c.id || `c_${timestamp}_${idx + 1}`,
-                  options: c.options || (c.options_data ? c.options_data.map((o: any) => o.text) : [])
-                })),
-                is_custom: true,
-                created_at: new Date().toISOString()
-              };
-              this.saveDeck(generated);
-              return generated;
-            }
-          }
+      if (res.ok) {
+        const data = await res.json();
+        const parsed = data?.deck;
+        if (data?.success && parsed && Array.isArray(parsed.cards) && parsed.cards.length > 0) {
+          const generated: CustomPracticeDeck = {
+            deck_id: String(parsed.deck_id || newDeckId).toUpperCase(),
+            title: parsed.title || `${cleanTopic} Practice`,
+            category: (parsed.category || cleanCategory) as any,
+            description: parsed.description || `Practice questions for ${cleanTopic}`,
+            target_language: 'English',
+            native_language: 'Vietnamese',
+            level: (parsed.level || cleanLevel) as any,
+            cards: parsed.cards.map((c: any, idx: number) => ({
+              ...c,
+              id: c.id || `c_${timestamp}_${idx + 1}`,
+              options: c.options || (c.options_data ? c.options_data.map((o: any) => o.text) : [])
+            })),
+            is_custom: true,
+            created_at: parsed.created_at || new Date().toISOString()
+          };
+          this.saveDeck(generated);
+          return generated;
         }
-      } catch (err) {
-        console.warn('Direct Gemini API deck generation skipped or error occurred, using multi-format synthesizer fallback:', err);
       }
+    } catch (err) {
+      console.warn('Server Gemini deck generation skipped or error occurred, using multi-format synthesizer fallback:', err);
     }
 
     // High-Fidelity Multi-Format Synthesis Engine (100% resilient fallback)
