@@ -165,30 +165,34 @@ export function getEffectiveSpreadsheetId(explicitId?: string): string {
   return '';
 }
 
-/**
- * Fetches all exam rows from the private Google Sheet 'EXAMS' tab via Google Sheets API v4.
- */
-export async function fetchExamsFromSheet(spreadsheetId?: string): Promise<any[]> {
-  const sheets = getGoogleSheetsClient();
-  const sheetId = getEffectiveSpreadsheetId(spreadsheetId);
+const MAX_SHEET_CELL_CHARS = 49000;
+const recentlyFlushedSubmissionIds = new Set<string>();
 
-  if (!sheets || !sheetId) {
-    throw new Error('Google Service Account or Spreadsheet ID is not configured.');
+function sanitizeSheetCell(val: any, maxLen: number = MAX_SHEET_CELL_CHARS, protectFormula: boolean = false): string | number {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'number') return val;
+  if (typeof val === 'boolean') return String(val);
+  let str = String(val);
+  if (str.length > maxLen) {
+    str = str.substring(0, maxLen);
   }
+  if (protectFormula && str.length > 0) {
+    const first = str.charAt(0);
+    if (first === '=' || first === '+' || first === '@') {
+      str = `'${str}`;
+    } else if (first === '-' && str.length > 1 && !/^-[0-9.]/.test(str)) {
+      str = `'${str}`;
+    }
+  }
+  return str;
+}
 
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range: 'EXAMS!A2:K',
-    valueRenderOption: 'UNFORMATTED_VALUE'
-  });
-
-  const rows = res.data.values || [];
+function parseExamRows(rows: any[][]): any[] {
   return rows.map((row) => {
     const examCode = String(row[0] || '').trim().toUpperCase();
     const title = String(row[1] || `IELTS Examination - ${examCode}`).trim();
     const testType = String(row[2] || 'TEST').trim().toUpperCase() === 'PRACTICE' ? 'PRACTICE' : 'TEST';
-    
-    // Duration parse safe fallback to 120
+
     const rawDur = row[3];
     const parsedDur = typeof rawDur === 'number' ? rawDur : Number(rawDur);
     const durationMins = !isNaN(parsedDur) && parsedDur > 0 ? parsedDur : 120;
@@ -217,35 +221,16 @@ export async function fetchExamsFromSheet(spreadsheetId?: string): Promise<any[]
   }).filter(e => Boolean(e.exam_code));
 }
 
-/**
- * Fetches all questions from the private Google Sheet 'QUESTIONS' tab via Google Sheets API v4.
- * Note: Col G contains CORRECT_ANSWER, which is preserved ONLY in Server Memory for authoritative grading.
- */
-export async function fetchQuestionsFromSheet(spreadsheetId?: string, examCode?: string): Promise<any[]> {
-  const sheets = getGoogleSheetsClient();
-  const sheetId = getEffectiveSpreadsheetId(spreadsheetId);
-
-  if (!sheets || !sheetId) {
-    throw new Error('Google Service Account or Spreadsheet ID is not configured.');
-  }
-
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range: 'QUESTIONS!A2:H',
-    valueRenderOption: 'UNFORMATTED_VALUE'
-  });
-
-  const rows = res.data.values || [];
+function parseQuestionRows(rows: any[][], examCode?: string): any[] {
   const targetCode = examCode ? examCode.trim().toUpperCase() : null;
 
   const parsedQuestions = rows.map((row, idx) => {
     const rowExamCode = String(row[0] || '').trim().toUpperCase();
     const qId = String(row[1] || `Q${idx + 1}`).trim();
     const section = String(row[2] || 'reading').toLowerCase().trim() as 'listening' | 'reading';
-    const questionText = String(row[3] || '').trim();
-    const questionType = String(row[4] || 'multiple_choice').toLowerCase().trim();
+    let questionText = String(row[3] || '').trim();
+    let questionType = String(row[4] || 'multiple_choice').toLowerCase().trim();
 
-    // Parse options: supports JSON array, pipe-delimited (|), or newline-separated (\n)
     let options: string[] = [];
     const rawOptions = row[5];
     if (rawOptions !== undefined && rawOptions !== null) {
@@ -253,7 +238,21 @@ export async function fetchQuestionsFromSheet(spreadsheetId?: string, examCode?:
       if (strOptions) {
         try {
           const parsedJson = JSON.parse(strOptions);
-          if (Array.isArray(parsedJson)) {
+          if (parsedJson && typeof parsedJson === 'object' && !Array.isArray(parsedJson)) {
+            if (parsedJson.question_text) {
+              const upperText = questionText.toUpperCase();
+              const shortFlags = ['A', 'B', 'C', 'D', 'TRUE', 'FALSE', 'NOT GIVEN', 'YES', 'NO'];
+              if (shortFlags.includes(upperText) || questionText.length <= 4) {
+                questionText = String(parsedJson.question_text).trim();
+              }
+            }
+            if (parsedJson.question_type) {
+              questionType = String(parsedJson.question_type).toLowerCase().trim();
+            }
+            if (Array.isArray(parsedJson.options)) {
+              options = parsedJson.options.map((o: any) => String(o).trim()).filter(Boolean);
+            }
+          } else if (Array.isArray(parsedJson)) {
             options = parsedJson.map((o: any) => String(o).trim()).filter(Boolean);
           } else if (typeof parsedJson === 'string') {
             options = [parsedJson.trim()];
@@ -270,10 +269,7 @@ export async function fetchQuestionsFromSheet(spreadsheetId?: string, examCode?:
       }
     }
 
-    // Col G (index 6): CORRECT_ANSWER - Authoritative answer key
     const correctAnswer = row[6] !== undefined && row[6] !== null ? String(row[6]).trim() : '';
-
-    // Col H (index 7): MAX_SCORE
     const rawScore = Number(row[7]);
     const maxScore = !isNaN(rawScore) && rawScore > 0 ? rawScore : 1;
 
@@ -297,6 +293,47 @@ export async function fetchQuestionsFromSheet(spreadsheetId?: string, examCode?:
 }
 
 /**
+ * Fetches all exam rows from the private Google Sheet 'EXAMS' tab via Google Sheets API v4.
+ */
+export async function fetchExamsFromSheet(spreadsheetId?: string): Promise<any[]> {
+  const sheets = getGoogleSheetsClient();
+  const sheetId = getEffectiveSpreadsheetId(spreadsheetId);
+
+  if (!sheets || !sheetId) {
+    throw new Error('Google Service Account or Spreadsheet ID is not configured.');
+  }
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: 'EXAMS!A2:K',
+    valueRenderOption: 'UNFORMATTED_VALUE'
+  });
+
+  return parseExamRows(res.data.values || []);
+}
+
+/**
+ * Fetches all questions from the private Google Sheet 'QUESTIONS' tab via Google Sheets API v4.
+ * Note: Col G contains CORRECT_ANSWER, which is preserved ONLY in Server Memory for authoritative grading.
+ */
+export async function fetchQuestionsFromSheet(spreadsheetId?: string, examCode?: string): Promise<any[]> {
+  const sheets = getGoogleSheetsClient();
+  const sheetId = getEffectiveSpreadsheetId(spreadsheetId);
+
+  if (!sheets || !sheetId) {
+    throw new Error('Google Service Account or Spreadsheet ID is not configured.');
+  }
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: 'QUESTIONS!A2:H',
+    valueRenderOption: 'UNFORMATTED_VALUE'
+  });
+
+  return parseQuestionRows(res.data.values || [], examCode);
+}
+
+/**
  * Builds and synchronizes a complete IELTS exam from Google Sheets into the Server In-Memory Cache.
  */
 export async function syncExamFromGoogleSheets(
@@ -309,10 +346,22 @@ export async function syncExamFromGoogleSheets(
   }
 
   try {
-    const [allExams, questions] = await Promise.all([
-      fetchExamsFromSheet(spreadsheetId),
-      fetchQuestionsFromSheet(spreadsheetId, cleanCode)
-    ]);
+    const sheets = getGoogleSheetsClient();
+    const sheetId = getEffectiveSpreadsheetId(spreadsheetId);
+    if (!sheets || !sheetId) {
+      throw new Error('Google Service Account or Spreadsheet ID is not configured.');
+    }
+
+    // Single batchGet API call cuts Sheets API read quota & round-trip latency in half
+    const batchRes = await sheets.spreadsheets.values.batchGet({
+      spreadsheetId: sheetId,
+      ranges: ['EXAMS!A2:K', 'QUESTIONS!A2:H'],
+      valueRenderOption: 'UNFORMATTED_VALUE'
+    });
+
+    const valueRanges = batchRes.data.valueRanges || [];
+    const allExams = parseExamRows(valueRanges[0]?.values || []);
+    const questions = parseQuestionRows(valueRanges[1]?.values || [], cleanCode);
 
     const examMeta = allExams.find(e => e.exam_code === cleanCode);
     if (!examMeta) {
@@ -416,8 +465,22 @@ export async function syncAllExamsFromGoogleSheets(
   spreadsheetId?: string
 ): Promise<{ success: boolean; count: number; exams: any[]; error?: string }> {
   try {
-    const allExamMetas = await fetchExamsFromSheet(spreadsheetId);
-    const allQuestions = await fetchQuestionsFromSheet(spreadsheetId);
+    const sheets = getGoogleSheetsClient();
+    const sheetId = getEffectiveSpreadsheetId(spreadsheetId);
+    if (!sheets || !sheetId) {
+      throw new Error('Google Service Account or Spreadsheet ID is not configured.');
+    }
+
+    // Single batchGet API call for both EXAMS & QUESTIONS
+    const batchRes = await sheets.spreadsheets.values.batchGet({
+      spreadsheetId: sheetId,
+      ranges: ['EXAMS!A2:K', 'QUESTIONS!A2:H'],
+      valueRenderOption: 'UNFORMATTED_VALUE'
+    });
+
+    const valueRanges = batchRes.data.valueRanges || [];
+    const allExamMetas = parseExamRows(valueRanges[0]?.values || []);
+    const allQuestions = parseQuestionRows(valueRanges[1]?.values || []);
 
     const syncedList: any[] = [];
 
@@ -586,9 +649,21 @@ export async function flushSubmissionQueue(): Promise<{ success: boolean; count:
     return { success: true, count: 0 };
   }
 
-  // Atomic swap: take current batch and reset queue
-  const currentBatch = [...submissionQueue];
+  // Atomic swap & deduplicate by submission_id
+  const rawBatch = [...submissionQueue];
   submissionQueue = [];
+
+  const dedupedMap = new Map<string, QueuedSubmission>();
+  for (const item of rawBatch) {
+    const sid = String(item.submission?.submission_id || '').trim();
+    if (sid && recentlyFlushedSubmissionIds.has(sid)) continue;
+    const key = sid || `anon_${item.queuedAt}_${Math.random()}`;
+    dedupedMap.set(key, item);
+  }
+  const currentBatch = Array.from(dedupedMap.values());
+  if (currentBatch.length === 0) {
+    return { success: true, count: 0 };
+  }
 
   const sheets = getGoogleSheetsClient();
   const sheetId = getEffectiveSpreadsheetId();
@@ -599,39 +674,7 @@ export async function flushSubmissionQueue(): Promise<{ success: boolean; count:
   }
 
   try {
-    const rowsToAppend = currentBatch.map(item => {
-      const sub = item.submission;
-      const userAnswersStr = JSON.stringify({
-        answers: sub.answers || {},
-        listening: sub.listening_answers || {},
-        reading: sub.reading_answers || {}
-      });
-
-      const writingScoresStr = typeof sub.writing_scores === 'object' && sub.writing_scores !== null
-        ? JSON.stringify(sub.writing_scores)
-        : (typeof sub.detailed_results?.writing === 'object' ? JSON.stringify(sub.detailed_results.writing) : JSON.stringify({ TR: 0, CC: 0, LR: 0, GRA: 0 }));
-
-      return [
-        sub.submission_id || `SUB_${Date.now()}`,               // Col 1 (A): SUBMISSION_ID
-        sub.sbd || '',                                          // Col 2 (B): SBD
-        sub.student_name || sub.candidate_name || '',           // Col 3 (C): STUDENT_NAME
-        sub.exam_code || '',                                    // Col 4 (D): EXAM_CODE
-        sub.test_mode || 'TEST',                                // Col 5 (E): TEST_MODE
-        sub.listening_raw_score ?? sub.listening_raw ?? '',     // Col 6 (F): LISTENING_RAW
-        sub.listening_band ?? sub.listening_score ?? '',        // Col 7 (G): LISTENING_BAND
-        sub.reading_raw_score ?? sub.reading_raw ?? '',         // Col 8 (H): READING_RAW
-        sub.reading_band ?? sub.reading_score ?? '',            // Col 9 (I): READING_BAND
-        sub.writing_task1_text || sub.writing_task1_response || sub.writing_responses?.task1 || '', // Col 10 (J): WRITING_TASK1_TEXT
-        sub.writing_task2_text || sub.writing_task2_response || sub.writing_responses?.task2 || '', // Col 11 (K): WRITING_TASK2_TEXT
-        userAnswersStr,                                         // Col 12 (L): ANSWERS_JSON
-        writingScoresStr,                                       // Col 13 (M): WRITING_SCORES_JSON
-        sub.writing_band ?? '',                                 // Col 14 (N): WRITING_BAND
-        sub.overall_band ?? sub.band_score ?? '',               // Col 15 (O): OVERALL_BAND
-        sub.status || sub.writing_status || 'PENDING_TEACHER',  // Col 16 (P): STATUS
-        sub.submitted_at || new Date().toISOString(),           // Col 17 (Q): SUBMITTED_AT
-        sub.violations_count ?? sub.cheat_count ?? 0            // Col 18 (R): VIOLATIONS_COUNT
-      ];
-    });
+    const rowsToAppend = currentBatch.map(item => buildSubmissionSheetRow(item.submission));
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
@@ -643,11 +686,22 @@ export async function flushSubmissionQueue(): Promise<{ success: boolean; count:
       }
     });
 
+    for (const item of currentBatch) {
+      const sid = String(item.submission?.submission_id || '').trim();
+      if (sid) {
+        recentlyFlushedSubmissionIds.add(sid);
+        if (recentlyFlushedSubmissionIds.size > 2000) {
+          const first = recentlyFlushedSubmissionIds.values().next().value;
+          if (first) recentlyFlushedSubmissionIds.delete(first);
+        }
+      }
+    }
+
     console.log(`[Google Sheets Batch Append] Successfully appended ${rowsToAppend.length} submission(s) to SUBMISSIONS sheet.`);
     return { success: true, count: rowsToAppend.length };
   } catch (err: any) {
     console.error('[Google Sheets Batch Append Error]:', err.message);
-    
+
     // Put failed items back into queue with backoff up to 3 retries
     const retriable = currentBatch
       .filter(item => item.retryCount < 3)
@@ -655,7 +709,6 @@ export async function flushSubmissionQueue(): Promise<{ success: boolean; count:
 
     if (retriable.length > 0) {
       submissionQueue = [...retriable, ...submissionQueue];
-      // Schedule retry in 10s
       if (!batchTimeoutHandle) {
         batchTimeoutHandle = setTimeout(() => {
           batchTimeoutHandle = null;
@@ -666,6 +719,39 @@ export async function flushSubmissionQueue(): Promise<{ success: boolean; count:
 
     return { success: false, count: 0 };
   }
+}
+
+function buildSubmissionSheetRow(sub: any): (string | number)[] {
+  const userAnswersStr = sanitizeSheetCell(JSON.stringify({
+    answers: sub.answers || {},
+    listening: sub.listening_answers || {},
+    reading: sub.reading_answers || {}
+  }), MAX_SHEET_CELL_CHARS, false);
+
+  const writingScoresStr = typeof sub.writing_scores === 'object' && sub.writing_scores !== null
+    ? JSON.stringify(sub.writing_scores)
+    : (typeof sub.detailed_results?.writing === 'object' ? JSON.stringify(sub.detailed_results.writing) : JSON.stringify({ TR: 0, CC: 0, LR: 0, GRA: 0 }));
+
+  return [
+    sub.submission_id || `SUB_${Date.now()}`,
+    sanitizeSheetCell(sub.sbd || '', 100, true),
+    sanitizeSheetCell(sub.student_name || sub.candidate_name || '', 300, true),
+    sub.exam_code || '',
+    sub.test_mode || 'TEST',
+    sub.listening_raw_score ?? sub.listening_raw ?? '',
+    sub.listening_band ?? sub.listening_score ?? '',
+    sub.reading_raw_score ?? sub.reading_raw ?? '',
+    sub.reading_band ?? sub.reading_score ?? '',
+    sanitizeSheetCell(sub.writing_task1_text || sub.writing_task1_response || sub.writing_responses?.task1 || '', MAX_SHEET_CELL_CHARS, true),
+    sanitizeSheetCell(sub.writing_task2_text || sub.writing_task2_response || sub.writing_responses?.task2 || '', MAX_SHEET_CELL_CHARS, true),
+    userAnswersStr,
+    writingScoresStr,
+    sub.writing_band ?? '',
+    sub.overall_band ?? sub.band_score ?? '',
+    sub.status || sub.writing_status || 'PENDING_TEACHER',
+    sub.submitted_at || new Date().toISOString(),
+    sub.violations_count ?? sub.cheat_count ?? 0
+  ];
 }
 
 /**
@@ -684,38 +770,7 @@ export async function batchAppendSubmissions(submissions: any[]): Promise<{ succ
   }
 
   try {
-    const rows = submissions.map(sub => {
-      const userAnswersStr = JSON.stringify({
-        answers: sub.answers || {},
-        listening: sub.listening_answers || {},
-        reading: sub.reading_answers || {}
-      });
-
-      const writingScoresStr = typeof sub.writing_scores === 'object' && sub.writing_scores !== null
-        ? JSON.stringify(sub.writing_scores)
-        : (typeof sub.detailed_results?.writing === 'object' ? JSON.stringify(sub.detailed_results.writing) : JSON.stringify({ TR: 0, CC: 0, LR: 0, GRA: 0 }));
-
-      return [
-        sub.submission_id || `SUB_${Date.now()}`,               // Col 1 (A): SUBMISSION_ID
-        sub.sbd || '',                                          // Col 2 (B): SBD
-        sub.student_name || sub.candidate_name || '',           // Col 3 (C): STUDENT_NAME
-        sub.exam_code || '',                                    // Col 4 (D): EXAM_CODE
-        sub.test_mode || 'TEST',                                // Col 5 (E): TEST_MODE
-        sub.listening_raw_score ?? sub.listening_raw ?? '',     // Col 6 (F): LISTENING_RAW
-        sub.listening_band ?? sub.listening_score ?? '',        // Col 7 (G): LISTENING_BAND
-        sub.reading_raw_score ?? sub.reading_raw ?? '',         // Col 8 (H): READING_RAW
-        sub.reading_band ?? sub.reading_score ?? '',            // Col 9 (I): READING_BAND
-        sub.writing_task1_text || sub.writing_task1_response || sub.writing_responses?.task1 || '', // Col 10 (J): WRITING_TASK1_TEXT
-        sub.writing_task2_text || sub.writing_task2_response || sub.writing_responses?.task2 || '', // Col 11 (K): WRITING_TASK2_TEXT
-        userAnswersStr,                                         // Col 12 (L): ANSWERS_JSON
-        writingScoresStr,                                       // Col 13 (M): WRITING_SCORES_JSON
-        sub.writing_band ?? '',                                 // Col 14 (N): WRITING_BAND
-        sub.overall_band ?? sub.band_score ?? '',               // Col 15 (O): OVERALL_BAND
-        sub.status || sub.writing_status || 'PENDING_TEACHER',  // Col 16 (P): STATUS
-        sub.submitted_at || new Date().toISOString(),           // Col 17 (Q): SUBMITTED_AT
-        sub.violations_count ?? sub.cheat_count ?? 0            // Col 18 (R): VIOLATIONS_COUNT
-      ];
-    });
+    const rows = submissions.map(sub => buildSubmissionSheetRow(sub));
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,

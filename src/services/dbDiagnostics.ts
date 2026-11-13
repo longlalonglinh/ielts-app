@@ -1,5 +1,5 @@
 import { ExamData, Question, QuestionType } from '../types';
-import { DEFAULT_API_URL } from './api';
+import { DEFAULT_API_URL, postToGasWithLockRetry } from './api';
 import { sanitizeExamForSkills } from '../utils/examUtils';
 
 export interface DiagnosticStepResult {
@@ -457,34 +457,18 @@ export async function seedExamToGoogleSheets(
       }
     };
 
-    const res = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-
-    if (res.ok) {
-      const text = await res.text();
-      try {
-        const json = JSON.parse(text);
-        return {
-          success: true,
-          message: json.message || `Successfully uploaded exam [${exam.exam_code}] to Google Sheets!`,
-          details: json
-        };
-      } catch {
-        return {
-          success: true,
-          message: `Sent exam data for [${exam.exam_code}] to Google Sheets.`,
-          details: text
-        };
-      }
-    } else {
+    const json = await postToGasWithLockRetry(apiUrl, payload, 2);
+    if (json && (json.success || json.status === 'success' || json.is_opaque)) {
       return {
-        success: false,
-        message: `Google server returned HTTP error code ${res.status}. Please verify Web App access permissions.`
+        success: true,
+        message: json.message || `Successfully uploaded exam [${exam.exam_code}] to Google Sheets!`,
+        details: json
       };
     }
+    return {
+      success: false,
+      message: json?.message || `Google server returned an error while uploading [${exam.exam_code}]. Please verify Web App access permissions.`
+    };
   } catch (err: any) {
     return {
       success: false,

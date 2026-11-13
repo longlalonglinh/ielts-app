@@ -198,6 +198,30 @@ export function deduplicateSubmissions(list: SubmissionRecord[]): SubmissionReco
 }
 
 /**
+ * Safely persist lightweight recent submissions into LocalStorage without breaching 5MB quota
+ * (Full lossless archive including detailed_results always lives in IndexedDB)
+ */
+export function safeSaveSubmissionsToLocalStorage(list: SubmissionRecord[]): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  try {
+    const deduped = deduplicateSubmissions(list).slice(0, 50).map(sub => {
+      const { detailed_results: _omitted, ...lightweight } = sub as any;
+      return lightweight;
+    });
+    localStorage.setItem('ielts_student_submissions', JSON.stringify(deduped));
+  } catch (e) {
+    try {
+      // Aggressive trim if still near quota
+      const minimal = deduplicateSubmissions(list).slice(0, 15).map(sub => {
+        const { detailed_results: _o1, writing_task1_text: _w1, writing_task2_text: _w2, ...tiny } = sub as any;
+        return tiny;
+      });
+      localStorage.setItem('ielts_student_submissions', JSON.stringify(minimal));
+    } catch {}
+  }
+}
+
+/**
  * Deduplicate and sanitize cheat logs
  */
 export function deduplicateCheatLogs(list: CheatLog[]): CheatLog[] {
@@ -272,7 +296,7 @@ export async function fetchSubmissions(
         allMerged.forEach(sub => {
           saveSubmissionToIndexedDB(sub).catch(() => {});
         });
-        localStorage.setItem('ielts_student_submissions', JSON.stringify(allMerged.slice(0, 100)));
+        safeSaveSubmissionsToLocalStorage(allMerged);
 
         return { success: true, data: allMerged, source: 'gas' };
       }
@@ -403,7 +427,7 @@ export async function saveWritingScore(
       }
       return sub;
     });
-    localStorage.setItem('ielts_student_submissions', JSON.stringify(updated));
+    safeSaveSubmissionsToLocalStorage(updated);
   }
 
   if (!apiUrl || apiUrl.includes('mock_ielts_exam_system_gas_url')) {
@@ -763,7 +787,7 @@ export async function submitExamPayload(
     if (!subsArr.some(s => s.submission_id === record.submission_id)) {
       subsArr.unshift(record);
     }
-    localStorage.setItem('ielts_student_submissions', JSON.stringify(deduplicateSubmissions(subsArr)));
+    safeSaveSubmissionsToLocalStorage(subsArr);
   } catch (e) {
     console.warn('LocalStorage save failed, IndexedDB preserved:', e);
   }
@@ -807,7 +831,7 @@ export async function submitExamPayload(
         const existing = localStorage.getItem('ielts_student_submissions');
         const subsArr: SubmissionRecord[] = existing ? JSON.parse(existing) : [];
         const updated = subsArr.map(s => s.submission_id === record.submission_id ? record : s);
-        localStorage.setItem('ielts_student_submissions', JSON.stringify(deduplicateSubmissions(updated)));
+        safeSaveSubmissionsToLocalStorage(updated);
       } catch (e) {}
 
       return {
@@ -885,7 +909,7 @@ export async function syncPendingSubmissions(gasUrl?: string): Promise<{
               const existing = localStorage.getItem('ielts_student_submissions');
               const subsArr: SubmissionRecord[] = existing ? JSON.parse(existing) : [];
               const updated = subsArr.map(s => s.submission_id === certifiedSub.submission_id ? certifiedSub : s);
-              localStorage.setItem('ielts_student_submissions', JSON.stringify(deduplicateSubmissions(updated)));
+              safeSaveSubmissionsToLocalStorage(updated);
             } catch (e) {}
 
             results.push({
@@ -1134,6 +1158,138 @@ if (typeof window !== 'undefined') {
 }
 
 /**
+ * Reconstruct a standardized ExamData object from a raw Google Apps Script get_exam response.
+ * Supports objective questions, reading-passage-only exams (including multi-passage dividers),
+ * writing-image-only tasks, and audio-only tests. Returns null when the response has no exam data.
+ */
+export function buildExamFromGasRawResponse(
+  raw: any,
+  cleanCode: string,
+  existingCached?: ExamData
+): ExamData | null {
+  if (!raw || raw.status === 'error' || raw.success === false) {
+    return null;
+  }
+
+  const extracted = extractQuestionsFromRawResponse(raw, cleanCode);
+  const meta = (extracted.meta && typeof extracted.meta === 'object')
+    ? extracted.meta
+    : (raw.exam_meta || raw.meta || raw.exam || {});
+  const questions = extracted.questions || [];
+
+  const rawPassage = String(
+    meta.reading_passage || meta.passage_text || raw.reading_passage || raw.passage_text || raw.exam?.reading_passage || raw.exam?.passage_text || ''
+  ).trim();
+  const writingTask1Prompt = String(
+    meta.writing_task1_prompt || raw.writing_task1_prompt || raw.exam?.writing_task1_prompt || ''
+  ).trim();
+  const writingTask2Prompt = String(
+    meta.writing_task2_prompt || raw.writing_task2_prompt || raw.exam?.writing_task2_prompt || ''
+  ).trim();
+  const rawTask1Image = String(
+    meta.writing_task1_image || meta.writing_task1_image_url || meta.writing_task1_imageUrl ||
+    raw.writing_task1_image || raw.writing_task1_image_url || raw.writing_task1_imageUrl ||
+    raw.exam?.writing_task1_image || raw.exam?.writing_task1_image_url || raw.exam?.writing_task1_imageUrl ||
+    meta.imageUrl || meta.image_url || raw.imageUrl || raw.image_url ||
+    raw.sections?.find((s: any) => s.skill === 'writing')?.tasks?.[0]?.image_url ||
+    raw.sections?.find((s: any) => s.skill === 'writing')?.tasks?.[0]?.imageUrl ||
+    existingCached?.writing_task1_image ||
+    existingCached?.writing_task1_image_url ||
+    existingCached?.writing_task1_imageUrl ||
+    ''
+  ).trim();
+  const audioUrl = String(meta.audio_url || raw.audio_url || raw.exam?.audio_url || '').trim();
+  const audioTitle = String(meta.audio_title || raw.audio_title || raw.exam?.audio_title || '').trim();
+
+  const metaPassages =
+    (Array.isArray(meta.passages) && meta.passages.length > 0 && meta.passages) ||
+    (Array.isArray(raw.passages) && raw.passages.length > 0 && raw.passages) ||
+    (Array.isArray(raw.exam?.passages) && raw.exam.passages.length > 0 && raw.exam.passages) ||
+    [];
+
+  const hasMetaObject = Boolean(raw.exam_meta && typeof raw.exam_meta === 'object' && raw.exam_meta.exam_code);
+  const hasContent =
+    questions.length > 0 ||
+    metaPassages.length > 0 ||
+    Boolean(rawPassage || audioUrl || writingTask1Prompt || writingTask2Prompt || rawTask1Image || hasMetaObject);
+
+  if (!hasContent) {
+    return null;
+  }
+
+  const listeningQs = questions.filter((q: any) => String(q.section || '').toLowerCase() === 'listening');
+  const readingQs = questions.filter((q: any) => String(q.section || '').toLowerCase() !== 'listening');
+
+  let passages: ReadingPassageItem[] = metaPassages as ReadingPassageItem[];
+  if (passages.length === 0 && rawPassage) {
+    if (rawPassage.includes('--- Passage Divider ---')) {
+      const chunks = rawPassage
+        .split(/\r?\n\s*---\s*Passage Divider\s*---\s*\r?\n|--- Passage Divider ---/i)
+        .map((c: string) => c.trim())
+        .filter(Boolean);
+      const totalReading = readingQs.length;
+      const chunkCount = Math.max(chunks.length, 1);
+      passages = chunks.map((chunkText: string, idx: number) => {
+        const pIndex = Math.min(idx + 1, 3) as 1 | 2 | 3;
+        const startIdx = Math.floor((idx * totalReading) / chunkCount);
+        const endIdx = Math.floor(((idx + 1) * totalReading) / chunkCount);
+        return {
+          passage_index: pIndex,
+          title: `Reading Passage ${pIndex}`,
+          text: chunkText,
+          questions: readingQs.slice(startIdx, endIdx).map((q: any) => ({ ...q, passage_index: pIndex }))
+        };
+      });
+    } else {
+      passages = [
+        {
+          passage_index: 1,
+          title: meta.passage_title || 'Reading Passage 1',
+          text: rawPassage,
+          questions: readingQs.map((q: any) => ({ ...q, passage_index: 1 }))
+        }
+      ];
+    }
+  }
+
+  const detectedSkills: ('listening' | 'reading' | 'writing')[] = [];
+  if (listeningQs.length > 0 || audioUrl) detectedSkills.push('listening');
+  if (readingQs.length > 0 || rawPassage || passages.length > 0) detectedSkills.push('reading');
+  if (writingTask1Prompt || writingTask2Prompt || rawTask1Image) detectedSkills.push('writing');
+  if (detectedSkills.length === 0) detectedSkills.push('reading');
+
+  const parsedDuration = Number(meta.duration_mins || raw.duration_mins || raw.exam?.duration_mins);
+  const durationMins = !isNaN(parsedDuration) && parsedDuration > 0 ? parsedDuration : 120;
+  const testType = (meta.test_type || raw.test_type || raw.exam?.test_type || 'TEST') as 'TEST' | 'PRACTICE';
+
+  const rawExamObj: ExamData = {
+    exam_code: cleanCode,
+    title: meta.title || raw.title || raw.exam?.title || `IELTS Examination - ${cleanCode}`,
+    test_type: testType,
+    exam_type: (meta.exam_type || raw.exam_type || (detectedSkills.length === 1 ? 'one_skill' : detectedSkills.length === 2 ? 'two_skills' : 'full_test')) as any,
+    skills: Array.isArray(meta.skills || raw.skills) ? (meta.skills || raw.skills) : detectedSkills,
+    duration_mins: durationMins,
+    audio_url: audioUrl,
+    audio_title: audioTitle,
+    passage_title: meta.passage_title || 'Reading Passage 1',
+    passage_text: rawPassage,
+    reading_passage: rawPassage,
+    passages,
+    questions,
+    sections: raw.sections || meta.sections,
+    writing_task1_prompt: writingTask1Prompt,
+    writing_task1_image: rawTask1Image,
+    writing_task1_image_url: rawTask1Image,
+    writing_task1_imageUrl: rawTask1Image,
+    writing_task2_prompt: writingTask2Prompt,
+    status: 'published',
+    is_draft: false
+  };
+
+  return standardizeExamData(rawExamObj, cleanCode);
+}
+
+/**
  * Asynchronously revalidate exam data from Google Sheets in the background without blocking UI
  */
 export function triggerBackgroundRevalidation(apiUrl: string, cleanCode: string): void {
@@ -1145,53 +1301,20 @@ export function triggerBackgroundRevalidation(apiUrl: string, cleanCode: string)
     try {
       const fetchUrl = `${apiUrl}?action=get_exam&exam_code=${encodeURIComponent(cleanCode)}`;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       const res = await fetch(fetchUrl, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
+        redirect: 'follow',
         signal: controller.signal
       });
       clearTimeout(timeoutId);
 
       if (res.ok) {
         const raw = await res.json();
-        const extracted = extractQuestionsFromRawResponse(raw, cleanCode);
-        const meta = extracted.meta || {};
-        const hasQuestions = extracted.questions && extracted.questions.length > 0;
-        const hasWritingPrompts = Boolean(
-          meta.writing_task1_prompt || meta.writing_task2_prompt ||
-          raw.writing_task1_prompt || raw.writing_task2_prompt ||
-          raw.exam?.writing_task1_prompt || raw.exam?.writing_task2_prompt
-        );
-
-        if (hasQuestions || hasWritingPrompts) {
-          const existingCached = examMemoryCache.get(cleanCode);
-          const rawTask1Image = meta.writing_task1_image || meta.writing_task1_image_url || meta.writing_task1_imageUrl || 
-            raw.writing_task1_image || raw.writing_task1_image_url || raw.writing_task1_imageUrl || 
-            raw.exam?.writing_task1_image || raw.exam?.writing_task1_image_url || raw.exam?.writing_task1_imageUrl || 
-            meta.imageUrl || meta.image_url || raw.imageUrl || raw.image_url || 
-            raw.sections?.find((s: any) => s.skill === 'writing')?.tasks?.[0]?.image_url || 
-            raw.sections?.find((s: any) => s.skill === 'writing')?.tasks?.[0]?.imageUrl || 
-            existingCached?.writing_task1_image || 
-            existingCached?.writing_task1_image_url || 
-            existingCached?.writing_task1_imageUrl || 
-            '';
-
-          const rawExamObj: ExamData = {
-            exam_code: cleanCode,
-            title: meta.title || raw.title || raw.exam?.title || `IELTS Examination - ${cleanCode}`,
-            audio_url: meta.audio_url || raw.audio_url || raw.exam?.audio_url || '',
-            passages: meta.passages || raw.passages || raw.exam?.passages || [],
-            questions: extracted.questions || [],
-            sections: raw.sections,
-            writing_task1_prompt: meta.writing_task1_prompt || raw.writing_task1_prompt || raw.exam?.writing_task1_prompt || '',
-            writing_task1_image: rawTask1Image,
-            writing_task1_image_url: rawTask1Image,
-            writing_task1_imageUrl: rawTask1Image,
-            writing_task2_prompt: meta.writing_task2_prompt || raw.writing_task2_prompt || raw.exam?.writing_task2_prompt || ''
-          };
-
-          const fresh = standardizeExamData(rawExamObj, cleanCode);
+        const existingCached = examMemoryCache.get(cleanCode);
+        const fresh = buildExamFromGasRawResponse(raw, cleanCode, existingCached);
+        if (fresh) {
           examMemoryCache.set(cleanCode, fresh);
           saveExamToIndexedDB(fresh).catch(() => {});
           safeSaveCurrentExamToLocalStorage(fresh);
@@ -1226,7 +1349,10 @@ export function prefetchExam(
   const prefetchPromise = (async () => {
     // 1. Check Centralized Server DB (/api/exams/:code) first (<20ms, private Sheet guard)
     try {
-      const sRes = await fetch(`/api/exams/${encodeURIComponent(cleanCode)}`);
+      const sRes = await fetch(getApiUrl(`/api/exams/${encodeURIComponent(cleanCode)}`));
+      if (sRes.status === 403) {
+        return { success: false };
+      }
       if (sRes.ok) {
         const sJson = await sRes.json();
         if (sJson && sJson.success && sJson.exam) {
@@ -1284,52 +1410,20 @@ export function prefetchExam(
       try {
         const fetchUrl = `${apiUrl}?action=get_exam&exam_code=${encodeURIComponent(cleanCode)}`;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
         const res = await fetch(fetchUrl, {
           method: 'GET',
           headers: { 'Accept': 'application/json' },
+          redirect: 'follow',
           signal: controller.signal
         });
         clearTimeout(timeoutId);
 
         if (res.ok) {
           const raw = await res.json();
-          const extracted = extractQuestionsFromRawResponse(raw, cleanCode);
-          const meta = extracted.meta || {};
-          const hasQuestions = extracted.questions && extracted.questions.length > 0;
-          const hasWritingPrompts = Boolean(
-            meta.writing_task1_prompt || meta.writing_task2_prompt ||
-            raw.writing_task1_prompt || raw.writing_task2_prompt ||
-            raw.exam?.writing_task1_prompt || raw.exam?.writing_task2_prompt
-          );
-
-          if (hasQuestions || hasWritingPrompts) {
-            const existingCached = examMemoryCache.get(cleanCode);
-            const rawTask1Image = meta.writing_task1_image || meta.writing_task1_image_url || meta.writing_task1_imageUrl || 
-              raw.writing_task1_image || raw.writing_task1_image_url || raw.writing_task1_imageUrl || 
-              raw.exam?.writing_task1_image || raw.exam?.writing_task1_image_url || raw.exam?.writing_task1_imageUrl || 
-              meta.imageUrl || meta.image_url || raw.imageUrl || raw.image_url || 
-              raw.sections?.find((s: any) => s.skill === 'writing')?.tasks?.[0]?.image_url || 
-              raw.sections?.find((s: any) => s.skill === 'writing')?.tasks?.[0]?.imageUrl || 
-              existingCached?.writing_task1_image || 
-              existingCached?.writing_task1_image_url || 
-              existingCached?.writing_task1_imageUrl || 
-              '';
-
-            const rawExamObj: ExamData = {
-              exam_code: cleanCode,
-              title: meta.title || raw.title || raw.exam?.title || `IELTS Examination - ${cleanCode}`,
-              audio_url: meta.audio_url || raw.audio_url || raw.exam?.audio_url || '',
-              passages: meta.passages || raw.passages || raw.exam?.passages || [],
-              questions: extracted.questions || [],
-              sections: raw.sections,
-              writing_task1_prompt: meta.writing_task1_prompt || raw.writing_task1_prompt || raw.exam?.writing_task1_prompt || '',
-              writing_task1_image: rawTask1Image,
-              writing_task1_image_url: rawTask1Image,
-              writing_task1_imageUrl: rawTask1Image,
-              writing_task2_prompt: meta.writing_task2_prompt || raw.writing_task2_prompt || raw.exam?.writing_task2_prompt || ''
-            };
-            const standardized = standardizeExamData(rawExamObj, cleanCode);
+          const existingCached = examMemoryCache.get(cleanCode);
+          const standardized = buildExamFromGasRawResponse(raw, cleanCode, existingCached);
+          if (standardized) {
             examMemoryCache.set(cleanCode, standardized);
             saveExamToIndexedDB(standardized).catch(() => {});
             safeSaveCurrentExamToLocalStorage(standardized);
@@ -1348,10 +1442,6 @@ export function prefetchExam(
   return prefetchPromise;
 }
 
-/**
- * Ultra-fast Exam Fetching with Cache-First & Stale-While-Revalidate architecture.
- * Loads in ~0ms if in-memory, ~2ms if in IndexedDB/LocalStorage, or resolves prefetch.
- */
 /**
  * Clear timer countdown targets stored in sessionStorage
  */
@@ -1433,7 +1523,7 @@ export async function getDynamicSpreadsheetId(): Promise<string> {
 /**
  * Ultra-fast Exam Fetching with Cache-First & Stale-While-Revalidate architecture.
  * Loads in ~0ms if in-memory, ~2ms if in IndexedDB/LocalStorage, or resolves prefetch.
- * Supports forceFresh to bypass local cache and query live Google Apps Script endpoint.
+ * Supports forceFresh to bypass local and server caches and query live Google Apps Script / Sheets.
  */
 export async function fetchExam(
   apiUrl: string, 
@@ -1454,9 +1544,10 @@ export async function fetchExam(
   }
 
   // Tier 2: Authoritative Centralized Server Cache (/api/exams/:code) - Instant <20ms & Private Sheet Guard
-  // Clients fetch exclusively via Server API, preventing any exposure of Google Sheet IDs or answer keys in Network tab!
+  // Clients fetch via Server API first; pass ?force=true when forceFresh is requested to bypass stale server caches.
   try {
-    const serverRes = await fetch(`/api/exams/${encodeURIComponent(cleanCode)}`);
+    const serverUrl = getApiUrl(`/api/exams/${encodeURIComponent(cleanCode)}${forceFresh ? '?force=true' : ''}`);
+    const serverRes = await fetch(serverUrl);
     if (serverRes.status === 403) {
       const errJson = await serverRes.json().catch(() => ({}));
       return {
@@ -1478,12 +1569,12 @@ export async function fetchExam(
     // If server is momentarily unreachable (e.g., offline mode), proceed to local client storage tiers
   }
 
-  // Tier 3: In-flight prefetch check with quick grace period
+  // Tier 3: In-flight prefetch check with cold-start friendly grace period (3.5s)
   if (!forceFresh && inFlightExamFetches.has(cleanCode)) {
     try {
       const fastResult = await Promise.race([
         inFlightExamFetches.get(cleanCode)!,
-        new Promise<null>((res) => setTimeout(() => res(null), 600))
+        new Promise<null>((res) => setTimeout(() => res(null), 3500))
       ]);
       if (fastResult && fastResult.success && fastResult.exam) {
         return { success: true, exam: fastResult.exam, source: 'gas' };
@@ -1549,7 +1640,7 @@ export async function fetchExam(
     }
   }
 
-  // Tier 7: Direct targeted GAS Fetch (Single request, 4.5s timeout)
+  // Tier 7: Direct targeted GAS Fetch (12s cold-start tolerant timeout, follows redirects)
   if (apiUrl && !apiUrl.includes('mock_ielts_exam_system_gas_url') && !apiUrl.includes('AKfycbx_mock')) {
     try {
       const endpoints = [
@@ -1559,62 +1650,35 @@ export async function fetchExam(
 
       for (const fetchUrl of endpoints) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4500);
-        const res = await fetch(fetchUrl, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        try {
+          const res = await fetch(fetchUrl, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            redirect: 'follow',
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
 
-        if (res.ok) {
-          const raw = await res.json();
-          const extracted = extractQuestionsFromRawResponse(raw, cleanCode);
-          const meta = extracted.meta || {};
-          const hasQuestions = extracted.questions && extracted.questions.length > 0;
-          const hasWritingPrompts = Boolean(
-            meta.writing_task1_prompt || meta.writing_task2_prompt ||
-            raw.writing_task1_prompt || raw.writing_task2_prompt ||
-            raw.exam?.writing_task1_prompt || raw.exam?.writing_task2_prompt
-          );
-
-          if (hasQuestions || hasWritingPrompts) {
+          if (res.ok) {
+            const raw = await res.json();
             const existingCached = examMemoryCache.get(cleanCode);
-            const rawTask1Image = meta.writing_task1_image || meta.writing_task1_image_url || meta.writing_task1_imageUrl || 
-              raw.writing_task1_image || raw.writing_task1_image_url || raw.writing_task1_imageUrl || 
-              raw.exam?.writing_task1_image || raw.exam?.writing_task1_image_url || raw.exam?.writing_task1_imageUrl || 
-              meta.imageUrl || meta.image_url || raw.imageUrl || raw.image_url || 
-              raw.sections?.find((s: any) => s.skill === 'writing')?.tasks?.[0]?.image_url || 
-              raw.sections?.find((s: any) => s.skill === 'writing')?.tasks?.[0]?.imageUrl || 
-              existingCached?.writing_task1_image || 
-              existingCached?.writing_task1_image_url || 
-              existingCached?.writing_task1_imageUrl || 
-              '';
-
-            const rawExamObj: ExamData = {
-              exam_code: cleanCode,
-              title: meta.title || raw.title || raw.exam?.title || `IELTS Examination - ${cleanCode}`,
-              audio_url: meta.audio_url || raw.audio_url || raw.exam?.audio_url || '',
-              passages: meta.passages || raw.passages || raw.exam?.passages || [],
-              questions: extracted.questions || [],
-              sections: raw.sections,
-              writing_task1_prompt: meta.writing_task1_prompt || raw.writing_task1_prompt || raw.exam?.writing_task1_prompt || '',
-              writing_task1_image: rawTask1Image,
-              writing_task1_image_url: rawTask1Image,
-              writing_task1_imageUrl: rawTask1Image,
-              writing_task2_prompt: meta.writing_task2_prompt || raw.writing_task2_prompt || raw.exam?.writing_task2_prompt || ''
-            };
-
-            const standardized = standardizeExamData(rawExamObj, cleanCode);
-            examMemoryCache.set(cleanCode, standardized);
-            await saveExamToIndexedDB(standardized);
-            safeSaveCurrentExamToLocalStorage(standardized);
-
-            // Save to centralized server database if server is available
-            saveExamToServerDb(standardized).catch(() => {});
-
-            return { success: true, exam: standardized, source: 'gas' };
+            const standardized = buildExamFromGasRawResponse(raw, cleanCode, existingCached);
+            if (standardized) {
+              examMemoryCache.set(cleanCode, standardized);
+              await saveExamToIndexedDB(standardized).catch(() => {});
+              safeSaveCurrentExamToLocalStorage(standardized);
+              saveExamToServerDb(standardized).catch(() => {});
+              return { success: true, exam: standardized, source: 'gas' };
+            }
+            // If modern GAS responded cleanly with success:true / status:'success' and empty data, don't stall on legacy alias
+            if (raw && (raw.status === 'success' || raw.success === true)) {
+              break;
+            }
           }
+        } catch (endpointErr) {
+          clearTimeout(timeoutId);
+          console.warn(`Direct GAS fetch attempt failed for ${cleanCode}:`, endpointErr);
         }
       }
     } catch (err) {
@@ -1624,7 +1688,7 @@ export async function fetchExam(
 
   // Tier 8: Direct Server fallback check before giving up
   try {
-    const sFallback = await fetch(`/api/exams/${encodeURIComponent(cleanCode)}`);
+    const sFallback = await fetch(getApiUrl(`/api/exams/${encodeURIComponent(cleanCode)}`));
     if (sFallback.ok) {
       const sJson = await sFallback.json();
       if (sJson && sJson.success && sJson.exam) {
@@ -2288,7 +2352,7 @@ export async function importSubmissionsJSON(
           importedCount++;
           list.unshift(subRecord);
         }
-        localStorage.setItem('ielts_student_submissions', JSON.stringify(deduplicateSubmissions(list)));
+        safeSaveSubmissionsToLocalStorage(list);
       } catch (e) {
         importedCount++;
       }
@@ -2348,6 +2412,23 @@ export async function deleteSubmission(submissionId: string): Promise<{ success:
     return { success: false, error: err.message };
   }
 }
-
-
-
+/**
+ * Trigger Google Sheets storage compaction & submission deduplication via GAS V3.0
+ */
+export async function optimizeGasSheetsStorage(
+  apiUrl: string = DEFAULT_API_URL
+): Promise<{ success: boolean; deduplicated_submissions?: number; compacted?: any; error?: string }> {
+  if (!apiUrl || apiUrl.includes('mock_ielts_exam_system_gas_url') || apiUrl.includes('AKfycbx_mock')) {
+    return { success: false, error: 'Google Apps Script URL is not configured' };
+  }
+  try {
+    const res = await postToGasWithLockRetry(apiUrl, { action: 'optimize_sheets' }, 1);
+    return {
+      success: Boolean(res && (res.success || res.status === 'success' || res.is_opaque)),
+      deduplicated_submissions: res?.deduplicated_submissions,
+      compacted: res?.compacted
+    };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Optimize sheets failed' };
+  }
+}

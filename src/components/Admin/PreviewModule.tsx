@@ -40,7 +40,7 @@ import {
   safeSaveExamListToLocalStorage, 
   safeSaveCurrentExamToLocalStorage 
 } from '../../services/indexedDb';
-import { saveExamToServerDb, saveServerConfig, fetchServerConfig } from '../../services/api';
+import { saveExamToServerDb, saveServerConfig, fetchServerConfig, postToGasWithLockRetry } from '../../services/api';
 import { 
   getStoredSpreadsheetId, 
   setStoredSpreadsheetId, 
@@ -279,17 +279,13 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
       onSaveToGas(sanitizedExam);
     }
 
-    // Direct fetch to GAS if configured
+    // Direct push to GAS with 302/CORS & lock retry resilience
     try {
       if (gasUrl && !gasUrl.includes('AKfycbx_mock')) {
-        await fetch(gasUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'upload_exam',
-            exam_data: sanitizedExam
-          })
-        });
+        await postToGasWithLockRetry(gasUrl, {
+          action: 'upload_exam',
+          exam_data: sanitizedExam
+        }, 2);
       }
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 3000);

@@ -1354,6 +1354,7 @@ Trả về DUY NHẤT một JSON hợp lệ (không kèm text thừa) theo schem
 
   app.get('/api/exams/:code', async (req, res) => {
     const code = req.params.code.trim().toUpperCase();
+    const forceFresh = req.query.force === 'true';
 
     // Security check: Only verified admin receives unsanitized answer keys
     const authHeader = req.headers['authorization'];
@@ -1361,18 +1362,18 @@ Trả về DUY NHẤT một JSON hợp lệ (không kèm text thừa) theo schem
     const isAdmin = adminToken === 'admin-secret' || (typeof authHeader === 'string' && authHeader.includes('Bearer admin')) || req.query.admin === 'true';
 
     // Tier 1: Check Server RAM Cache (Instant < 2ms latency)
-    let fullExam = getCachedExam(code);
+    let fullExam = !forceFresh ? getCachedExam(code) : null;
 
     // Tier 2: Check Local Server Storage JSON
-    if (!fullExam) {
+    if (!fullExam && !forceFresh) {
       fullExam = getStoredExam(code);
       if (fullExam) {
         setCachedExam(code, fullExam);
       }
     }
 
-    // Tier 3: If not cached and Google Service Account is configured, fetch directly from private Google Sheet
-    if (!fullExam && isServiceAccountConfigured()) {
+    // Tier 3: If not cached (or force=true) and Google Service Account is configured, fetch directly from private Google Sheet
+    if ((!fullExam || forceFresh) && isServiceAccountConfigured()) {
       try {
         const syncRes = await syncExamFromGoogleSheets(code);
         if (syncRes.success && syncRes.exam) {
@@ -1384,36 +1385,97 @@ Trả về DUY NHẤT một JSON hợp lệ (không kèm text thừa) theo schem
     }
 
     // Tier 4: Fallback to Google Apps Script bridge if available
-    if (!fullExam) {
+    if (!fullExam || forceFresh) {
       const config = getStoredConfig();
       if (config.gas_url && !config.gas_url.includes('AKfycbx_mock')) {
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
           const fetchUrl = `${config.gas_url}?action=get_exam&exam_code=${encodeURIComponent(code)}&_t=${Date.now()}`;
-          const gasRes = await fetch(fetchUrl);
+          const gasRes = await fetch(fetchUrl, { signal: controller.signal });
+          clearTimeout(timeoutId);
           if (gasRes.ok) {
             const gasData = await gasRes.json();
-            const questions = gasData.questions || gasData.data || [];
+            const questions = Array.isArray(gasData.questions)
+              ? gasData.questions
+              : (Array.isArray(gasData.data) ? gasData.data : []);
             const meta = gasData.exam_meta || gasData.meta || {};
+            const rawPassage = String(meta.reading_passage || meta.passage_text || gasData.reading_passage || '').trim();
+            const task1Prompt = String(meta.writing_task1_prompt || gasData.writing_task1_prompt || '').trim();
+            const task2Prompt = String(meta.writing_task2_prompt || gasData.writing_task2_prompt || '').trim();
+            const task1Image = String(
+              meta.writing_task1_image || meta.writing_task1_image_url || meta.writing_task1_imageUrl || gasData.writing_task1_image || ''
+            ).trim();
+            const audioUrl = String(meta.audio_url || gasData.audio_url || '').trim();
 
-            if (questions.length > 0 || meta.title || meta.reading_passage) {
-              const listeningQs = questions.filter((q: any) => q.section === 'listening');
-              const readingQs = questions.filter((q: any) => q.section === 'reading');
+            if (questions.length > 0 || meta.title || rawPassage || task1Prompt || task2Prompt || task1Image || audioUrl) {
+              const listeningQs = questions.filter((q: any) => String(q.section || '').toLowerCase() === 'listening');
+              const readingQs = questions.filter((q: any) => String(q.section || '').toLowerCase() !== 'listening');
+
+              let passages: any[] = [];
+              if (rawPassage) {
+                if (rawPassage.includes('--- Passage Divider ---')) {
+                  const chunks = rawPassage
+                    .split(/\r?\n\s*---\s*Passage Divider\s*---\s*\r?\n|--- Passage Divider ---/i)
+                    .map((c: string) => c.trim())
+                    .filter(Boolean);
+                  const totalReading = readingQs.length;
+                  const chunkCount = Math.max(chunks.length, 1);
+                  passages = chunks.map((chunkText: string, idx: number) => {
+                    const pIndex = Math.min(idx + 1, 3);
+                    const startIdx = Math.floor((idx * totalReading) / chunkCount);
+                    const endIdx = Math.floor(((idx + 1) * totalReading) / chunkCount);
+                    return {
+                      passage_index: pIndex,
+                      title: `Reading Passage ${pIndex}`,
+                      text: chunkText,
+                      questions: readingQs.slice(startIdx, endIdx).map((q: any) => ({ ...q, passage_index: pIndex }))
+                    };
+                  });
+                } else {
+                  passages = [{
+                    passage_index: 1,
+                    title: 'Reading Passage 1',
+                    text: rawPassage,
+                    questions: readingQs.map((q: any) => ({ ...q, passage_index: 1 }))
+                  }];
+                }
+              }
+
+              const detectedSkills: string[] = [];
+              if (listeningQs.length > 0 || audioUrl) detectedSkills.push('listening');
+              if (readingQs.length > 0 || rawPassage) detectedSkills.push('reading');
+              if (task1Prompt || task2Prompt || task1Image) detectedSkills.push('writing');
+              if (detectedSkills.length === 0) detectedSkills.push('reading');
 
               const bridgeExam = {
                 exam_code: code,
                 title: meta.title || `IELTS Examination - ${code}`,
-                audio_url: meta.audio_url || '',
-                passages: meta.reading_passage ? [{ passage_index: 1, title: 'Reading Passage 1', text: meta.reading_passage }] : [],
+                test_type: meta.test_type || 'TEST',
+                exam_type: detectedSkills.length === 1 ? 'one_skill' : detectedSkills.length === 2 ? 'two_skills' : 'full_test',
+                skills: detectedSkills,
+                duration_mins: Number(meta.duration_mins) || 120,
+                audio_url: audioUrl,
+                audio_title: meta.audio_title || '',
+                passage_title: 'Reading Passage 1',
+                passage_text: rawPassage,
+                reading_passage: rawPassage,
+                passages,
                 listening_questions: listeningQs,
                 reading_questions: readingQs,
-                writing_task1_prompt: meta.writing_task1_prompt || '',
-                writing_task2_prompt: meta.writing_task2_prompt || '',
-                questions
+                writing_task1_prompt: task1Prompt,
+                writing_task1_image: task1Image,
+                writing_task1_image_url: task1Image,
+                writing_task1_imageUrl: task1Image,
+                writing_task2_prompt: task2Prompt,
+                questions,
+                status: 'published',
+                is_draft: false
               };
 
-              saveStoredExam(bridgeExam);
-              setCachedExam(code, bridgeExam);
-              fullExam = bridgeExam;
+              const savedBridge = saveStoredExam(bridgeExam);
+              setCachedExam(code, savedBridge);
+              fullExam = savedBridge;
             }
           }
         } catch (gasErr: any) {
@@ -1456,10 +1518,13 @@ Trả về DUY NHẤT một JSON hợp lệ (không kèm text thừa) theo schem
         return res.status(400).json({ success: false, error: 'Missing exam_code in body' });
       }
       const saved = saveStoredExam(exam);
+      // Keep Server RAM Cache immediately synchronized (prevents stale draft status in RAM)
+      setCachedExam(saved.exam_code, saved);
 
-      // Asynchronously push to Google Apps Script
+      // Asynchronously push ONLY published exams to Google Apps Script (prevents draft exams from appearing live on Sheet while blocked by 403)
+      const isDraft = saved.status === 'draft' || Boolean(saved.is_draft);
       const config = getStoredConfig();
-      if (config.gas_url && !config.gas_url.includes('AKfycbx_mock')) {
+      if (!isDraft && config.gas_url && !config.gas_url.includes('AKfycbx_mock')) {
         fetch(config.gas_url, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
