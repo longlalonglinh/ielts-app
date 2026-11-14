@@ -800,14 +800,70 @@ export async function submitExamPayload(
     });
   }
 
+  // 3. Authoritative Backend Server Submission (/api/submit) with fast timeout guard
+  // (Handles server grading, persistence, Google Sheets batch queue, and async GAS forwarding)
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const serverRes = await fetch(getApiUrl('/api/submit'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...record,
+        ...payload,
+        submission_id: submissionId,
+        submission_type: submissionType,
+        submitted_at: timestamp
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (serverRes && serverRes.ok) {
+      const data = await serverRes.json();
+      if (data && data.success && data.submission) {
+        const certifiedSub = data.submission;
+        const certifiedRecord: SubmissionRecord = {
+          ...record,
+          ...certifiedSub,
+          is_offline_pending: false,
+          is_server_certified: true,
+          sync_status: 'CERTIFIED_ONLINE'
+        };
+        await saveSubmissionToIndexedDB(certifiedRecord);
+        await removePendingSubmissionFromIndexedDB(submissionId);
+
+        try {
+          const existing = localStorage.getItem('ielts_student_submissions');
+          const subsArr: SubmissionRecord[] = existing ? JSON.parse(existing) : [];
+          const updated = subsArr.map(s => s.submission_id === certifiedRecord.submission_id ? certifiedRecord : s);
+          safeSaveSubmissionsToLocalStorage(updated);
+        } catch (e) {}
+
+        return {
+          ...responseObj,
+          ...certifiedSub,
+          submission_id: certifiedRecord.submission_id,
+          submission_type: submissionType,
+          is_offline_pending: false,
+          is_server_certified: true,
+          sync_status: 'CERTIFIED_ONLINE',
+          message: data.message || 'Exam authoritatively submitted and graded by server.'
+        };
+      }
+    }
+  } catch (serverErr) {
+    console.warn('Backend /api/submit unreachable, falling back to direct GAS webhook:', serverErr);
+  }
+
   if (!apiUrl || apiUrl.includes('mock_ielts_exam_system_gas_url') || apiUrl.includes('AKfycbx_mock')) {
     return responseObj;
   }
 
-  // 3. Direct Google Apps Script Webhook Submission with exponential backoff & no-cors fallback
+  // 4. Direct Google Apps Script Webhook Fallback Submission (for static-only hosting)
   try {
     const postData = {
-      action: 'submitExam',
+      action: 'submit_exam',
       ...payload,
       submission_id: submissionId,
       submission_type: submissionType,
@@ -819,7 +875,7 @@ export async function submitExamPayload(
     };
 
     const gasRes = await postToGasWithLockRetry(apiUrl, postData, 3);
-    if (gasRes && (gasRes.status === 'success' || gasRes.is_opaque || gasRes.submission_id)) {
+    if (gasRes && (gasRes.status === 'success' || gasRes.success === true || gasRes.is_opaque || gasRes.submission_id)) {
       // Mark as synchronized online in local IndexedDB vault
       record.is_offline_pending = false;
       record.is_server_certified = true;

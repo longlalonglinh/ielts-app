@@ -40,6 +40,7 @@ describe('IELTS Question Types & Answer Scoring Suite', () => {
       expect(canonicalizeQuestionType('matching_information')).toBe(IELTSQuestionType.MATCHING_INFORMATION);
       expect(canonicalizeQuestionType('which_paragraph_contains')).toBe(IELTSQuestionType.MATCHING_INFORMATION);
       expect(canonicalizeQuestionType('matching_features')).toBe(IELTSQuestionType.MATCHING_FEATURES);
+      expect(canonicalizeQuestionType('matching')).toBe(IELTSQuestionType.MATCHING_FEATURES);
       expect(canonicalizeQuestionType('matching_sentence_endings')).toBe(IELTSQuestionType.MATCHING_SENTENCE_ENDINGS);
       expect(canonicalizeQuestionType('summary_completion_box')).toBe(IELTSQuestionType.SUMMARY_COMPLETION_BOX);
       expect(canonicalizeQuestionType('table_completion')).toBe(IELTSQuestionType.TABLE_COMPLETION);

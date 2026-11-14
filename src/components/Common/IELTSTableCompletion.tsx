@@ -127,10 +127,15 @@ export const IELTSTableCompletion: React.FC<IELTSTableCompletionProps> = ({
                     const cellQId = cell.question_id || question.question_id;
                     const explicitQNum = cell.question_id ? parseInt(cell.question_id.replace(/\D/g, ''), 10) || questionNumber : questionNumber;
                     
-                    // If cell text contains token or is blank
-                    const cellContent = isTargetBlank 
-                      ? (cell.text ? `${cell.text} [blank_${explicitQNum}]` : `[blank_${explicitQNum}]`)
-                      : (cell.text || '-');
+                    // If cell text contains token, legacy blank, or is blank
+                    let cellContent = cell.text || '-';
+                    if (cellContent.includes('[blank_')) {
+                      // already tokenized inline
+                    } else if (/(_{3,}|\.{3,}|\[\.+\]|\[\s*_+\s*\])/.test(cellContent)) {
+                      cellContent = cellContent.replace(/(_{3,}|\.{3,}|\[\.+\]|\[\s*_+\s*\])/, `[blank_${explicitQNum}]`);
+                    } else if (isTargetBlank) {
+                      cellContent = cell.text ? `${cell.text} [blank_${explicitQNum}]` : `[blank_${explicitQNum}]`;
+                    }
 
                     return (
                       <td key={cIdx} className="p-3 align-middle border-r border-purple-100 last:border-r-0 font-medium text-[#3C2A63]">
@@ -206,9 +211,12 @@ export const IELTSTableCompletion: React.FC<IELTSTableCompletionProps> = ({
   }
 
   // Case 3: Standard Table Card with Token Matrix Blank Renderer
-  const fallbackText = question.question_text?.includes('[blank_') 
-    ? question.question_text 
-    : `${question.question_text || 'Table completion row:'} [blank_${questionNumber}]`;
+  const rawFallback = question.question_text || 'Table completion row:';
+  const fallbackText = rawFallback.includes('[blank_')
+    ? rawFallback
+    : /(_{3,}|\.{3,}|\[\.+\]|\[\s*_+\s*\])/.test(rawFallback)
+      ? rawFallback.replace(/(_{3,}|\.{3,}|\[\.+\]|\[\s*_+\s*\])/, `[blank_${questionNumber}]`)
+      : `${rawFallback} [blank_${questionNumber}]`;
 
   return (
     <div className="p-4 bg-purple-50/60 rounded-2xl border border-purple-200 space-y-2">

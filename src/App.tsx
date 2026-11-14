@@ -1524,7 +1524,7 @@ export default function App() {
 
         {/* ADMIN VIEW */}
         {activeView === 'admin' && (
-          <div className="space-y-6">
+          <div className="space-y-6 min-w-0 max-w-full overflow-x-hidden">
             
             {/* GitHub Pages Static Mode Info Alert */}
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
@@ -1713,8 +1713,8 @@ export default function App() {
                 </div>
 
                 {/* Code Block */}
-                <div className="relative">
-                  <pre className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-indigo-200 font-mono overflow-x-auto max-h-96 leading-relaxed select-all">
+                <div className="relative w-full max-w-full overflow-hidden">
+                  <pre className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-indigo-200 font-mono overflow-x-auto max-w-full max-h-96 leading-relaxed select-all">
                     {gasBackendScript}
                   </pre>
                 </div>

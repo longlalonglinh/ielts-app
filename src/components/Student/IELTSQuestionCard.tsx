@@ -69,7 +69,15 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
   }, [userAnswer]);
 
   // Canonicalize question type to standard IELTS enum
-  const qType = canonicalizeQuestionType(question.question_type);
+  let qType = canonicalizeQuestionType(question.question_type);
+  if (
+    qType === IELTSQuestionType.SUMMARY_COMPLETION_TEXT &&
+    ((question.word_bank && question.word_bank.length > 0) ||
+      (question.matching_options && question.matching_options.length > 0) ||
+      (question.options && question.options.length > 0))
+  ) {
+    qType = IELTSQuestionType.SUMMARY_COMPLETION_BOX;
+  }
 
   // Check if answer is filled
   const isFilled = Boolean(userAnswer && userAnswer.trim().length > 0);
@@ -293,7 +301,9 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
       </div>
 
       {/* Context Content Box (Summary or paragraph context embedding [blank_X]) */}
-      {(question as any).context_content && !(question as any).context_content.includes('|') && (
+      {(question as any).context_content &&
+        !(question as any).context_content.includes('|') &&
+        qType !== IELTSQuestionType.SUMMARY_COMPLETION_BOX && (
         <div className="p-4 bg-white rounded-2xl border border-purple-200/80 text-xs md:text-sm leading-relaxed text-[#3C2A63]">
           <InlineBlankRenderer
             content={(question as any).context_content}
@@ -312,27 +322,41 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
       )}
 
       {/* Question Main Text */}
-      {question.question_text && (
-        <div className="font-extrabold text-[#3C2A63] text-sm md:text-base">
-          {question.question_text.includes('[blank_') ? (
-            <InlineBlankRenderer
-              content={question.question_text}
-              userAnswers={{ [String(questionNumber)]: userAnswer, [question.question_id]: userAnswer, ...allUserAnswers }}
-              onAnswerChange={(qKey, val) => {
-                const parsed = parseInt(qKey, 10);
-                if (parsed === questionNumber || qKey === question.question_id || qKey === String(questionNumber)) {
-                  onAnswerChange(question.question_id, val);
-                } else {
-                  const prefix = question.section === 'listening' ? 'L' : 'R';
-                  onAnswerChange(`${prefix}${qKey}`, val);
-                }
-              }}
-            />
-          ) : (
-            renderQuestionTextInline(question.question_text)
-          )}
-        </div>
-      )}
+      {(() => {
+        if (!question.question_text) return null;
+        const ctxContent = (question as any).context_content || '';
+        const hasStructuredTable = Boolean(question.table_data && question.table_data.headers && question.table_data.headers.length > 0);
+        const hasMarkdownTable = ctxContent.includes('|') || question.question_text.includes('|');
+        const isCase3TableFallback = qType === IELTSQuestionType.TABLE_COMPLETION && !hasStructuredTable && !hasMarkdownTable;
+        const isDuplicateMarkdownTableInText = qType === IELTSQuestionType.TABLE_COMPLETION && question.question_text.includes('|');
+        const isDuplicateSummaryBoxText = qType === IELTSQuestionType.SUMMARY_COMPLETION_BOX && !ctxContent;
+
+        if (isCase3TableFallback || isDuplicateMarkdownTableInText || isDuplicateSummaryBoxText) {
+          return null;
+        }
+
+        return (
+          <div className="font-extrabold text-[#3C2A63] text-sm md:text-base">
+            {question.question_text.includes('[blank_') ? (
+              <InlineBlankRenderer
+                content={question.question_text}
+                userAnswers={{ [String(questionNumber)]: userAnswer, [question.question_id]: userAnswer, ...allUserAnswers }}
+                onAnswerChange={(qKey, val) => {
+                  const parsed = parseInt(qKey, 10);
+                  if (parsed === questionNumber || qKey === question.question_id || qKey === String(questionNumber)) {
+                    onAnswerChange(question.question_id, val);
+                  } else {
+                    const prefix = question.section === 'listening' ? 'L' : 'R';
+                    onAnswerChange(`${prefix}${qKey}`, val);
+                  }
+                }}
+              />
+            ) : (
+              renderQuestionTextInline(question.question_text)
+            )}
+          </div>
+        );
+      })()}
 
       {/* Word Limit Warning Message */}
       {isGapFill && isOverLimit && (
@@ -599,95 +623,146 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
       {/* ========================================================= */}
       {/* 4. MATCHING INFORMATION (WHICH PARAGRAPH CONTAINS INFO)    */}
       {/* ========================================================= */}
-      {qType === IELTSQuestionType.MATCHING_INFORMATION && (
-        <div className="space-y-3 pt-1">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#7C68A5]">
-                Select corresponding paragraph letter:
-              </span>
-              {hasNbCondition && (
-                <span className="text-[10px] text-amber-700 bg-amber-100 font-extrabold px-2 py-0.5 rounded-full">
-                  NB: Letters may be used more than once
+      {qType === IELTSQuestionType.MATCHING_INFORMATION && (() => {
+        const infoOptions: { id: string; label?: string }[] =
+          question.matching_options && question.matching_options.length > 0
+            ? question.matching_options.map(o => ({ id: o.id, label: o.text }))
+            : question.options && question.options.length > 0
+              ? question.options.map((opt, idx) => {
+                  const trimmed = String(opt).trim();
+                  const paraMatch = trimmed.match(/^(?:Paragraph|Section|Part)\s+([A-Za-z0-9]+)$/i);
+                  if (paraMatch) {
+                    return { id: paraMatch[1].toUpperCase(), label: trimmed };
+                  }
+                  const prefixMatch = trimmed.match(/^([A-Za-z0-9]+)[\.\)\:\s]\s*(.*)$/);
+                  if (prefixMatch && prefixMatch[1].length <= 3) {
+                    return { id: prefixMatch[1].toUpperCase(), label: trimmed };
+                  }
+                  if (trimmed.length <= 3) {
+                    return { id: trimmed.toUpperCase(), label: trimmed };
+                  }
+                  return { id: String.fromCharCode(65 + idx), label: trimmed };
+                })
+              : ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(id => ({ id }));
+
+        return (
+          <div className="space-y-3 pt-1">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[#7C68A5]">
+                  Select corresponding paragraph letter:
                 </span>
-              )}
-            </div>
+                {hasNbCondition && (
+                  <span className="text-[10px] text-amber-700 bg-amber-100 font-extrabold px-2 py-0.5 rounded-full">
+                    NB: Letters may be used more than once
+                  </span>
+                )}
+              </div>
 
-            <div className="flex flex-wrap gap-2">
-              {(question.matching_options && question.matching_options.length > 0
-                ? question.matching_options.map(o => o.id)
-                : ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-              ).map((optKey) => {
-                const isSelected = userAnswer.toUpperCase() === optKey.toUpperCase();
-                return (
-                  <button
-                    key={optKey}
-                    type="button"
-                    onClick={() => onAnswerChange(question.question_id, optKey)}
-                    className={`w-10 h-10 rounded-full border text-sm font-black transition cursor-pointer flex items-center justify-center ${
-                      isSelected
-                        ? 'bg-[#6B51A5] text-white border-[#6B51A5] shadow-md scale-105'
-                        : 'bg-white border-purple-200 text-[#3C2A63] hover:bg-[#F3EFF9]'
-                    }`}
-                  >
-                    {optKey}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* 5. MATCHING FEATURES (PEOPLE / SCIENTISTS / RESEARCHERS)   */}
-      {/* ========================================================= */}
-      {qType === IELTSQuestionType.MATCHING_FEATURES && (
-        <div className="space-y-3 pt-1">
-          {question.matching_options && question.matching_options.length > 0 && (
-            <div className="p-3.5 bg-gradient-to-br from-purple-50 to-indigo-50/60 rounded-2xl border border-purple-200 text-xs space-y-2">
-              <strong className="block text-[#3C2A63] font-black uppercase tracking-wider flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-[#6B51A5]" />
-                LIST OF PEOPLE / FEATURES
-              </strong>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {question.matching_options.map((mOpt) => (
-                  <div key={mOpt.id} className="p-2 bg-white rounded-xl border border-purple-100 flex items-start gap-2 shadow-xs">
-                    <span className="font-extrabold text-[#6B51A5] shrink-0">{mOpt.id}.</span>
-                    <span className="text-[#3C2A63] font-medium">{mOpt.text}</span>
-                  </div>
-                ))}
+              <div className="flex flex-wrap gap-2">
+                {infoOptions.map((optItem) => {
+                  const isSelected = userAnswer.trim().toUpperCase() === optItem.id.toUpperCase();
+                  return (
+                    <button
+                      key={optItem.id}
+                      type="button"
+                      title={optItem.label || `Paragraph ${optItem.id}`}
+                      onClick={() => onAnswerChange(question.question_id, optItem.id)}
+                      className={`min-w-[40px] h-10 px-3 rounded-full border text-sm font-black transition cursor-pointer flex items-center justify-center ${
+                        isSelected
+                          ? 'bg-[#6B51A5] text-white border-[#6B51A5] shadow-md scale-105'
+                          : 'bg-white border-purple-200 text-[#3C2A63] hover:bg-[#F3EFF9]'
+                      }`}
+                    >
+                      {optItem.id}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          )}
+          </div>
+        );
+      })()}
 
-          <div className="space-y-2">
-            <span className="text-xs font-bold text-[#7C68A5]">Select person/feature letter:</span>
-            <div className="flex flex-wrap gap-2">
-              {(question.matching_options && question.matching_options.length > 0
-                ? question.matching_options.map(o => o.id)
-                : ['A', 'B', 'C', 'D', 'E', 'F']
-              ).map((optKey) => {
-                const isSelected = userAnswer.toUpperCase() === optKey.toUpperCase();
-                return (
-                  <button
-                    key={optKey}
-                    type="button"
-                    onClick={() => onAnswerChange(question.question_id, optKey)}
-                    className={`w-10 h-10 rounded-full border text-sm font-black transition cursor-pointer flex items-center justify-center ${
-                      isSelected
-                        ? 'bg-[#6B51A5] text-white border-[#6B51A5] shadow-md scale-105'
-                        : 'bg-white border-purple-200 text-[#3C2A63] hover:bg-[#F3EFF9]'
-                    }`}
-                  >
-                    {optKey}
-                  </button>
-                );
-              })}
+      {/* ========================================================= */}
+      {/* 5. MATCHING FEATURES / LISTENING MATCHING OPTIONS         */}
+      {/* ========================================================= */}
+      {qType === IELTSQuestionType.MATCHING_FEATURES && (() => {
+        const featureOptions: { id: string; text: string }[] =
+          question.matching_options && question.matching_options.length > 0
+            ? question.matching_options
+            : question.options && question.options.length > 0
+              ? question.options.map((opt, idx) => {
+                  const trimmed = String(opt).trim();
+                  const prefixMatch = trimmed.match(/^([A-Za-z0-9]+)[\.\)\:\s]+\s*(.*)$/);
+                  if (prefixMatch && prefixMatch[1].length <= 3) {
+                    return { id: prefixMatch[1].toUpperCase(), text: prefixMatch[2] || trimmed };
+                  }
+                  return { id: String.fromCharCode(65 + idx), text: trimmed };
+                })
+              : ['A', 'B', 'C', 'D', 'E', 'F'].map(id => ({ id, text: '' }));
+
+        const hasDescriptiveItems = featureOptions.some(m => Boolean(m.text && m.text.trim()));
+
+        return (
+          <div className="space-y-3 pt-1">
+            {hasDescriptiveItems && (
+              <div className="p-3.5 bg-gradient-to-br from-purple-50 to-indigo-50/60 rounded-2xl border border-purple-200 text-xs space-y-2">
+                <strong className="block text-[#3C2A63] font-black uppercase tracking-wider flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-[#6B51A5]" />
+                  <span>{question.section === 'listening' ? 'LIST OF OPTIONS' : 'LIST OF PEOPLE / FEATURES'}</span>
+                </strong>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {featureOptions.map((mOpt) => {
+                    const isCardSelected = userAnswer.trim().toUpperCase() === mOpt.id.toUpperCase();
+                    return (
+                      <button
+                        key={mOpt.id}
+                        type="button"
+                        onClick={() => onAnswerChange(question.question_id, mOpt.id)}
+                        className={`p-2.5 rounded-xl border flex items-start gap-2 shadow-xs text-left transition cursor-pointer ${
+                          isCardSelected
+                            ? 'bg-[#6B51A5] border-[#6B51A5] text-white font-bold shadow-sm'
+                            : 'bg-white border-purple-100 text-[#3C2A63] hover:border-purple-300 hover:bg-purple-50/40'
+                        }`}
+                      >
+                        <span className={`font-extrabold shrink-0 ${isCardSelected ? 'text-white' : 'text-[#6B51A5]'}`}>{mOpt.id}.</span>
+                        <span className="font-medium flex-1">{mOpt.text}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-[#7C68A5]">
+                {question.section === 'listening' ? 'Select matching option letter:' : 'Select person/feature letter:'}
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {featureOptions.map((mOpt) => {
+                  const isSelected = userAnswer.trim().toUpperCase() === mOpt.id.toUpperCase();
+                  return (
+                    <button
+                      key={mOpt.id}
+                      type="button"
+                      title={mOpt.text || mOpt.id}
+                      onClick={() => onAnswerChange(question.question_id, mOpt.id)}
+                      className={`w-10 h-10 rounded-full border text-sm font-black transition cursor-pointer flex items-center justify-center ${
+                        isSelected
+                          ? 'bg-[#6B51A5] text-white border-[#6B51A5] shadow-md scale-105'
+                          : 'bg-white border-purple-200 text-[#3C2A63] hover:bg-[#F3EFF9]'
+                      }`}
+                    >
+                      {mOpt.id}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================= */}
       {/* 6. MATCHING SENTENCE ENDINGS (1-1 HALF-SENTENCE MATCHING)  */}
@@ -749,6 +824,7 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
           userAnswer={userAnswer}
           onAnswerChange={onAnswerChange}
           wordBank={question.word_bank}
+          allUserAnswers={allUserAnswers}
         />
       )}
 
@@ -762,6 +838,7 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
           questionNumber={questionNumber}
           userAnswer={userAnswer}
           onAnswerChange={onAnswerChange}
+          allUserAnswers={allUserAnswers}
         />
       )}
 
@@ -775,6 +852,7 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
           questionNumber={questionNumber}
           userAnswer={userAnswer}
           onAnswerChange={onAnswerChange}
+          allUserAnswers={allUserAnswers}
         />
       )}
 
@@ -835,9 +913,15 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
       {/* ========================================================= */}
       {(qType === IELTSQuestionType.FILL_IN_THE_BLANK ||
         qType === IELTSQuestionType.SUMMARY_COMPLETION_TEXT ||
-        qType === IELTSQuestionType.SHORT_ANSWER) && (
-        <div className="space-y-2 pt-1">
-          {(!question.question_text || question.question_text.split(/(_{3,}|\.{3,}|\[\.+\]|\[\s*_+\s*\])/g).length === 1) && (
+        qType === IELTSQuestionType.SHORT_ANSWER) && (() => {
+        const qText = question.question_text || '';
+        const ctxText = (question as any).context_content || '';
+        const hasInlineLegacyBlank = qText.split(/(_{3,}|\.{3,}|\[\.+\]|\[\s*_+\s*\])/g).length > 1;
+        const hasInlineTokenBlank = /\[blank_\d+\]/i.test(qText) || /\[blank_\d+\]/i.test(ctxText);
+        if (hasInlineLegacyBlank || hasInlineTokenBlank) return null;
+
+        return (
+          <div className="space-y-2 pt-1">
             <div className="relative">
               <input
                 type="text"
@@ -854,9 +938,9 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
                 * Tip: You can copy text from the reading passage, paste, or drag and drop directly into the blank.
               </span>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        );
+      })()}
 
     </div>
   );

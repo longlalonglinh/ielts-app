@@ -171,9 +171,12 @@ function normalizeToCardItem(input: PracticeCard | PracticeCardItem): PracticeCa
     };
   });
 
-  // 5. Check if multiple correct answers exist or min_selections indicates multi-response
+  // 5. Check if multiple correct answers exist or min_selections indicates multi-response (only promote multiple-choice)
   const correctCount = normalizedOptions.filter(o => o.isCorrect).length;
-  if (correctCount > 1 || (legacy.min_selections && legacy.min_selections > 1) || (legacy.minSelections && legacy.minSelections > 1)) {
+  if (
+    type === 'multiple-choice' &&
+    (correctCount > 1 || (legacy.min_selections && legacy.min_selections > 1) || (legacy.minSelections && legacy.minSelections > 1))
+  ) {
     type = 'multiple-response';
   }
 
@@ -211,7 +214,7 @@ function normalizeToCardItem(input: PracticeCard | PracticeCardItem): PracticeCa
     type,
     cognitiveLevel: legacy.cognitive_level || legacy.cognitiveLevel || 'applying',
     learningOutcomeId: legacy.learning_outcome_id || legacy.learningOutcomeId || 'LO-IELTS-ACAD-01',
-    promptPrefix: legacy.prompt_prefix || legacy.promptPrefix || (type === 'multiple-response' ? 'Select ALL correct answers that apply:' : type === 'true-false-not-given' ? 'Evaluate statement truth value:' : 'Choose the most appropriate option:'),
+    promptPrefix: legacy.prompt_prefix || legacy.promptPrefix || (type === 'multiple-response' ? 'Select ALL correct answers that apply:' : type === 'true-false-not-given' ? 'Evaluate statement truth value:' : type === 'category-matching' ? 'Classify and match each item to its category:' : 'Choose the most appropriate option:'),
     stimulusText: legacy.sentence_en || legacy.stimulusText || legacy.sentence || '',
     promptSuffix: legacy.prompt_suffix || legacy.promptSuffix || '',
     options: normalizedOptions,
@@ -489,51 +492,55 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
                   key={optId}
                   className={`rounded-2xl border transition-all p-3.5 ${containerStyle}`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => handleSelectSingle(optId)}
-                    disabled={isSubmitted}
-                    className="w-full text-left flex items-start justify-between gap-3 cursor-pointer"
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* Round Radio Indicator */}
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition ${
-                        isSelected 
-                          ? isSubmitted 
-                            ? opt.isCorrect ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-rose-500 bg-rose-500 text-white'
-                            : 'border-[#6B51A5] bg-[#6B51A5] text-white'
-                          : 'border-slate-300 bg-white'
-                      }`}>
-                        {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                  <div className="w-full flex items-start justify-between gap-3">
+                    <div
+                      role="button"
+                      tabIndex={isSubmitted ? -1 : 0}
+                      aria-disabled={isSubmitted}
+                      onClick={() => !isSubmitted && handleSelectSingle(optId)}
+                      onKeyDown={(e) => {
+                        if (!isSubmitted && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault();
+                          handleSelectSingle(optId);
+                        }
+                      }}
+                      className={`flex-1 text-left flex items-start justify-between gap-3 ${isSubmitted ? 'cursor-default' : 'cursor-pointer'}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Round Radio Indicator */}
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition ${
+                          isSelected 
+                            ? isSubmitted 
+                              ? opt.isCorrect ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-rose-500 bg-rose-500 text-white'
+                              : 'border-[#6B51A5] bg-[#6B51A5] text-white'
+                            : 'border-slate-300 bg-white'
+                        }`}>
+                          {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                        </div>
+
+                        <div>
+                          <span className="text-sm font-semibold">{optText}</span>
+                        </div>
                       </div>
 
-                      <div>
-                        <span className="text-sm font-semibold">{optText}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
                       {badgeText && (
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border shrink-0 ${badgeColor}`}>
                           {badgeText}
                         </span>
                       )}
-
-                      {isSubmitted && opt.distractorRationale && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleRationale(optId);
-                          }}
-                          className="p-1 text-slate-500 hover:text-[#6B51A5] rounded-md"
-                          title="Toggle explanation"
-                        >
-                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-                      )}
                     </div>
-                  </button>
+
+                    {isSubmitted && opt.distractorRationale && (
+                      <button
+                        type="button"
+                        onClick={() => toggleRationale(optId)}
+                        className="p-1 text-slate-500 hover:text-[#6B51A5] rounded-md cursor-pointer shrink-0"
+                        title="Toggle explanation"
+                      >
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    )}
+                  </div>
 
                   {/* Tier 2: Micro-explanation / Distractor Rationale */}
                   {isSubmitted && opt.distractorRationale && isExpanded && (
@@ -616,51 +623,55 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
                   key={optId}
                   className={`rounded-2xl border transition-all p-3.5 ${containerStyle}`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => handleToggleMultiple(optId)}
-                    disabled={isSubmitted}
-                    className="w-full text-left flex items-start justify-between gap-3 cursor-pointer"
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* Square Checkbox Indicator */}
-                      <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 transition ${
-                        isSelected 
-                          ? isSubmitted 
-                            ? opt.isCorrect ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-rose-500 bg-rose-500 text-white'
-                            : 'border-[#6B51A5] bg-[#6B51A5] text-white'
-                          : 'border-slate-300 bg-white'
-                      }`}>
-                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  <div className="w-full flex items-start justify-between gap-3">
+                    <div
+                      role="button"
+                      tabIndex={isSubmitted ? -1 : 0}
+                      aria-disabled={isSubmitted}
+                      onClick={() => !isSubmitted && handleToggleMultiple(optId)}
+                      onKeyDown={(e) => {
+                        if (!isSubmitted && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault();
+                          handleToggleMultiple(optId);
+                        }
+                      }}
+                      className={`flex-1 text-left flex items-start justify-between gap-3 ${isSubmitted ? 'cursor-default' : 'cursor-pointer'}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Square Checkbox Indicator */}
+                        <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 transition ${
+                          isSelected 
+                            ? isSubmitted 
+                              ? opt.isCorrect ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-rose-500 bg-rose-500 text-white'
+                              : 'border-[#6B51A5] bg-[#6B51A5] text-white'
+                            : 'border-slate-300 bg-white'
+                        }`}>
+                          {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                        </div>
+
+                        <div>
+                          <span className="text-sm font-semibold">{optText}</span>
+                        </div>
                       </div>
 
-                      <div>
-                        <span className="text-sm font-semibold">{optText}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
                       {badgeText && (
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border shrink-0 ${badgeColor}`}>
                           {badgeText}
                         </span>
                       )}
-
-                      {isSubmitted && opt.distractorRationale && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleRationale(optId);
-                          }}
-                          className="p-1 text-slate-500 hover:text-[#6B51A5] rounded-md"
-                          title="Toggle explanation"
-                        >
-                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-                      )}
                     </div>
-                  </button>
+
+                    {isSubmitted && opt.distractorRationale && (
+                      <button
+                        type="button"
+                        onClick={() => toggleRationale(optId)}
+                        className="p-1 text-slate-500 hover:text-[#6B51A5] rounded-md cursor-pointer shrink-0"
+                        title="Toggle explanation"
+                      >
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    )}
+                  </div>
 
                   {/* Tier 2: Micro-explanation / Distractor Rationale */}
                   {isSubmitted && opt.distractorRationale && isExpanded && (

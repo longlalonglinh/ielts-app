@@ -104,6 +104,9 @@ export function canonicalizeQuestionType(rawType: string | undefined | null): IE
   if (upper.includes('MATCHING_SENTENCE') || upper.includes('SENTENCE_ENDING') || upper.includes('ENDING')) {
     return IELTSQuestionType.MATCHING_SENTENCE_ENDINGS;
   }
+  if (upper === 'MATCHING' || upper.includes('MATCHING')) {
+    return IELTSQuestionType.MATCHING_FEATURES;
+  }
   if (upper.includes('SUMMARY_COMPLETION_BOX') || upper.includes('WORD_LIST') || upper.includes('WORDLIST') || upper.includes('WORD_BANK')) {
     return IELTSQuestionType.SUMMARY_COMPLETION_BOX;
   }

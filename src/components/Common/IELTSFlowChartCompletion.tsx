@@ -8,6 +8,7 @@ interface IELTSFlowChartCompletionProps {
   questionNumber: number;
   userAnswer: string;
   onAnswerChange: (questionId: string, answer: string) => void;
+  allUserAnswers?: Record<string, string>;
 }
 
 export const IELTSFlowChartCompletion: React.FC<IELTSFlowChartCompletionProps> = ({
@@ -15,7 +16,8 @@ export const IELTSFlowChartCompletion: React.FC<IELTSFlowChartCompletionProps> =
   question,
   questionNumber,
   userAnswer,
-  onAnswerChange
+  onAnswerChange,
+  allUserAnswers = {}
 }) => {
   // If structured flowchart steps exist
   if (steps && steps.length > 0) {
@@ -29,6 +31,12 @@ export const IELTSFlowChartCompletion: React.FC<IELTSFlowChartCompletionProps> =
         <div className="space-y-2">
           {steps.map((st, idx) => {
             const isTargetBlank = st.is_blank || st.question_id === question.question_id;
+            const stepQId = st.question_id || question.question_id;
+            const stepVal = stepQId === question.question_id
+              ? userAnswer
+              : (allUserAnswers[stepQId] ?? '');
+            const stepQNumMatch = stepQId.match(/\d+/);
+            const displayQNum = stepQNumMatch ? parseInt(stepQNumMatch[0], 10) : questionNumber;
 
             return (
               <React.Fragment key={idx}>
@@ -49,12 +57,12 @@ export const IELTSFlowChartCompletion: React.FC<IELTSFlowChartCompletionProps> =
                   {isTargetBlank && (
                     <div className="flex items-center gap-2 mt-2">
                       <span className="w-6 h-6 rounded-md bg-[#6B51A5] text-white text-[11px] font-black flex items-center justify-center shrink-0">
-                        {questionNumber}
+                        {displayQNum}
                       </span>
                       <input
                         type="text"
-                        value={userAnswer || ''}
-                        onChange={(e) => onAnswerChange(question.question_id, e.target.value)}
+                        value={stepVal || ''}
+                        onChange={(e) => onAnswerChange(stepQId, e.target.value)}
                         placeholder="Complete this step..."
                         className="w-full px-3 py-1.5 bg-[#FAF8FD] border border-purple-200 rounded-lg text-xs font-bold text-[#3C2A63] focus:outline-none focus:ring-2 focus:ring-[#6B51A5] focus:bg-white"
                       />
