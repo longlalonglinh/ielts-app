@@ -12,7 +12,7 @@ import {
   Activity,
   RefreshCw
 } from 'lucide-react';
-import { prefetchExam, fetchPublishedCatalog, DEFAULT_API_URL } from '../../services/api';
+import { prefetchExam, DEFAULT_API_URL } from '../../services/api';
 import { practiceService } from '../../services/practiceService';
 
 const isPracticeDeckCode = (code: string): boolean => {
@@ -60,18 +60,12 @@ export const LoginInstructions: React.FC<LoginInstructionsProps> = ({
   const [reviewPrevious, setReviewPrevious] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
-  const [publishedExams, setPublishedExams] = useState<Array<{ exam_code: string; title: string; test_type?: string }>>([]);
   const [availableDecks, setAvailableDecks] = useState<Array<{ deck_id: string; title: string }>>([]);
 
   const activeCode = examCode.trim().toUpperCase();
 
-  // Auto-load published exams & practice sets from Central Server so students on any machine see available codes
+  // Auto-load practice sets from Central Server so learners see available practice deck codes
   useEffect(() => {
-    fetchPublishedCatalog().then(list => {
-      if (list.length > 0) {
-        setPublishedExams(list.map(e => ({ exam_code: e.exam_code, title: e.title, test_type: e.test_type })));
-      }
-    }).catch(() => {});
 
     practiceService.fetchFromServer(gasUrl).then(res => {
       if (res.success && res.decks.length > 0) {
@@ -348,36 +342,6 @@ export const LoginInstructions: React.FC<LoginInstructionsProps> = ({
                     ? 'Enter the official 60-minute test paper code provided by your proctor.' 
                     : 'Enter a Writing task code (e.g. WT1003), vocabulary deck, or skill drill.'}
                 </span>
-
-                {/* Cross-device Published Catalog Quick-Select */}
-                {selectedMode === 'TEST' && publishedExams.length > 0 && (
-                  <div className="pt-1.5 space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#7C68A5] block">
-                      Available Published Exams ({publishedExams.length}):
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {publishedExams.slice(0, 8).map(ex => (
-                        <button
-                          key={ex.exam_code}
-                          type="button"
-                          onClick={() => {
-                            setExamCode(ex.exam_code);
-                            setErrorMsg('');
-                            if (onClearLoginError) onClearLoginError();
-                          }}
-                          title={ex.title}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold border transition cursor-pointer ${
-                            activeCode === ex.exam_code.toUpperCase()
-                              ? 'bg-[#6B51A5] text-white border-[#6B51A5]'
-                              : 'bg-purple-50 text-[#503A7A] border-purple-200 hover:bg-purple-100'
-                          }`}
-                        >
-                          {ex.exam_code}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {selectedMode === 'PRACTICE' && availableDecks.length > 0 && (
                   <div className="pt-1.5 space-y-1">

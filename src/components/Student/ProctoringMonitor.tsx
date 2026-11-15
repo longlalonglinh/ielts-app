@@ -12,6 +12,8 @@ interface ProctoringMonitorProps {
   sbd: string;
   examCode: string;
   testMode: 'TEST' | 'PRACTICE';
+  autoSubmitLimit?: number | null;
+  onMaxViolationsExceeded?: () => void;
   onViolationCountChange?: (count: number) => void;
   onProctoringMetricsChange?: (metrics: { violationCount: number; cumulativeOffScreenSeconds: number; rapidSwitchCount: number }) => void;
 }
@@ -21,10 +23,13 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
   sbd,
   examCode,
   testMode,
+  autoSubmitLimit = null,
+  onMaxViolationsExceeded,
   onViolationCountChange,
   onProctoringMetricsChange
 }) => {
   const [violationCount, setViolationCount] = useState(0);
+  const hasAutoSubmittedRef = useRef(false);
   const [isLocked30s, setIsLocked30s] = useState(false);
   const [lockCountdown, setLockCountdown] = useState(30);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -172,18 +177,35 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
     }, 4000);
   };
 
-  // Safely notify parent component and handle lock after render when violationCount updates
+  // Safely notify parent component, enforce configurable violation auto-submit limit, and handle lock
   useEffect(() => {
     if (violationCount > 0) {
       if (onViolationCountChange) {
         onViolationCountChange(violationCount);
       }
 
+      if (
+        autoSubmitLimit &&
+        autoSubmitLimit > 0 &&
+        violationCount >= autoSubmitLimit &&
+        !hasAutoSubmittedRef.current
+      ) {
+        hasAutoSubmittedRef.current = true;
+        setWarningMsg(`🚨 MAX VIOLATIONS (${violationCount}/${autoSubmitLimit}) EXCEEDED! Auto-submitting examination...`);
+        if (onMaxViolationsExceeded) {
+          const timer = setTimeout(() => {
+            onMaxViolationsExceeded();
+          }, 900);
+          return () => clearTimeout(timer);
+        }
+        return;
+      }
+
       if (violationCount >= 3 && !isLocked30s) {
         trigger30sLock();
       }
     }
-  }, [violationCount]);
+  }, [violationCount, autoSubmitLimit]);
 
   // Clean up lock, blur timers, media streams, and release fullscreen on unmount (e.g. when submitted)
   useEffect(() => {
@@ -357,6 +379,16 @@ export const ProctoringMonitor: React.FC<ProctoringMonitorProps> = ({
         </div>
 
         <div className="flex items-center space-x-3">
+          {autoSubmitLimit && autoSubmitLimit > 0 && (
+            <span className={`px-2.5 py-1 rounded-xl font-bold text-[11px] border ${
+              violationCount >= Math.max(1, autoSubmitLimit - 1)
+                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                : 'bg-amber-50 text-amber-800 border-amber-200'
+            }`}>
+              Violations: {violationCount}/{autoSubmitLimit}
+            </span>
+          )}
+
           {/* Fullscreen Button */}
           {!isFullscreen && (
             <button

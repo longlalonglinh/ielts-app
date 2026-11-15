@@ -92,12 +92,9 @@ export const WritingModule: React.FC<WritingModuleProps> = ({
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [zoomImageError, setZoomImageError] = useState(false);
   
-  // Guaranteed IELTS Academic Task 1 default image fallback
-  const DEFAULT_TASK1_FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=60';
-
-  // Extract task image using full property fallback cascade
+  // Extract task image using full property fallback cascade (empty when not configured)
   const task1FromList = tasks?.find(t => t.task_number === 1) || tasks?.[0];
-  const detectedImage = task1Image || imageUrl || image_url || task1FromList?.image_url || task1FromList?.imageUrl || (task1FromList as any)?.image || DEFAULT_TASK1_FALLBACK_IMAGE;
+  const detectedImage = task1Image || imageUrl || image_url || task1FromList?.image_url || task1FromList?.imageUrl || (task1FromList as any)?.image || '';
 
   // Persist image in local state so re-renders (keystrokes, autosave, timer ticks) never clear it
   const [cachedImage, setCachedImage] = useState<string>(() => {
@@ -105,8 +102,8 @@ export const WritingModule: React.FC<WritingModuleProps> = ({
   });
 
   useEffect(() => {
-    const fresh = normalizeGoogleDriveImageUrl(detectedImage);
-    if (fresh && fresh !== cachedImage) {
+    const fresh = normalizeGoogleDriveImageUrl(detectedImage) || '';
+    if (fresh !== cachedImage) {
       setCachedImage(fresh);
     }
   }, [detectedImage]);

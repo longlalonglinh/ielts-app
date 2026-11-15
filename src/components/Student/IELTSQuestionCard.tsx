@@ -369,7 +369,7 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
       {/* ========================================================= */}
       {/* 1. MULTIPLE CHOICE (SINGLE CHOICE & MULTIPLE ANSWERS)      */}
       {/* ========================================================= */}
-      {(qType === IELTSQuestionType.MULTIPLE_CHOICE || qType === IELTSQuestionType.MULTIPLE_CHOICE_MULTIPLE_ANSWERS) && question.options && (
+      {(qType === IELTSQuestionType.MULTIPLE_CHOICE || qType === IELTSQuestionType.MULTIPLE_CHOICE_MULTIPLE_ANSWERS) && (question.display_options || question.options) && (
         <div className="space-y-2.5 pt-1">
           {isMultiSelect ? (
             // MULTI-SELECT (CHECKBOX - CHOOSE MULTIPLE OPTIONS WITH SELECTION CAP)
@@ -390,9 +390,19 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
                   : 0;
                 const isCapReached = currentSelectedCount >= targetMultiCount;
 
-                return question.options.map((opt, optIdx) => {
-                  const letterMatch = opt.match(/^([A-Z])[\.\s]/);
-                  const letter = letterMatch ? letterMatch[1] : String.fromCharCode(65 + optIdx);
+                const renderedMultiOpts: Array<{ value: string; text: string }> = question.display_options
+                  ? question.display_options
+                  : (question.options || []).map((opt, idx) => {
+                      const letterMatch = opt.match(/^([A-Z])[\.\s]/);
+                      return {
+                        value: letterMatch ? letterMatch[1] : String.fromCharCode(65 + idx),
+                        text: opt
+                      };
+                    });
+
+                return renderedMultiOpts.map((optEntry, optIdx) => {
+                  const letter = optEntry.value;
+                  const displayText = optEntry.text;
                   const isChecked = isMultiSelected(letter);
                   const isOptionDisabled = !isChecked && isCapReached;
                   const shapeMeta = [
@@ -405,7 +415,7 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
 
                   return (
                     <label
-                      key={optIdx}
+                      key={`${letter}-${optIdx}`}
                       className={`flex items-center space-x-3 p-3.5 min-h-[48px] rounded-2xl border text-xs md:text-sm transition-all ${
                         isChecked
                           ? 'bg-[#6B51A5] border-[#6B51A5] text-white font-bold shadow-md cursor-pointer'
@@ -426,7 +436,7 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
                       }`}>
                         {shapeMeta.shape}
                       </span>
-                      <span className="flex-1">{opt}</span>
+                      <span className="flex-1">{displayText}</span>
                       {isOptionDisabled && (
                         <span className="text-[10px] text-slate-400 italic">
                           (Cap reached)
@@ -440,43 +450,59 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
           ) : (
             // SINGLE-SELECT (RADIO BUTTON - CHOOSE ONE OPTION)
             <div className="space-y-2.5">
-              {question.options.map((opt, optIdx) => {
-                const letterMatch = opt.match(/^([A-Z])[\.\s]/);
-                const letter = letterMatch ? letterMatch[1] : String.fromCharCode(65 + optIdx);
-                const isSelected = userAnswer.trim().toUpperCase() === letter.toUpperCase() || userAnswer.trim() === opt.trim();
-                const shapeMeta = [
-                  { shape: '●', bg: 'bg-indigo-100 text-indigo-800' },
-                  { shape: '■', bg: 'bg-blue-100 text-blue-800' },
-                  { shape: '◆', bg: 'bg-amber-100 text-amber-800' },
-                  { shape: '★', bg: 'bg-emerald-100 text-emerald-800' },
-                  { shape: '▲', bg: 'bg-purple-100 text-purple-800' }
-                ][optIdx % 5];
+              {(() => {
+                const renderedSingleOpts: Array<{ value: string; text: string; rawText?: string }> = question.display_options
+                  ? question.display_options
+                  : (question.options || []).map((opt, idx) => {
+                      const letterMatch = opt.match(/^([A-Z])[\.\s]/);
+                      return {
+                        value: letterMatch ? letterMatch[1] : String.fromCharCode(65 + idx),
+                        text: opt,
+                        rawText: opt
+                      };
+                    });
 
-                return (
-                  <label
-                    key={optIdx}
-                    className={`flex items-center space-x-3 p-3.5 min-h-[48px] rounded-2xl border text-xs md:text-sm cursor-pointer transition-all ${
-                      isSelected
-                        ? 'bg-[#6B51A5] border-[#6B51A5] text-white font-bold shadow-md ring-2 ring-purple-300'
-                        : 'bg-white border-purple-200/80 text-[#3C2A63] hover:bg-[#F3EFF9]'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`radio_q_${question.question_id}`}
-                      checked={isSelected}
-                      onChange={() => onAnswerChange(question.question_id, letter)}
-                      className="w-4 h-4 text-[#6B51A5] border-purple-300 focus:ring-[#6B51A5]"
-                    />
-                    <span className={`w-6 h-6 rounded-lg text-xs font-black flex items-center justify-center border shadow-xs shrink-0 ${
-                      isSelected ? 'bg-white/20 text-white border-white/40' : `${shapeMeta.bg} border-purple-200`
-                    }`} title={`Option ${letter} Shape Indicator`}>
-                      {shapeMeta.shape}
-                    </span>
-                    <span className="flex-1">{opt}</span>
-                  </label>
-                );
-              })}
+                return renderedSingleOpts.map((optEntry, optIdx) => {
+                  const letter = optEntry.value;
+                  const displayText = optEntry.text;
+                  const isSelected =
+                    userAnswer.trim().toUpperCase() === letter.toUpperCase() ||
+                    userAnswer.trim() === displayText.trim() ||
+                    (optEntry.rawText ? userAnswer.trim() === optEntry.rawText.trim() : false);
+                  const shapeMeta = [
+                    { shape: '●', bg: 'bg-indigo-100 text-indigo-800' },
+                    { shape: '■', bg: 'bg-blue-100 text-blue-800' },
+                    { shape: '◆', bg: 'bg-amber-100 text-amber-800' },
+                    { shape: '★', bg: 'bg-emerald-100 text-emerald-800' },
+                    { shape: '▲', bg: 'bg-purple-100 text-purple-800' }
+                  ][optIdx % 5];
+
+                  return (
+                    <label
+                      key={`${letter}-${optIdx}`}
+                      className={`flex items-center space-x-3 p-3.5 min-h-[48px] rounded-2xl border text-xs md:text-sm cursor-pointer transition-all ${
+                        isSelected
+                          ? 'bg-[#6B51A5] border-[#6B51A5] text-white font-bold shadow-md ring-2 ring-purple-300'
+                          : 'bg-white border-purple-200/80 text-[#3C2A63] hover:bg-[#F3EFF9]'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`radio_q_${question.question_id}`}
+                        checked={isSelected}
+                        onChange={() => onAnswerChange(question.question_id, letter)}
+                        className="w-4 h-4 text-[#6B51A5] border-purple-300 focus:ring-[#6B51A5]"
+                      />
+                      <span className={`w-6 h-6 rounded-lg text-xs font-black flex items-center justify-center border shadow-xs shrink-0 ${
+                        isSelected ? 'bg-white/20 text-white border-white/40' : `${shapeMeta.bg} border-purple-200`
+                      }`} title={`Option ${letter} Shape Indicator`}>
+                        {shapeMeta.shape}
+                      </span>
+                      <span className="flex-1">{displayText}</span>
+                    </label>
+                  );
+                });
+              })()}
             </div>
           )}
         </div>

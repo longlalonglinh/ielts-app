@@ -45,10 +45,27 @@ import {
   Activity,
   Hourglass,
   AlertTriangle,
-  Download
+  Download,
+  KeyRound
 } from 'lucide-react';
 
-import { DEFAULT_API_URL, fetchExam, prefetchExam, submitExamPayload, syncPendingSubmissions, clearExamCache, clearSessionTimers, fetchServerConfig, saveServerConfig, checkServerHealth } from './services/api';
+import {
+  DEFAULT_API_URL,
+  fetchExam,
+  prefetchExam,
+  submitExamPayload,
+  syncPendingSubmissions,
+  clearExamCache,
+  clearSessionTimers,
+  fetchServerConfig,
+  saveServerConfig,
+  checkServerHealth,
+  isAdminAuthenticated,
+  verifyAdminPassword,
+  verifyStoredAdminSession,
+  clearAdminToken
+} from './services/api';
+import { applyCandidateExamShuffle } from './utils/examShuffle';
 import { setStoredSpreadsheetId } from './services/gvizService';
 import { gradeExamAnswers } from './services/answerScoring';
 import { getCurrentAnswersFromIndexedDB, getWritingDraftFromIndexedDB, saveWritingDraftToIndexedDB, saveCurrentAnswersToIndexedDB, clearCurrentAnswersFromIndexedDB, createCandidateDraftBackup } from './services/indexedDb';
@@ -91,6 +108,21 @@ export default function App() {
   });
   const [adminTab, setAdminTab] = useState<'dashboard' | 'grading' | 'upload' | 'preview' | 'gas_setup' | 'custom_practice'>('dashboard');
 
+  // Admin Session Authentication State
+  const [adminAuthed, setAdminAuthed] = useState<boolean>(() => isAdminAuthenticated());
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminAuthError, setAdminAuthError] = useState<string | null>(null);
+  const [isVerifyingAdmin, setIsVerifyingAdmin] = useState(false);
+
+  // Configurable Server Proctoring Policy State
+  const [proctoringPolicy, setProctoringPolicy] = useState<{
+    auto_submit_on_violation: boolean;
+    max_violations_limit: number;
+  }>({
+    auto_submit_on_violation: false,
+    max_violations_limit: 3
+  });
+
   useEffect(() => {
     const checkAdminQueryOrHash = () => {
       const params = new URLSearchParams(window.location.search);
@@ -105,17 +137,8 @@ export default function App() {
     checkAdminQueryOrHash();
     window.addEventListener('hashchange', checkAdminQueryOrHash);
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === 'a' || e.key === 'A')) {
-        e.preventDefault();
-        setActiveView(prev => (prev === 'admin' ? 'student' : 'admin'));
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-
     return () => {
       window.removeEventListener('hashchange', checkAdminQueryOrHash);
-      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
   
@@ -126,9 +149,10 @@ export default function App() {
   const [isServerConnected, setIsServerConnected] = useState<boolean | null>(null);
   const [gasConfigSyncState, setGasConfigSyncState] = useState<'idle' | 'saving' | 'synced' | 'error'>('idle');
 
-  // Automatically detect Central Server & sync GAS URL / Spreadsheet ID on mount (Cross-Device Sync)
+  // Automatically detect Central Server, verify Admin session & sync GAS URL / Spreadsheet ID / Proctoring Policy on mount
   useEffect(() => {
     checkServerHealth().then(ok => setIsServerConnected(ok)).catch(() => setIsServerConnected(false));
+    verifyStoredAdminSession().then(valid => setAdminAuthed(valid)).catch(() => {});
     fetchServerConfig().then(cfg => {
       if (!cfg) return;
       if (cfg.gas_url && cfg.gas_url.trim() && !cfg.gas_url.includes('mock_ielts_exam_system_gas_url')) {
@@ -144,8 +168,37 @@ export default function App() {
       if (cfg.spreadsheet_id && cfg.spreadsheet_id.trim()) {
         setStoredSpreadsheetId(cfg.spreadsheet_id.trim());
       }
+      if (typeof cfg.auto_submit_on_violation === 'boolean' || typeof cfg.max_violations_limit === 'number') {
+        setProctoringPolicy({
+          auto_submit_on_violation: Boolean(cfg.auto_submit_on_violation),
+          max_violations_limit: Math.max(1, Number(cfg.max_violations_limit) || 3)
+        });
+      }
     }).catch(() => {});
   }, []);
+
+  const handleAdminLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminPasswordInput.trim() || isVerifyingAdmin) return;
+    setIsVerifyingAdmin(true);
+    setAdminAuthError(null);
+    const res = await verifyAdminPassword(adminPasswordInput.trim());
+    setIsVerifyingAdmin(false);
+    if (res.success) {
+      setAdminAuthed(true);
+      setAdminPasswordInput('');
+    } else {
+      setAdminAuthError(res.error || 'Incorrect Admin password.');
+    }
+  };
+
+  const handleAdminLock = () => {
+    clearAdminToken();
+    setAdminAuthed(false);
+    setAdminPasswordInput('');
+    setAdminAuthError(null);
+    setActiveView('student');
+  };
 
   // Diagnostics Modal State
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
@@ -250,6 +303,23 @@ export default function App() {
       window.removeEventListener('keydown', handleReloadKey);
     };
   }, [isLoggedIn, currentModule]);
+
+  // Admin shortcut (Ctrl+Alt+A) — strictly blocked during active student TEST sessions
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === 'a' || e.key === 'A')) {
+        if (activeView === 'student' && isLoggedIn && testMode === 'TEST' && currentModule !== 'results') {
+          return;
+        }
+        e.preventDefault();
+        setActiveView(prev => (prev === 'admin' ? 'student' : 'admin'));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeView, isLoggedIn, testMode, currentModule]);
 
   // Reading questions count & ids helper
   const readingQuestionsCount = (examData.passages && examData.passages.length > 0)
@@ -534,7 +604,7 @@ export default function App() {
 
         const answersCount = Object.keys(userAnswers).filter(k => userAnswers[k]?.trim()).length;
         if (answersCount === 0 && !writingTask1.trim() && !writingTask2.trim()) {
-          handleSetExamData(freshExam);
+          handleSetExamData(applyCandidateExamShuffle(freshExam, sbd, testMode));
           const freshHasL = (freshExam.listening_questions?.length || 0) > 0;
           const freshHasR = (freshExam.reading_questions?.length || 0) > 0 || (freshExam.passages?.some(p => (p.questions?.length ?? 0) > 0) ?? false);
           if (currentModule === 'listening' && !freshHasL) {
@@ -552,7 +622,7 @@ export default function App() {
     return () => {
       window.removeEventListener('ielts:exam-revalidated', handleRevalidated);
     };
-  }, [isLoggedIn, examCode, examData, currentModule, userAnswers, writingTask1, writingTask2]);
+  }, [isLoggedIn, examCode, examData, currentModule, userAnswers, writingTask1, writingTask2, sbd, testMode]);
 
   // Handle Login & Load Exam with Ultra-Fast Instant Entry
   const handleLogin = async (
@@ -665,7 +735,15 @@ export default function App() {
     }
 
     setLoginErrorMessage(null);
-    handleSetExamData(finalExamData);
+    const preparedExamData = applyCandidateExamShuffle(finalExamData, cleanSbd, mode);
+    handleSetExamData(preparedExamData);
+    fetchServerConfig().then((cfg) => {
+      if (!cfg) return;
+      setProctoringPolicy({
+        auto_submit_on_violation: Boolean(cfg.auto_submit_on_violation),
+        max_violations_limit: Math.max(1, Number(cfg.max_violations_limit) || 3)
+      });
+    }).catch(() => {});
     setIsLoadingExam(false);
     setIsLoggedIn(true);
 
@@ -765,7 +843,8 @@ export default function App() {
       await clearExamCache(cleanCode);
       const res = await fetchExam(gasUrl, cleanCode, true);
       if (res.success && res.exam) {
-        handleSetExamData(res.exam);
+        const prepared = isLoggedIn ? applyCandidateExamShuffle(res.exam, sbd, testMode) : res.exam;
+        handleSetExamData(prepared);
         setSkillNotice(`✅ Successfully synchronized [${cleanCode}] fresh from Google Sheets!`);
         setTimeout(() => setSkillNotice(null), 5000);
       } else {
@@ -998,6 +1077,8 @@ export default function App() {
         onTriggerExit={() => setIsExitModalOpen(true)}
         isFocusFlowMode={isFocusFlowMode}
         onToggleFocusFlowMode={() => setIsFocusFlowMode(prev => !prev)}
+        isAdminAuthed={adminAuthed}
+        onLockAdmin={handleAdminLock}
       />
 
       {/* Non-blocking Offline / Online Toast Notification */}
@@ -1130,6 +1211,8 @@ export default function App() {
                     sbd={sbd}
                     examCode={examCode}
                     testMode={testMode}
+                    autoSubmitLimit={proctoringPolicy.auto_submit_on_violation ? proctoringPolicy.max_violations_limit : null}
+                    onMaxViolationsExceeded={() => handleSubmitExam('TIMEOUT_FORCED')}
                     onViolationCountChange={(count) => setViolationCount(count)}
                     onProctoringMetricsChange={(m) => setProctoringMetrics(m)}
                   />
@@ -1381,7 +1464,7 @@ export default function App() {
                         (task1Obj as any)?.image || 
                         examData.image_url || 
                         (examData as any).imageUrl || 
-                        'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=60';
+                        '';
                       const resolvedTask2Prompt = examData.writing_task2_prompt || task2Obj?.prompt;
 
                       return (
@@ -1533,8 +1616,74 @@ export default function App() {
           </div>
         )}
 
+        {/* ADMIN PASSWORD GATE */}
+        {activeView === 'admin' && !adminAuthed && (
+          <div className="max-w-md mx-auto my-8 sm:my-12 bg-white border border-purple-200/80 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-purple-950/10 space-y-6 animate-fadeIn">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-purple-100 text-[#6B51A5] border border-purple-200 flex items-center justify-center mx-auto shadow-sm">
+                <KeyRound className="w-7 h-7" />
+              </div>
+              <h2 className="text-xl font-black text-[#3C2A63]">Admin &amp; Teacher Access</h2>
+              <p className="text-xs text-[#7C68A5] leading-relaxed">
+                Enter your Admin access password (configured via server <code className="font-mono bg-purple-50 px-1.5 py-0.5 rounded text-[#503A7A]">ADMIN_TOKEN</code>) to unlock submissions, answer keys, and exam management tools.
+              </p>
+            </div>
+
+            {adminAuthError && (
+              <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{adminAuthError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label htmlFor="admin-password-input" className="block text-xs font-extrabold uppercase tracking-wider text-[#503A7A]">
+                  Admin Password / Access Token
+                </label>
+                <input
+                  id="admin-password-input"
+                  type="password"
+                  value={adminPasswordInput}
+                  onChange={(e) => setAdminPasswordInput(e.target.value)}
+                  placeholder="Enter Admin access token..."
+                  autoFocus
+                  className="w-full px-4 py-3 bg-[#F8F6FC] border border-purple-200 rounded-2xl text-sm text-[#3C2A63] font-medium focus:outline-none focus:ring-2 focus:ring-[#6B51A5]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isVerifyingAdmin || !adminPasswordInput.trim()}
+                className="w-full py-3 bg-[#6B51A5] hover:bg-[#583F8F] disabled:opacity-50 text-white font-extrabold text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-purple-950/15 flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                {isVerifyingAdmin ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Verifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Unlock Admin Portal</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            <button
+              type="button"
+              onClick={() => setActiveView('student')}
+              className="w-full py-2.5 bg-[#F5F2F9] hover:bg-purple-100 text-[#503A7A] border border-purple-200 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Return to Student View</span>
+            </button>
+          </div>
+        )}
+
         {/* ADMIN VIEW */}
-        {activeView === 'admin' && (
+        {activeView === 'admin' && adminAuthed && (
           <div className="space-y-6 min-w-0 max-w-full overflow-x-hidden">
             
             {/* Runtime Architecture Status Banner (Server Hybrid vs Pure Static SPA) */}

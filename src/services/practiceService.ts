@@ -1,6 +1,6 @@
 import { CustomPracticeDeck, PracticeUserStats, SentenceGrammarAnalysis, CardReviewState, PracticeCard, LearnerProfile, StudentProgressRecord } from '../types/practice';
 import { STARTER_PRACTICE_DECKS } from '../data/practiceDecks';
-import { fetchPracticeDecksFromGAS, initPracticeDatabaseInGAS, savePracticeDeckToGAS, syncStudentProgressToGAS, fetchStudentProgressFromGAS, getApiUrl } from './api';
+import { fetchPracticeDecksFromGAS, initPracticeDatabaseInGAS, savePracticeDeckToGAS, syncStudentProgressToGAS, fetchStudentProgressFromGAS, getApiUrl, getAdminAuthHeaders } from './api';
 import { clearPracticeDecksInIndexedDB } from './indexedDb';
 
 const STORAGE_CUSTOM_DECKS = 'custom_practice_decks_repo';
@@ -167,7 +167,7 @@ export const practiceService = {
     try {
       const res = await fetch(getApiUrl('/api/practice-decks'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ ...deck, gas_url: gasUrl })
       });
       if (res.ok) {
@@ -218,7 +218,7 @@ export const practiceService = {
     try {
       const res = await fetch(getApiUrl('/api/practice-decks/batch'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ decks, replace_all: replaceAll, gas_url: gasUrl })
       });
       if (res.ok) {
@@ -258,7 +258,8 @@ export const practiceService = {
     try {
       const qs = gasUrl ? `?gas_url=${encodeURIComponent(gasUrl)}` : '';
       const res = await fetch(getApiUrl(`/api/practice-decks/${encodeURIComponent(deckId.trim().toUpperCase())}${qs}`), {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
       });
       if (res.ok) {
         const data = await res.json();
@@ -276,7 +277,10 @@ export const practiceService = {
     this.clearAllPracticeDecks();
     try {
       const qs = gasUrl ? `?gas_url=${encodeURIComponent(gasUrl)}` : '';
-      const res = await fetch(getApiUrl(`/api/practice-decks${qs}`), { method: 'DELETE' });
+      const res = await fetch(getApiUrl(`/api/practice-decks${qs}`), {
+        method: 'DELETE',
+        headers: getAdminAuthHeaders()
+      });
       if (res.ok) {
         const data = await res.json();
         return {

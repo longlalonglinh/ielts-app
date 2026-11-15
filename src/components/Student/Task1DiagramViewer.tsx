@@ -223,7 +223,35 @@ export const Task1DiagramViewer: React.FC<Task1DiagramViewerProps> = ({
             </div>
           )}
 
-          {/* High-Contrast Crisp SVG IELTS Academic Diagram */}
+          {!effectiveImageUrl && !useVectorFallback && (
+            <div className="rounded-2xl bg-[#FAF9FD] border border-dashed border-purple-200 p-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 rounded-xl bg-purple-100 text-[#6B51A5] shrink-0">
+                  <ImageIcon className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-xs font-extrabold text-[#3C2A63]">No Diagram Image Attached</h4>
+                  <p className="text-[11px] text-[#7C68A5] leading-relaxed">
+                    This Task 1 prompt does not have an attached chart or diagram image URL. Read the prompt carefully or notify the invigilator if a figure is expected.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onReportIssue) onReportIssue();
+                  else setIsReportModalOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <Flag className="w-3.5 h-3.5 text-rose-600" />
+                <span>Report Missing Diagram</span>
+              </button>
+            </div>
+          )}
+
+          {/* High-Contrast Crisp SVG IELTS Academic Diagram (only rendered when image errors or explicitly requested via Vector fallback) */}
+          {(useVectorFallback || imageError) && (
           <div className="rounded-xl border border-purple-200 bg-[#FAF9FD] p-4 shadow-inner">
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-purple-100">
               <span className="text-[11px] font-bold text-[#6B51A5] uppercase tracking-wider flex items-center gap-1.5">
@@ -305,6 +333,7 @@ export const Task1DiagramViewer: React.FC<Task1DiagramViewerProps> = ({
               Note: This vector representation illustrates the statistical proportions and comparative trends outlined in the prompt.
             </p>
           </div>
+          )}
         </div>
       )}
 

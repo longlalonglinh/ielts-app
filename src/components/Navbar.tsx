@@ -16,7 +16,8 @@ import {
   UserCog,
   ChevronDown,
   LogOut,
-  Sparkles
+  Sparkles,
+  Lock
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -34,6 +35,8 @@ interface NavbarProps {
   onTriggerExit?: () => void;
   isFocusFlowMode?: boolean;
   onToggleFocusFlowMode?: () => void;
+  isAdminAuthed?: boolean;
+  onLockAdmin?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -50,7 +53,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onTriggerReload,
   onTriggerExit,
   isFocusFlowMode = false,
-  onToggleFocusFlowMode
+  onToggleFocusFlowMode,
+  isAdminAuthed = true,
+  onLockAdmin
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -83,7 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           
           {/* Left: Brand Title & Mobile Menu Trigger */}
           <div className="flex items-center space-x-1.5 sm:space-x-3 min-w-0 shrink">
-            {activeView === 'admin' && (
+            {activeView === 'admin' && isAdminAuthed && (
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -133,7 +138,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           {/* Admin Desktop Sub-Tabs */}
-          {activeView === 'admin' && (
+          {activeView === 'admin' && isAdminAuthed && (
             <div className="hidden lg:flex items-center space-x-1 bg-[#E2DDEC] p-1 rounded-2xl min-w-0 overflow-x-auto scrollbar-none">
               {adminTabsConfig.map((tab) => {
                 const IconComponent = tab.icon;
@@ -171,7 +176,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Right Controls: View Switcher & Fullscreen */}
           <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
             
-            {/* When in Admin mode: Return to Student view */}
+            {/* When in Admin mode: Lock Session & Return to Student view */}
+            {activeView === 'admin' && isAdminAuthed && onLockAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onLockAdmin();
+                }}
+                className="px-2 sm:px-2.5 py-1.5 rounded-xl sm:rounded-2xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 whitespace-nowrap"
+                title="Lock Admin Session & Return to Student View"
+              >
+                <Lock className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden xl:inline">Lock Admin</span>
+              </button>
+            )}
+
             {activeView === 'admin' && (
               <button
                 onClick={() => {
@@ -265,7 +285,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Admin Mobile Horizontal Scroll Tab Bar (< lg) */}
-      {activeView === 'admin' && (
+      {activeView === 'admin' && isAdminAuthed && (
         <div className="lg:hidden border-t border-purple-100/80 bg-[#F8F6FC] px-2 py-2 overflow-x-auto scrollbar-none flex items-center gap-1.5 shadow-inner">
           {adminTabsConfig.map((tab) => {
             const IconComponent = tab.icon;
@@ -305,7 +325,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       )}
 
       {/* Admin Mobile Menu Dropdown Drawer */}
-      {activeView === 'admin' && mobileMenuOpen && (
+      {activeView === 'admin' && isAdminAuthed && mobileMenuOpen && (
         <div className="lg:hidden border-t border-purple-100 bg-white p-4 shadow-xl space-y-2 animate-in slide-in-from-top duration-200">
           <div className="text-xs font-black uppercase text-[#7C68A5] px-1 pb-1">
             Admin Management Sections:

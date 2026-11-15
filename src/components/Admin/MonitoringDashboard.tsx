@@ -24,9 +24,11 @@ import {
   Award,
   Layers,
   Sparkles,
-  Check
+  Check,
+  BarChart3,
+  Sliders
 } from 'lucide-react';
-import { CheatLog, SubmissionRecord } from '../../types';
+import { CheatLog, Question, SubmissionRecord } from '../../types';
 import { 
   fetchSubmissions, 
   fetchCheatLogs, 
@@ -36,10 +38,120 @@ import {
   exportSubmissionsCSV,
   exportSubmissionsJSON,
   importSubmissionsJSON,
-  syncDatabaseToSheets
+  syncDatabaseToSheets,
+  fetchServerConfig,
+  saveServerConfig,
+  fetchExam,
+  fetchPublishedCatalog
 } from '../../services/api';
+import { DEFAULT_EXAMS } from '../../data/defaultExams';
 import { formatSubmissionTime } from '../../utils/dateFormatter';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
+
+export interface QuestionItemAnalysisRow {
+  question_id: string;
+  section: string;
+  question_type: string;
+  question_text: string;
+  correct_answer: string;
+  attempts: number;
+  correctCount: number;
+  correctRate: number;
+  difficultyLabel: 'Too Hard (<30%)' | 'Too Easy (>85%)' | 'Balanced (30-85%)';
+  answerBreakdown: Array<{ answer: string; count: number; isCorrect: boolean }>;
+}
+
+function isFallbackAnswerMatch(studentAns: string, correctAns: string | string[], acceptableAnswers?: string[]): boolean {
+  const norm = (s: string) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const u = norm(studentAns);
+  if (!u) return false;
+  const candidates = new Set<string>();
+  const rawList = Array.isArray(correctAns) ? correctAns : String(correctAns || '').split(/[|\/]/);
+  rawList
+    .map(norm)
+    .filter(Boolean)
+    .forEach(c => candidates.add(c));
+  if (Array.isArray(acceptableAnswers)) {
+    acceptableAnswers.map(norm).filter(Boolean).forEach(c => candidates.add(c));
+  }
+  return candidates.has(u);
+}
+
+export function computeExamItemAnalysis(
+  examCode: string,
+  questions: Question[],
+  submissions: SubmissionRecord[]
+): QuestionItemAnalysisRow[] {
+  const targetCode = String(examCode || '').trim().toUpperCase();
+  const matchingSubs = submissions.filter(
+    sub => String(sub?.exam_code || '').trim().toUpperCase() === targetCode
+  );
+
+  return questions.map((q) => {
+    const qid = q.question_id;
+    let attempts = 0;
+    let correctCount = 0;
+    const distMap = new Map<string, { answer: string; count: number; isCorrect: boolean }>();
+
+    matchingSubs.forEach((sub) => {
+      const anySub = sub as any;
+      const detailed = sub.detailed_results?.[qid];
+      const rawAns =
+        detailed?.user_answer ??
+        sub.listening_answers?.[qid] ??
+        sub.reading_answers?.[qid] ??
+        anySub.answers?.[qid] ??
+        anySub.user_answers?.[qid] ??
+        '';
+      const cleanedAns = String(rawAns || '').trim();
+      const displayAns = cleanedAns || '(Blank)';
+
+      const isCorrect = detailed
+        ? Boolean(detailed.is_correct)
+        : isFallbackAnswerMatch(cleanedAns, q.correct_answer || '', q.acceptable_answers);
+
+      attempts++;
+      if (isCorrect) correctCount++;
+
+      const key = displayAns.toUpperCase();
+      const existing = distMap.get(key);
+      if (existing) {
+        existing.count += 1;
+        existing.isCorrect = existing.isCorrect || isCorrect;
+      } else {
+        distMap.set(key, { answer: displayAns, count: 1, isCorrect });
+      }
+    });
+
+    const correctRate = attempts > 0 ? Math.round((correctCount / attempts) * 100) : 0;
+    const difficultyLabel: QuestionItemAnalysisRow['difficultyLabel'] =
+      attempts === 0
+        ? 'Balanced (30-85%)'
+        : correctRate < 30
+        ? 'Too Hard (<30%)'
+        : correctRate > 85
+        ? 'Too Easy (>85%)'
+        : 'Balanced (30-85%)';
+
+    const answerBreakdown = Array.from(distMap.values()).sort((a, b) => b.count - a.count);
+    const formattedKey = Array.isArray(q.correct_answer)
+      ? q.correct_answer.join(', ')
+      : String(q.correct_answer || '');
+
+    return {
+      question_id: qid,
+      section: q.section || 'reading',
+      question_type: String(q.question_type || 'MULTIPLE_CHOICE'),
+      question_text: String(q.question_text || '').trim() || `Question ${qid}`,
+      correct_answer: formattedKey,
+      attempts,
+      correctCount,
+      correctRate,
+      difficultyLabel,
+      answerBreakdown
+    };
+  });
+}
 
 interface MonitoringDashboardProps {
   apiUrl?: string;
@@ -57,10 +169,21 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
   const [cheatLogs, setCheatLogs] = useState<CheatLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeSubTab, setActiveTab] = useState<'submissions' | 'cheatlogs'>('submissions');
+  const [activeSubTab, setActiveTab] = useState<'submissions' | 'cheatlogs' | 'analysis'>('submissions');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
   const [violationThresholdFilter, setViolationThresholdFilter] = useState<'all' | 'high'>('all');
   const [currentTimeMs, setCurrentTimeMs] = useState<number>(Date.now());
+
+  // Proctoring Auto-Submit Policy State
+  const [autoSubmitEnabled, setAutoSubmitEnabled] = useState(false);
+  const [maxViolationsLimit, setMaxViolationsLimit] = useState(3);
+  const [isSavingPolicy, setIsSavingPolicy] = useState(false);
+
+  // Item Analysis State
+  const [catalogCodes, setCatalogCodes] = useState<string[]>([]);
+  const [selectedAnalysisExam, setSelectedAnalysisExam] = useState<string>('TEST01');
+  const [analysisQuestions, setAnalysisQuestions] = useState<Question[]>([]);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
   // Database Management & Extraction State
   const [selectedSubmission, setSelectedSubmission] = useState<SubmissionRecord | null>(null);
@@ -81,7 +204,11 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
       // Fetch submissions
       const subRes = await fetchSubmissions(effectiveApiUrl);
       if (subRes.success && subRes.data) {
-        setSubmissions(deduplicateSubmissions(subRes.data));
+        const deduped = deduplicateSubmissions(subRes.data);
+        setSubmissions(deduped);
+        if (deduped.length > 0 && deduped[0].exam_code) {
+          setSelectedAnalysisExam(prev => prev || deduped[0].exam_code);
+        }
       }
 
       // Fetch cheat logs
@@ -98,7 +225,118 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
 
   useEffect(() => {
     loadData();
+    fetchServerConfig().then((cfg) => {
+      if (!cfg) return;
+      if (typeof cfg.auto_submit_on_violation === 'boolean') {
+        setAutoSubmitEnabled(cfg.auto_submit_on_violation);
+      }
+      if (typeof cfg.max_violations_limit === 'number' && cfg.max_violations_limit >= 1) {
+        setMaxViolationsLimit(cfg.max_violations_limit);
+      }
+    }).catch(() => {});
+
+    fetchPublishedCatalog({ asAdmin: true }).then((list) => {
+      if (Array.isArray(list)) {
+        setCatalogCodes(list.map(item => String(item.exam_code || '').toUpperCase()).filter(Boolean));
+      }
+    }).catch(() => {});
   }, [effectiveApiUrl]);
+
+  // Available exam codes for Item Analysis selector
+  const availableExamCodes = React.useMemo(() => {
+    const codeSet = new Set<string>();
+    submissions.forEach(s => {
+      if (s.exam_code) codeSet.add(String(s.exam_code).trim().toUpperCase());
+    });
+    catalogCodes.forEach(c => codeSet.add(c));
+    DEFAULT_EXAMS.forEach(d => {
+      if (d.exam_code) codeSet.add(d.exam_code.toUpperCase());
+    });
+    return Array.from(codeSet).sort();
+  }, [submissions, catalogCodes]);
+
+  // Load questions for selected exam when Item Analysis sub-tab is active
+  useEffect(() => {
+    if (activeSubTab !== 'analysis' || !selectedAnalysisExam) return;
+    let cancelled = false;
+    setLoadingAnalysis(true);
+
+    const extractCombinedQuestions = (exam: any): Question[] => {
+      if (!exam) return [];
+      const combined: Question[] = [];
+      const seen = new Set<string>();
+      const pushList = (qs?: Question[]) => {
+        if (!Array.isArray(qs)) return;
+        qs.forEach(q => {
+          if (q && q.question_id && !seen.has(q.question_id)) {
+            seen.add(q.question_id);
+            combined.push(q);
+          }
+        });
+      };
+      pushList(exam.listening_questions);
+      if (Array.isArray(exam.passages)) {
+        exam.passages.forEach((p: any) => pushList(p.questions));
+      }
+      pushList(exam.reading_questions);
+      pushList(exam.questions);
+      return combined;
+    };
+
+    fetchExam(effectiveApiUrl, selectedAnalysisExam, false, { asAdmin: true })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success && res.exam) {
+          setAnalysisQuestions(extractCombinedQuestions(res.exam));
+        } else {
+          const fallback = DEFAULT_EXAMS.find(d => d.exam_code.toUpperCase() === selectedAnalysisExam.toUpperCase());
+          setAnalysisQuestions(extractCombinedQuestions(fallback));
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const fallback = DEFAULT_EXAMS.find(d => d.exam_code.toUpperCase() === selectedAnalysisExam.toUpperCase());
+        setAnalysisQuestions(extractCombinedQuestions(fallback));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAnalysis(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSubTab, selectedAnalysisExam, effectiveApiUrl]);
+
+  const itemAnalysisRows = React.useMemo(
+    () => computeExamItemAnalysis(selectedAnalysisExam, analysisQuestions, submissions),
+    [selectedAnalysisExam, analysisQuestions, submissions]
+  );
+
+  const handleSaveProctoringPolicy = async () => {
+    setIsSavingPolicy(true);
+    const sanitizedLimit = Math.max(1, Math.min(20, Number(maxViolationsLimit) || 3));
+    setMaxViolationsLimit(sanitizedLimit);
+    try {
+      const ok = await saveServerConfig({
+        auto_submit_on_violation: autoSubmitEnabled,
+        max_violations_limit: sanitizedLimit
+      });
+      if (ok) {
+        showToast(
+          'success',
+          autoSubmitEnabled
+            ? `Proctoring policy saved: Auto-submit after ${sanitizedLimit} violation(s).`
+            : 'Proctoring policy saved: Warning-only mode (auto-submit disabled).'
+        );
+      } else {
+        showToast('error', 'Unable to save proctoring policy to server (verify Admin authentication).');
+      }
+    } catch (err: any) {
+      showToast('error', 'Failed to save proctoring policy: ' + (err?.message || 'Error'));
+    } finally {
+      setIsSavingPolicy(false);
+    }
+  };
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setActionNotice({ type, message });
@@ -432,6 +670,18 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
             <ShieldAlert className="w-3.5 h-3.5" />
             <span>Proctoring Alerts ({cheatLogs.length})</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('analysis')}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeSubTab === 'analysis'
+                ? 'bg-indigo-700 text-white shadow-md'
+                : 'text-[#3C2A63] hover:text-[#503A7A]'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>Item Analysis</span>
+          </button>
         </div>
 
         {/* Search Field & View Mode Toggle */}
@@ -680,6 +930,55 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
       {/* CHEAT LOGS VIEW */}
       {activeSubTab === 'cheatlogs' && (
         <>
+          {/* Proctoring Auto-Submit Policy Controls */}
+          <div className="bg-white border border-rose-200/80 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-2xl bg-rose-100 text-rose-700 shrink-0">
+                <Sliders className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-[#3C2A63]">Proctoring Enforcement Policy (TEST Mode)</h3>
+                <p className="text-xs text-[#7C68A5]">
+                  Optionally force-submit a candidate&apos;s exam automatically when tab-switch/blur violations reach the configured threshold.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#F8F6FC] border border-purple-200 cursor-pointer text-xs font-bold text-[#3C2A63]">
+                <input
+                  type="checkbox"
+                  checked={autoSubmitEnabled}
+                  onChange={(e) => setAutoSubmitEnabled(e.target.checked)}
+                  className="rounded border-purple-300 text-rose-600 focus:ring-rose-500"
+                />
+                <span>Auto-Submit on Excess Violations</span>
+              </label>
+
+              <div className="flex items-center gap-2 text-xs font-bold text-[#503A7A]">
+                <span>Max Limit:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={maxViolationsLimit}
+                  onChange={(e) => setMaxViolationsLimit(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  className="w-16 px-2.5 py-1.5 bg-[#F8F6FC] border border-purple-200 rounded-xl text-center font-mono font-bold text-[#3C2A63]"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveProctoringPolicy}
+                disabled={isSavingPolicy}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl text-xs font-extrabold transition shadow-sm cursor-pointer flex items-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>{isSavingPolicy ? 'Saving...' : 'Save Policy'}</span>
+              </button>
+            </div>
+          </div>
+
           {filteredLogs.length > 150 && (
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-4 py-2 rounded-2xl flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
@@ -837,6 +1136,168 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
             </div>
           </div>
         </>
+      )}
+
+      {/* ITEM ANALYSIS VIEW */}
+      {activeSubTab === 'analysis' && (
+        <div className="space-y-4">
+          <div className="bg-white border border-purple-100/80 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-indigo-100 text-indigo-700 shrink-0">
+                <BarChart3 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-[#3C2A63]">Per-Question Item Analysis &amp; Distractor Breakdown</h3>
+                <p className="text-xs text-[#7C68A5]">
+                  Identify overly difficult (&lt;30%) or too easy (&gt;85%) questions and inspect candidate answer distribution.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <label className="text-xs font-bold text-[#503A7A]">Exam Code:</label>
+              <select
+                value={selectedAnalysisExam}
+                onChange={(e) => setSelectedAnalysisExam(e.target.value)}
+                className="px-3.5 py-2 bg-[#F8F6FC] border border-purple-200 rounded-xl text-xs font-bold text-[#3C2A63] focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {availableExamCodes.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {loadingAnalysis ? (
+            <div className="bg-white border border-purple-100 rounded-3xl p-10 text-center space-y-2">
+              <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin mx-auto" />
+              <p className="text-xs font-bold text-[#503A7A]">Analyzing question statistics for {selectedAnalysisExam}...</p>
+            </div>
+          ) : itemAnalysisRows.length === 0 ? (
+            <div className="bg-white border border-purple-100 rounded-3xl p-10 text-center text-xs text-[#7C68A5]">
+              No objective questions found for exam <strong>{selectedAnalysisExam}</strong>.
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-white border border-purple-100 rounded-2xl p-4 shadow-xs">
+                  <span className="text-[10px] font-bold uppercase text-[#7C68A5] block">Analyzed Questions</span>
+                  <span className="text-xl font-black text-[#3C2A63] font-mono">{itemAnalysisRows.length}</span>
+                </div>
+                <div className="bg-white border border-purple-100 rounded-2xl p-4 shadow-xs">
+                  <span className="text-[10px] font-bold uppercase text-[#7C68A5] block">Submissions Sampled</span>
+                  <span className="text-xl font-black text-indigo-800 font-mono">{itemAnalysisRows[0]?.attempts || 0}</span>
+                </div>
+                <div className="bg-white border border-rose-200 rounded-2xl p-4 shadow-xs">
+                  <span className="text-[10px] font-bold uppercase text-rose-700 block">Too Hard (&lt;30%)</span>
+                  <span className="text-xl font-black text-rose-700 font-mono">
+                    {itemAnalysisRows.filter(r => r.attempts > 0 && r.correctRate < 30).length}
+                  </span>
+                </div>
+                <div className="bg-white border border-emerald-200 rounded-2xl p-4 shadow-xs">
+                  <span className="text-[10px] font-bold uppercase text-emerald-700 block">Too Easy (&gt;85%)</span>
+                  <span className="text-xl font-black text-emerald-700 font-mono">
+                    {itemAnalysisRows.filter(r => r.attempts > 0 && r.correctRate > 85).length}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white border border-purple-100/80 rounded-3xl overflow-hidden shadow-xl shadow-purple-950/5">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-[#3C2A63]">
+                    <thead className="bg-[#F8F6FC] border-b border-purple-100 text-[#503A7A] font-extrabold uppercase tracking-wider">
+                      <tr>
+                        <th className="py-3.5 px-4">Q#</th>
+                        <th className="py-3.5 px-4">Section</th>
+                        <th className="py-3.5 px-4">Question</th>
+                        <th className="py-3.5 px-4">Answer Key</th>
+                        <th className="py-3.5 px-4">Accuracy</th>
+                        <th className="py-3.5 px-4">Difficulty</th>
+                        <th className="py-3.5 px-4">Response Distribution</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-purple-100/60">
+                      {itemAnalysisRows.map((row) => (
+                        <tr key={row.question_id} className="hover:bg-[#F8F6FC] transition-colors">
+                          <td className="py-3 px-4 font-mono font-bold text-[#6B51A5] whitespace-nowrap">
+                            {row.question_id}
+                          </td>
+                          <td className="py-3 px-4 uppercase font-bold text-[11px] text-[#503A7A]">
+                            {row.section}
+                          </td>
+                          <td className="py-3 px-4 max-w-xs">
+                            <p className="line-clamp-2 font-medium text-[#3C2A63]">{row.question_text}</p>
+                          </td>
+                          <td className="py-3 px-4 font-mono font-extrabold text-emerald-700">
+                            {row.correct_answer || '---'}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {row.attempts === 0 ? (
+                              <span className="text-[#7C68A5] italic">No attempts</span>
+                            ) : (
+                              <div className="space-y-1 min-w-[90px]">
+                                <div className="font-mono font-black text-[#3C2A63]">
+                                  {row.correctRate}% ({row.correctCount}/{row.attempts})
+                                </div>
+                                <div className="w-full h-1.5 bg-purple-100 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${
+                                      row.correctRate < 30
+                                        ? 'bg-rose-500'
+                                        : row.correctRate > 85
+                                        ? 'bg-emerald-500'
+                                        : 'bg-indigo-500'
+                                    }`}
+                                    style={{ width: `${row.correctRate}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
+                              row.attempts === 0
+                                ? 'bg-slate-100 text-slate-600 border-slate-200'
+                                : row.difficultyLabel === 'Too Hard (<30%)'
+                                ? 'bg-rose-100 text-rose-800 border-rose-200'
+                                : row.difficultyLabel === 'Too Easy (>85%)'
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                : 'bg-indigo-100 text-indigo-800 border-indigo-200'
+                            }`}>
+                              {row.attempts === 0 ? 'Unattempted' : row.difficultyLabel}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            {row.answerBreakdown.length === 0 ? (
+                              <span className="text-[11px] text-[#7C68A5]">---</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {row.answerBreakdown.slice(0, 5).map((item, i) => (
+                                  <span
+                                    key={`${row.question_id}-dist-${i}`}
+                                    className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border ${
+                                      item.isCorrect
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                        : 'bg-slate-50 text-slate-700 border-slate-200'
+                                    }`}
+                                  >
+                                    {item.answer}: {item.count}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {/* Submission Detail Inspection Modal */}

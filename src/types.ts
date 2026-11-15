@@ -203,6 +203,7 @@ export interface Question {
   instruction?: string; // e.g. "Write NO MORE THAN TWO WORDS AND/OR A NUMBER"
   word_limit?: string; // e.g. "NO MORE THAN TWO WORDS"
   options?: string[]; // Multiple choice options ["A. Option 1", "B. Option 2", ...]
+  display_options?: Array<{ value: string; text: string }>; // Deterministically shuffled display options preserving canonical key
   headings_list?: MatchingOption[]; // For Matching Headings: [{ id: "i", text: "..." }, ...]
   matching_options?: MatchingOption[]; // For Matching Features/Endings: [{ id: "A", text: "..." }, ...]
   diagram_image_url?: string; // For Diagram/Map/Plan Labelling

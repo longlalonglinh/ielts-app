@@ -210,6 +210,61 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Centralized Admin Authentication Helper (replaces insecure ?admin=true backdoor)
+  const ADMIN_SECRET = (process.env.ADMIN_TOKEN || 'admin-secret').trim();
+
+  const isAuthorizedAdmin = (req: express.Request): boolean => {
+    const rawHeader = req.headers['x-admin-token'];
+    const tokenHeader = Array.isArray(rawHeader) ? rawHeader[0] : (rawHeader || '');
+    const authHeader = typeof req.headers['authorization'] === 'string' ? req.headers['authorization'] : '';
+    const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    return (
+      (Boolean(tokenHeader) && tokenHeader.trim() === ADMIN_SECRET) ||
+      (Boolean(bearer) && bearer === ADMIN_SECRET)
+    );
+  };
+
+  const requireAdminMiddleware: express.RequestHandler = (req, res, next) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(401).json({
+        success: false,
+        error: 'ADMIN_AUTH_REQUIRED',
+        message: 'Unauthorized: Valid Admin password/token is required.'
+      });
+    }
+    return next();
+  };
+
+  app.post('/api/admin/login', (req, res) => {
+    const submitted = String(req.body?.password || req.body?.token || '').trim();
+    if (!submitted || submitted !== ADMIN_SECRET) {
+      return res.status(401).json({
+        success: false,
+        error: 'INVALID_ADMIN_CREDENTIALS',
+        message: 'Incorrect Admin password.'
+      });
+    }
+    return res.json({
+      success: true,
+      token: ADMIN_SECRET
+    });
+  });
+
+  app.get('/api/admin/verify', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(401).json({ success: false, authorized: false });
+    }
+    return res.json({ success: true, authorized: true });
+  });
+
+  // Protect all other /api/admin/* endpoints
+  app.use('/api/admin', (req, res, next) => {
+    if (req.path === '/login' || req.path === '/verify') {
+      return next();
+    }
+    return requireAdminMiddleware(req, res, next);
+  });
+
   // Dedicated Multer storage for Native Multimodal PDF pipeline
   const pdfUpload = multer({ 
     storage: multer.memoryStorage(),
@@ -1204,19 +1259,23 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
         service_account_private_key: config.service_account_private_key ? '*** CONFIGURED ***' : undefined,
         service_account_json: config.service_account_json ? '*** CONFIGURED ***' : undefined,
         is_service_account_configured: isServiceAccountConfigured(),
-        effective_spreadsheet_id: getEffectiveSpreadsheetId()
+        effective_spreadsheet_id: getEffectiveSpreadsheetId(),
+        auto_submit_on_violation: Boolean(config.auto_submit_on_violation),
+        max_violations_limit: Number(config.max_violations_limit) || 3
       } 
     });
   });
 
-  app.post('/api/config', (req, res) => {
+  app.post('/api/config', requireAdminMiddleware, (req, res) => {
     const { 
       gas_url, 
       spreadsheet_id, 
       service_account_email, 
       service_account_private_key, 
       service_account_json, 
-      service_account_project_id 
+      service_account_project_id,
+      auto_submit_on_violation,
+      max_violations_limit
     } = req.body;
 
     const updateData: any = {};
@@ -1226,6 +1285,11 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     if (service_account_private_key !== undefined) updateData.service_account_private_key = String(service_account_private_key || '').trim();
     if (service_account_json !== undefined) updateData.service_account_json = String(service_account_json || '').trim();
     if (service_account_project_id !== undefined) updateData.service_account_project_id = String(service_account_project_id || '').trim();
+    if (auto_submit_on_violation !== undefined) updateData.auto_submit_on_violation = Boolean(auto_submit_on_violation);
+    if (max_violations_limit !== undefined) {
+      const parsedLimit = Math.max(1, Math.min(20, Number(max_violations_limit) || 3));
+      updateData.max_violations_limit = parsedLimit;
+    }
 
     const updated = saveStoredConfig(updateData);
     res.json({ 
@@ -1235,7 +1299,9 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
         service_account_private_key: updated.service_account_private_key ? '*** CONFIGURED ***' : undefined,
         service_account_json: updated.service_account_json ? '*** CONFIGURED ***' : undefined,
         is_service_account_configured: isServiceAccountConfigured(),
-        effective_spreadsheet_id: getEffectiveSpreadsheetId()
+        effective_spreadsheet_id: getEffectiveSpreadsheetId(),
+        auto_submit_on_violation: Boolean(updated.auto_submit_on_violation),
+        max_violations_limit: Number(updated.max_violations_limit) || 3
       } 
     });
   });
@@ -1445,16 +1511,14 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     }
   };
 
-  app.post('/api/sync-sheet', handleSyncSheet);
-  app.get('/api/sync-sheet', handleSyncSheet);
+  app.post('/api/sync-sheet', requireAdminMiddleware, handleSyncSheet);
+  app.get('/api/sync-sheet', requireAdminMiddleware, handleSyncSheet);
   app.post('/api/admin/sync-sheet', handleSyncSheet);
   app.get('/api/admin/sync-sheet', handleSyncSheet);
 
   // Centralized Exams API
   app.get('/api/exams', (req, res) => {
-    const authHeader = req.headers['authorization'];
-    const adminToken = req.headers['x-admin-token'];
-    const isAdmin = adminToken === 'admin-secret' || (typeof authHeader === 'string' && authHeader.includes('Bearer admin')) || req.query.admin === 'true';
+    const isAdmin = isAuthorizedAdmin(req);
 
     let exams = getStoredExams();
     if (!isAdmin) {
@@ -1485,10 +1549,8 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     const code = req.params.code.trim().toUpperCase();
     const forceFresh = req.query.force === 'true';
 
-    // Security check: Only verified admin receives unsanitized answer keys
-    const authHeader = req.headers['authorization'];
-    const adminToken = req.headers['x-admin-token'];
-    const isAdmin = adminToken === 'admin-secret' || (typeof authHeader === 'string' && authHeader.includes('Bearer admin')) || req.query.admin === 'true';
+    // Security check: Only verified admin receives unsanitized answer keys or draft exams
+    const isAdmin = isAuthorizedAdmin(req);
 
     // Tier 1: Check Server RAM Cache (Instant < 2ms latency)
     let fullExam = !forceFresh ? getCachedExam(code) : null;
@@ -1549,7 +1611,7 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     });
   });
 
-  app.post('/api/exams', async (req, res) => {
+  app.post('/api/exams', requireAdminMiddleware, async (req, res) => {
     try {
       const { gas_url: explicitGasUrl, ...examBody } = req.body || {};
       if (!examBody || !examBody.exam_code) {
@@ -1589,7 +1651,7 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     }
   });
 
-  app.delete('/api/exams/:code', (req, res) => {
+  app.delete('/api/exams/:code', requireAdminMiddleware, (req, res) => {
     const code = (req.params.code || '').trim().toUpperCase();
 
     // TC-SYSA-01: Protect exams with active sessions from accidental deletion
@@ -1627,8 +1689,8 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     }
   });
 
-  // Centralized Submissions API
-  app.get('/api/submissions', (req, res) => {
+  // Centralized Submissions API (Admin Only)
+  app.get('/api/submissions', requireAdminMiddleware, (req, res) => {
     const submissions = getStoredSubmissions();
     res.json({ success: true, data: submissions, count: submissions.length });
   });
@@ -1812,11 +1874,9 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
       return res.status(404).json({ success: false, error: 'SUBMISSION_NOT_FOUND' });
     }
 
-    const authHeader = req.headers['authorization'];
-    const adminToken = req.headers['x-admin-token'];
     const userSbd = (req.headers['x-user-sbd'] || req.query.sbd || '').toString().trim().toUpperCase();
 
-    const isAdmin = adminToken === 'admin-secret' || authHeader?.includes('Bearer admin') || req.query.admin === 'true';
+    const isAdmin = isAuthorizedAdmin(req);
     const isOwner = Boolean(userSbd && userSbd === (found.sbd || '').trim().toUpperCase());
 
     if (!isAdmin && !isOwner) {
@@ -2056,7 +2116,7 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     res.json({ success: true, code: GOOGLE_APPS_SCRIPT_CODE });
   });
 
-  app.post('/api/submissions/grade-writing', (req, res) => {
+  app.post('/api/submissions/grade-writing', requireAdminMiddleware, (req, res) => {
     try {
       const { submission_id, writing_scores, overall_writing, feedback, expected_version, examiner_id } = req.body;
       const result = updateStoredWritingScore(
@@ -2106,7 +2166,7 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
   const cheatLogRateLimits = new Map<string, number[]>();
 
   // Centralized Cheat Logs API
-  app.get('/api/cheat-logs', (req, res) => {
+  app.get('/api/cheat-logs', requireAdminMiddleware, (req, res) => {
     res.json({ success: true, data: getStoredCheatLogs() });
   });
 
@@ -2125,11 +2185,13 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     cheatLogRateLimits.set(clientKey, timestamps);
 
     const saved = saveStoredCheatLog(req.body);
+    // Asynchronously sync cheat log to Google Apps Script (CHEATLOGS tab) without delaying student response
+    pushPayloadToGas(undefined, { action: 'log_cheat', ...saved }, 'CHEATLOGS').catch(() => {});
     res.json({ success: true, log: saved });
   });
 
   // Server-to-GAS Synchronization
-  app.post('/api/sync/pull-from-gas', async (req, res) => {
+  app.post('/api/sync/pull-from-gas', requireAdminMiddleware, async (req, res) => {
     const config = getStoredConfig();
     const gasUrl = (req.body.gas_url || config.gas_url || '').trim();
 
@@ -2245,7 +2307,7 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     res.json({ success: true, data: decks });
   });
 
-  app.post('/api/practice-decks', async (req, res) => {
+  app.post('/api/practice-decks', requireAdminMiddleware, async (req, res) => {
     const { gas_url, skip_gas, ...deckPayload } = req.body || {};
     if (!deckPayload || (!deckPayload.deck_id && !deckPayload.title && !Array.isArray(deckPayload.cards))) {
       return res.status(400).json({ success: false, error: 'Missing practice deck payload' });
@@ -2267,7 +2329,7 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     });
   });
 
-  app.post('/api/practice-decks/batch', async (req, res) => {
+  app.post('/api/practice-decks/batch', requireAdminMiddleware, async (req, res) => {
     const { decks, replace_all, gas_url, skip_gas } = req.body || {};
     if (!Array.isArray(decks)) {
       return res.status(400).json({ success: false, error: 'decks array is required' });
@@ -2293,7 +2355,7 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     });
   });
 
-  app.delete('/api/practice-decks/:id', async (req, res) => {
+  app.delete('/api/practice-decks/:id', requireAdminMiddleware, async (req, res) => {
     const deckId = String(req.params.id || '').trim().toUpperCase();
     const deleted = deleteStoredPracticeDeck(deckId);
     const gasUrl = typeof req.query.gas_url === 'string' ? req.query.gas_url : undefined;
@@ -2310,7 +2372,7 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     });
   });
 
-  app.delete('/api/practice-decks', async (req, res) => {
+  app.delete('/api/practice-decks', requireAdminMiddleware, async (req, res) => {
     replaceStoredPracticeDecks([]);
     const gasUrl = typeof req.query.gas_url === 'string' ? req.query.gas_url : undefined;
     const gasOutcome = await pushPayloadToGas(gasUrl, {

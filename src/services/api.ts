@@ -72,6 +72,91 @@ export const getApiUrl = (path: string): string => {
   return API_BASE_URL ? `${API_BASE_URL}${cleanPath}` : cleanPath;
 };
 
+const ADMIN_TOKEN_STORAGE_KEY = 'ielts_admin_session_token';
+
+export function getAdminToken(): string {
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      return (sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || '').trim();
+    }
+  } catch {}
+  return '';
+}
+
+export function setAdminToken(token: string): void {
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      if (token && token.trim()) {
+        sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token.trim());
+      } else {
+        sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+      }
+    }
+  } catch {}
+}
+
+export function clearAdminToken(): void {
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+    }
+  } catch {}
+}
+
+export function isAdminAuthenticated(): boolean {
+  return Boolean(getAdminToken());
+}
+
+export function getAdminAuthHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const token = getAdminToken();
+  return token ? { ...extra, 'x-admin-token': token } : { ...extra };
+}
+
+export async function verifyAdminPassword(password: string): Promise<{ success: boolean; token?: string; error?: string }> {
+  try {
+    const res = await fetch(getApiUrl('/api/admin/login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data?.success && data?.token) {
+      setAdminToken(data.token);
+      return { success: true, token: data.token };
+    }
+    return {
+      success: false,
+      error: data?.message || data?.error || 'Incorrect Admin password.'
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Unable to verify Admin password with server.'
+    };
+  }
+}
+
+export async function verifyStoredAdminSession(): Promise<boolean> {
+  const token = getAdminToken();
+  if (!token) return false;
+  try {
+    const res = await fetch(getApiUrl('/api/admin/verify'), {
+      headers: { 'x-admin-token': token }
+    });
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        clearAdminToken();
+      }
+      return false;
+    }
+    const data = await res.json().catch(() => ({}));
+    return Boolean(data?.success && data?.authorized);
+  } catch {
+    // Allow existing session token when operating offline in static/offline fallback
+    return true;
+  }
+}
+
 /**
  * Check connection status to internet and Google Apps Script API endpoint
  */
@@ -261,7 +346,9 @@ export async function fetchSubmissions(
 
   // Fetch from Centralized Server Database (/api/submissions) - Cross-Device Sync
   try {
-    const serverRes = await fetch(getApiUrl('/api/submissions'));
+    const serverRes = await fetch(getApiUrl('/api/submissions'), {
+      headers: getAdminAuthHeaders()
+    });
     if (serverRes.ok) {
       const serverJson = await serverRes.json();
       if (serverJson && Array.isArray(serverJson.data)) {
@@ -322,7 +409,9 @@ export async function fetchCheatLogs(
 
   // Fetch from Centralized Server Database (/api/cheat-logs)
   try {
-    const sRes = await fetch(getApiUrl('/api/cheat-logs'));
+    const sRes = await fetch(getApiUrl('/api/cheat-logs'), {
+      headers: getAdminAuthHeaders()
+    });
     if (sRes.ok) {
       const sJson = await sRes.json();
       if (sJson && Array.isArray(sJson.data)) {
@@ -375,7 +464,7 @@ export async function saveWritingScore(
   try {
     const serverRes = await fetch(getApiUrl('/api/submissions/grade-writing'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         submission_id: submissionId,
         writing_scores: {
@@ -1602,16 +1691,18 @@ export async function getDynamicSpreadsheetId(): Promise<string> {
 export async function fetchExam(
   apiUrl: string, 
   examCode: string,
-  forceFresh: boolean = false
+  forceFresh: boolean = false,
+  options?: { asAdmin?: boolean }
 ): Promise<{ success: boolean; exam?: ExamData; error?: string; source?: 'gas' | 'idb' | 'local' | 'default' | 'memory' | 'gviz' | 'server' }> {
   const cleanCode = (examCode || 'TEST01').trim().toUpperCase();
+  const useAdminAuth = Boolean(options?.asAdmin && isAdminAuthenticated());
 
   if (forceFresh) {
     await clearExamCache(cleanCode);
   }
 
   // Tier 1: In-Memory Cache (Instant ~0ms)
-  if (!forceFresh && examMemoryCache.has(cleanCode)) {
+  if (!forceFresh && !useAdminAuth && examMemoryCache.has(cleanCode)) {
     const cached = examMemoryCache.get(cleanCode)!;
     triggerBackgroundRevalidation(apiUrl, cleanCode);
     return { success: true, exam: cached, source: 'memory' };
@@ -1622,7 +1713,7 @@ export async function fetchExam(
   let serverRespondedAuthoritatively = false;
   try {
     const serverUrl = getApiUrl(`/api/exams/${encodeURIComponent(cleanCode)}${forceFresh ? '?force=true' : ''}`);
-    const serverRes = await fetch(serverUrl);
+    const serverRes = await fetch(serverUrl, useAdminAuth ? { headers: getAdminAuthHeaders() } : undefined);
     if (serverRes.status === 404) {
       serverRespondedAuthoritatively = true;
     }
@@ -1711,7 +1802,9 @@ export async function fetchExam(
         examMemoryCache.set(cleanCode, standardized);
         saveExamToIndexedDB(standardized).catch(() => {});
         safeSaveCurrentExamToLocalStorage(standardized);
-        saveExamToServerDb(standardized).catch(() => {});
+        if (useAdminAuth) {
+          saveExamToServerDb(standardized).catch(() => {});
+        }
         return { success: true, exam: standardized, source: 'gviz' };
       }
     } catch (gvizErr) {
@@ -1747,7 +1840,9 @@ export async function fetchExam(
               examMemoryCache.set(cleanCode, standardized);
               await saveExamToIndexedDB(standardized).catch(() => {});
               safeSaveCurrentExamToLocalStorage(standardized);
-              saveExamToServerDb(standardized).catch(() => {});
+              if (useAdminAuth) {
+                saveExamToServerDb(standardized).catch(() => {});
+              }
               return { success: true, exam: standardized, source: 'gas' };
             }
             // If modern GAS responded cleanly with success:true / status:'success' and empty data, don't stall on legacy alias
@@ -2066,7 +2161,7 @@ export async function saveExamWithSyncStatus(
   try {
     const res = await fetch(getApiUrl('/api/exams'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(gasUrl ? { ...exam, gas_url: gasUrl } : exam)
     });
     if (!res.ok) {
@@ -2104,18 +2199,21 @@ export async function checkServerHealth(): Promise<boolean> {
   }
 }
 
-export async function fetchPublishedCatalog(): Promise<Array<{
+export async function fetchPublishedCatalog(options?: { asAdmin?: boolean }): Promise<Array<{
   exam_code: string;
   title: string;
   exam_type?: string;
   test_type?: string;
   skills?: string[];
   has_writing?: boolean;
+  status?: string;
+  is_draft?: boolean;
 }>> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(getApiUrl('/api/exams'), { signal: controller.signal });
+    const headers = options?.asAdmin ? getAdminAuthHeaders() : undefined;
+    const res = await fetch(getApiUrl('/api/exams'), { signal: controller.signal, headers });
     clearTimeout(timeoutId);
     if (!res.ok) return [];
     const data = await res.json().catch(() => null);
@@ -2127,9 +2225,15 @@ export async function fetchPublishedCatalog(): Promise<Array<{
 }
 
 /**
- * Fetch server configuration (e.g. centralized gas_url and spreadsheet_id)
+ * Fetch server configuration (e.g. centralized gas_url, spreadsheet_id, and proctoring policy)
  */
-export async function fetchServerConfig(): Promise<{ gas_url?: string; spreadsheet_id?: string; last_synced_at?: string } | null> {
+export async function fetchServerConfig(): Promise<{
+  gas_url?: string;
+  spreadsheet_id?: string;
+  last_synced_at?: string;
+  auto_submit_on_violation?: boolean;
+  max_violations_limit?: number;
+} | null> {
   try {
     const res = await fetch(getApiUrl('/api/config'));
     if (res.ok) {
@@ -2168,7 +2272,7 @@ export async function uploadImageToServer(dataUrlOrFile: string, filename?: stri
 }
 
 /**
- * Save server configuration (e.g. update gas_url and/or spreadsheet_id for all connected devices)
+ * Save server configuration (e.g. update gas_url, spreadsheet_id, and proctoring policy)
  */
 export async function saveServerConfig(
   config: { 
@@ -2178,13 +2282,15 @@ export async function saveServerConfig(
     service_account_private_key?: string;
     service_account_json?: string;
     service_account_project_id?: string;
+    auto_submit_on_violation?: boolean;
+    max_violations_limit?: number;
   } | string
 ): Promise<boolean> {
   try {
     const payload = typeof config === 'string' ? { gas_url: config } : config;
     const res = await fetch(getApiUrl('/api/config'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload)
     });
     return res.ok;
@@ -2206,7 +2312,7 @@ export async function triggerServerSheetSync(
   try {
     const res = await fetch(getApiUrl('/api/sync-sheet'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ exam_code: examCode, spreadsheet_id: spreadsheetId })
     });
     const latencyMs = Date.now() - startTime;
@@ -2231,7 +2337,9 @@ export async function triggerServerSheetSync(
  */
 export async function fetchAppsScriptWebhookCode(): Promise<string> {
   try {
-    const res = await fetch(getApiUrl('/api/admin/apps-script-webhook'));
+    const res = await fetch(getApiUrl('/api/admin/apps-script-webhook'), {
+      headers: getAdminAuthHeaders()
+    });
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.script) {
@@ -2249,7 +2357,10 @@ export async function fetchAppsScriptWebhookCode(): Promise<string> {
  */
 export async function flushServerSubmissionsQueue(): Promise<{ success: boolean; count: number }> {
   try {
-    const res = await fetch(getApiUrl('/api/admin/flush-submissions-queue'), { method: 'POST' });
+    const res = await fetch(getApiUrl('/api/admin/flush-submissions-queue'), {
+      method: 'POST',
+      headers: getAdminAuthHeaders()
+    });
     if (res.ok) {
       return await res.json();
     }
@@ -2266,7 +2377,7 @@ export async function syncServerWithGas(gasUrl?: string): Promise<{ success: boo
   try {
     const res = await fetch(getApiUrl('/api/sync/pull-from-gas'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ gas_url: gasUrl })
     });
     const data = await res.json();
@@ -2304,7 +2415,8 @@ export async function deleteExam(examCode: string): Promise<boolean> {
   // 4. Delete on server
   try {
     const res = await fetch(getApiUrl(`/api/exams/${encodeURIComponent(cleanCode)}`), {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAdminAuthHeaders()
     });
     return res.ok;
   } catch (e) {
@@ -2330,7 +2442,8 @@ export async function getExamByCode(examCode: string): Promise<ExamData | null> 
 export async function seedStarterPack(): Promise<{ success: boolean; imported?: number; error?: string }> {
   try {
     const res = await fetch(getApiUrl('/api/admin/seed-starter'), {
-      method: 'POST'
+      method: 'POST',
+      headers: getAdminAuthHeaders()
     });
     if (res.ok) {
       const data = await res.json();
@@ -2351,10 +2464,16 @@ export async function uploadAndParseIeltsPdf(file: File): Promise<any> {
   const formData = new FormData();
   formData.append('pdf', file);
 
-  const response = await fetch(getApiUrl('/api/admin/parse-pdf'), {
+  const token = getAdminToken();
+  const fetchInit: RequestInit = {
     method: 'POST',
-    body: formData,
-  });
+    body: formData
+  };
+  if (token) {
+    fetchInit.headers = { 'x-admin-token': token };
+  }
+
+  const response = await fetch(getApiUrl('/api/admin/parse-pdf'), fetchInit);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -2390,7 +2509,9 @@ export async function fetchSubmissionsStats(): Promise<{
   error?: string;
 }> {
   try {
-    const res = await fetch(getApiUrl('/api/admin/submissions/stats'));
+    const res = await fetch(getApiUrl('/api/admin/submissions/stats'), {
+      headers: getAdminAuthHeaders()
+    });
     if (res.ok) {
       const data = await res.json();
       return { success: true, stats: data.stats };
@@ -2402,7 +2523,7 @@ export async function fetchSubmissionsStats(): Promise<{
 }
 
 /**
- * Download Submissions as Excel-friendly CSV with UTF-8 BOM
+ * Download Submissions as Excel-friendly CSV with UTF-8 BOM (authenticated fetch + Blob download)
  */
 export async function exportSubmissionsCSV(searchTerm: string = '', status: string = 'all'): Promise<void> {
   const query = new URLSearchParams({
@@ -2411,16 +2532,23 @@ export async function exportSubmissionsCSV(searchTerm: string = '', status: stri
     status
   });
   const url = getApiUrl(`/api/admin/submissions/export?${query.toString()}`);
+  const res = await fetch(url, { headers: getAdminAuthHeaders() });
+  if (!res.ok) {
+    throw new Error(`Export CSV failed (HTTP ${res.status})`);
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
+  a.href = objectUrl;
   a.setAttribute('download', `ielts_submissions_${Date.now()}.csv`);
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  URL.revokeObjectURL(objectUrl);
 }
 
 /**
- * Download Submissions as full JSON database archive
+ * Download Submissions as full JSON database archive (authenticated fetch + Blob download)
  */
 export async function exportSubmissionsJSON(searchTerm: string = '', status: string = 'all'): Promise<void> {
   const query = new URLSearchParams({
@@ -2429,12 +2557,19 @@ export async function exportSubmissionsJSON(searchTerm: string = '', status: str
     status
   });
   const url = getApiUrl(`/api/admin/submissions/export?${query.toString()}`);
+  const res = await fetch(url, { headers: getAdminAuthHeaders() });
+  if (!res.ok) {
+    throw new Error(`Export JSON failed (HTTP ${res.status})`);
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
+  a.href = objectUrl;
   a.setAttribute('download', `ielts_submissions_backup_${Date.now()}.json`);
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  URL.revokeObjectURL(objectUrl);
 }
 
 /**
@@ -2509,14 +2644,12 @@ export async function importSubmissionsJSON(
       }
     }
 
-    // Also attempt server sync if API_BASE_URL is active
-    if (API_BASE_URL) {
-      fetch(getApiUrl('/api/admin/submissions/import'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ submissions, syncToSheets })
-      }).catch(() => {});
-    }
+    // Also attempt server sync
+    fetch(getApiUrl('/api/admin/submissions/import'), {
+      method: 'POST',
+      headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ submissions, syncToSheets })
+    }).catch(() => {});
 
     return {
       success: true,
@@ -2536,7 +2669,7 @@ export async function syncDatabaseToSheets(): Promise<{ success: boolean; flushe
   try {
     const res = await fetch(getApiUrl('/api/admin/submissions/sync-to-sheets'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' })
     });
     const data = await res.json();
     return data;
@@ -2551,7 +2684,8 @@ export async function syncDatabaseToSheets(): Promise<{ success: boolean; flushe
 export async function deleteSubmission(submissionId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const res = await fetch(getApiUrl(`/api/admin/submissions/${encodeURIComponent(submissionId)}`), {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAdminAuthHeaders()
     });
     const data = await res.json();
     return data;

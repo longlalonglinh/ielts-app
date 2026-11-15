@@ -150,7 +150,7 @@ export const ManualGrading: React.FC<ManualGradingProps> = ({ apiUrl, gasUrl }) 
       return;
     }
 
-    fetchExam(effectiveApiUrl, code).then(res => {
+    fetchExam(effectiveApiUrl, code, false, { asAdmin: true }).then(res => {
       if (res.success && res.exam) {
         setExamCache(prev => ({ ...prev, [code]: res.exam! }));
       }

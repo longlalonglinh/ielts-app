@@ -497,14 +497,27 @@ export interface ServerConfig {
   service_account_json?: string;
   service_account_project_id?: string;
   last_synced_at?: string;
+  auto_submit_on_violation?: boolean;
+  max_violations_limit?: number;
 }
 
 export function getStoredConfig(): ServerConfig {
   if (cachedConfig) return cachedConfig;
-  const def: ServerConfig = { gas_url: DEFAULT_GAS_URL, spreadsheet_id: '' };
+  const def: ServerConfig = {
+    gas_url: DEFAULT_GAS_URL,
+    spreadsheet_id: '',
+    auto_submit_on_violation: false,
+    max_violations_limit: 3
+  };
   cachedConfig = safeReadJson<ServerConfig>(CONFIG_FILE, def);
   if (!cachedConfig.gas_url) {
     cachedConfig.gas_url = DEFAULT_GAS_URL;
+  }
+  if (typeof cachedConfig.auto_submit_on_violation !== 'boolean') {
+    cachedConfig.auto_submit_on_violation = false;
+  }
+  if (!cachedConfig.max_violations_limit || cachedConfig.max_violations_limit < 1) {
+    cachedConfig.max_violations_limit = 3;
   }
   return cachedConfig;
 }

@@ -1,5 +1,7 @@
 {
   "gas_url": "https://script.google.com/macros/s/AKfycbySNk5foVr4UMC5ZVP1YTlxjxT9qFgdI85cH5nyQ63ffqXdYVZ7SJKbmD0B3xNO3DEe/exec",
   "spreadsheet_id": "",
-  "last_synced_at": "2026-11-15T10:29:32.878Z"
+  "last_synced_at": "2026-11-15T14:50:00.823Z",
+  "auto_submit_on_violation": false,
+  "max_violations_limit": 3
 }

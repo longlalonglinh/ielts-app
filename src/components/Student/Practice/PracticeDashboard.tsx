@@ -78,6 +78,7 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [sessionResults, setSessionResults] = useState<Record<string, boolean>>({});
   const [sessionCompleted, setSessionCompleted] = useState(false);
+  const [sessionCardsOverride, setSessionCardsOverride] = useState<PracticeCard[] | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Security / Proctoring Integrity Tracker
@@ -175,6 +176,7 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
   const loadDeckData = async (targetId: string) => {
     setIsLoadingDeck(true);
     setLoadError(null);
+    setSessionCardsOverride(null);
     try {
       const decks = practiceService.getAllDecks();
       setAllDecks(decks);
@@ -259,10 +261,31 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
     };
   }, [isPracticing, candidateSbd, activeDeck?.deck_id, currentLearner]);
 
+  const activeSessionCards = React.useMemo<PracticeCard[]>(() => {
+    if (sessionCardsOverride && sessionCardsOverride.length > 0) {
+      return sessionCardsOverride;
+    }
+    return activeDeck?.cards || [];
+  }, [sessionCardsOverride, activeDeck]);
+
+  const missedCards = React.useMemo<PracticeCard[]>(() => {
+    return activeSessionCards.filter((card) => sessionResults[card.id] === false);
+  }, [activeSessionCards, sessionResults]);
+
   const handleStartPractice = (deckToStart?: CustomPracticeDeck) => {
     const deck = deckToStart || activeDeck;
     if (!deck || deck.cards.length === 0) return;
     setActiveDeck(deck);
+    setSessionCardsOverride(null);
+    setCurrentCardIndex(0);
+    setSessionResults({});
+    setSessionCompleted(false);
+    setIsPracticing(true);
+  };
+
+  const handleRetryMissedCards = () => {
+    if (!activeDeck || missedCards.length === 0) return;
+    setSessionCardsOverride([...missedCards]);
     setCurrentCardIndex(0);
     setSessionResults({});
     setSessionCompleted(false);
@@ -270,19 +293,20 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
   };
 
   const handleNextCard = (isCorrect: boolean) => {
-    if (!activeDeck) return;
-    const currentCard = activeDeck.cards[currentCardIndex];
+    if (!activeDeck || activeSessionCards.length === 0) return;
+    const currentCard = activeSessionCards[currentCardIndex];
+    if (!currentCard) return;
     const newResults = {
       ...sessionResults,
       [currentCard.id]: isCorrect
     };
     setSessionResults(newResults);
 
-    if (currentCardIndex + 1 < activeDeck.cards.length) {
+    if (currentCardIndex + 1 < activeSessionCards.length) {
       setCurrentCardIndex(prev => prev + 1);
     } else {
       // Complete Session for active learner
-      const totalCards = activeDeck.cards.length;
+      const totalCards = activeSessionCards.length;
       const correctCount = Object.values(newResults).filter(Boolean).length;
       const updatedStats = practiceService.recordPracticeSession(
         activeDeck.deck_id,
@@ -354,6 +378,7 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
             <button
               onClick={() => {
                 if (isPracticing) {
+                  setSessionCardsOverride(null);
                   setIsPracticing(false);
                 } else {
                   onExitToLogin();
@@ -473,29 +498,38 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
               <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex justify-between text-xs text-[#7C68A5] mb-1.5 font-mono">
-                    <span>
-                      Learner: <strong className="text-[#3C2A63]">{currentLearner.student_name}</strong> • Question {currentCardIndex + 1} of {activeDeck.cards.length}
+                    <span className="flex items-center gap-2 flex-wrap">
+                      <span>
+                        Learner: <strong className="text-[#3C2A63]">{currentLearner.student_name}</strong> • Question {currentCardIndex + 1} of {activeSessionCards.length}
+                      </span>
+                      {sessionCardsOverride && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold">
+                          Ôn lại câu làm sai
+                        </span>
+                      )}
                     </span>
-                    <span>{Math.round(((currentCardIndex + 1) / activeDeck.cards.length) * 100)}%</span>
+                    <span>{Math.round(((currentCardIndex + 1) / Math.max(1, activeSessionCards.length)) * 100)}%</span>
                   </div>
                   <div className="w-full h-2.5 bg-purple-100 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-[#6B51A5] to-emerald-500 transition-all duration-300 rounded-full"
-                      style={{ width: `${((currentCardIndex + 1) / activeDeck.cards.length) * 100}%` }}
+                      style={{ width: `${((currentCardIndex + 1) / Math.max(1, activeSessionCards.length)) * 100}%` }}
                     />
                   </div>
                 </div>
               </div>
 
               {/* Active Card in Light Theme */}
-              <PracticeCardView
-                card={activeDeck.cards[currentCardIndex]}
-                cardIndex={currentCardIndex}
-                totalCards={activeDeck.cards.length}
-                onNext={handleNextCard}
-                isLast={currentCardIndex === activeDeck.cards.length - 1}
-                isMastered={Boolean(userStats.cards_state[activeDeck.cards[currentCardIndex]?.id]?.mastered)}
-              />
+              {activeSessionCards[currentCardIndex] && (
+                <PracticeCardView
+                  card={activeSessionCards[currentCardIndex]}
+                  cardIndex={currentCardIndex}
+                  totalCards={activeSessionCards.length}
+                  onNext={handleNextCard}
+                  isLast={currentCardIndex === activeSessionCards.length - 1}
+                  isMastered={Boolean(userStats.cards_state[activeSessionCards[currentCardIndex]?.id]?.mastered)}
+                />
+              )}
             </div>
           ) : (
             
@@ -516,7 +550,7 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
                 <div className="p-4 bg-[#F5F2F9] rounded-2xl border border-purple-100 text-center">
                   <span className="text-xs text-[#7C68A5] block">Score</span>
                   <span className="text-2xl font-black text-[#6B51A5] font-mono">
-                    {Object.values(sessionResults).filter(Boolean).length} / {activeDeck.cards.length}
+                    {Object.values(sessionResults).filter(Boolean).length} / {activeSessionCards.length}
                   </span>
                 </div>
                 <div className="p-4 bg-[#F5F2F9] rounded-2xl border border-purple-100 text-center">
@@ -534,21 +568,37 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
                 </p>
               )}
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => handleStartPractice()}
-                  className="flex-1 py-2.5 bg-[#F5F2F9] hover:bg-purple-100 text-[#503A7A] border border-purple-200 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>Practice Again</span>
-                </button>
+              <div className="space-y-2.5">
+                {missedCards.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleRetryMissedCards}
+                    className="w-full py-2.5 px-4 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-2xl text-xs font-extrabold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                  >
+                    <RotateCcw className="w-4 h-4 text-amber-700" />
+                    <span>Ôn lại các câu làm sai ({missedCards.length})</span>
+                  </button>
+                )}
 
-                <button
-                  onClick={() => setIsPracticing(false)}
-                  className="flex-1 py-2.5 bg-[#6B51A5] hover:bg-[#503A7A] text-white rounded-2xl text-xs font-bold transition shadow-md shadow-[#6B51A5]/20 cursor-pointer"
-                >
-                  Back to Library
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleStartPractice()}
+                    className="flex-1 py-2.5 bg-[#F5F2F9] hover:bg-purple-100 text-[#503A7A] border border-purple-200 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Practice Again</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setSessionCardsOverride(null);
+                      setIsPracticing(false);
+                    }}
+                    className="flex-1 py-2.5 bg-[#6B51A5] hover:bg-[#503A7A] text-white rounded-2xl text-xs font-bold transition shadow-md shadow-[#6B51A5]/20 cursor-pointer"
+                  >
+                    Back to Library
+                  </button>
+                </div>
               </div>
             </div>
           )

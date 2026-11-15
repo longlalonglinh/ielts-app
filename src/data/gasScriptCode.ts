@@ -321,10 +321,120 @@ function compactSheet_(sheet, minBufferRows) {
   return { trimmedRows: trimmedRows, trimmedCols: trimmedCols };
 }
 
+function repairSheetsHeaders_(ss) {
+  var specs = [
+    {
+      name: 'EXAMS',
+      bg: '#e2e8f0',
+      headers: [
+        'EXAM_CODE', 'TITLE', 'TEST_TYPE', 'DURATION_MINS',
+        'AUDIO_URL', 'READING_PASSAGE', 'WRITING_TASK1_PROMPT', 'WRITING_TASK2_PROMPT',
+        'WRITING_TASK1_IMAGE', 'AUDIO_TITLE', 'CREATED_AT'
+      ]
+    },
+    {
+      name: 'QUESTIONS',
+      bg: '#e2e8f0',
+      headers: [
+        'EXAM_CODE', 'QUESTION_ID', 'SECTION', 'QUESTION_TEXT',
+        'QUESTION_TYPE', 'OPTIONS_JSON', 'CORRECT_ANSWER', 'MAX_SCORE'
+      ]
+    },
+    {
+      name: 'SUBMISSIONS',
+      bg: '#e2e8f0',
+      headers: [
+        'SUBMISSION_ID', 'SBD', 'STUDENT_NAME', 'EXAM_CODE', 'TEST_MODE',
+        'LISTENING_RAW', 'LISTENING_BAND', 'READING_RAW', 'READING_BAND',
+        'WRITING_TASK1_TEXT', 'WRITING_TASK2_TEXT', 'ANSWERS_JSON', 'WRITING_SCORES_JSON',
+        'WRITING_BAND', 'OVERALL_BAND', 'STATUS', 'SUBMITTED_AT', 'VIOLATIONS_COUNT'
+      ]
+    },
+    {
+      name: 'CHEATLOGS',
+      bg: '#e2e8f0',
+      headers: [
+        'LOG_ID', 'SUBMISSION_ID', 'SBD', 'EXAM_CODE',
+        'VIOLATION_TYPE', 'VIOLATION_COUNT', 'TIMESTAMP'
+      ]
+    },
+    {
+      name: 'PRACTICE_QUESTIONS',
+      bg: '#c7d2fe',
+      headers: PRACTICE_HEADERS
+    },
+    {
+      name: 'STUDENT_PROGRESS',
+      bg: '#ede9fe',
+      headers: PROGRESS_HEADERS
+    }
+  ];
+
+  var repaired = [];
+  for (var i = 0; i < specs.length; i++) {
+    var spec = specs[i];
+    var sh = ss.getSheetByName(spec.name) || ss.insertSheet(spec.name);
+    var cols = spec.headers.length;
+    if (sh.getLastRow() === 0) {
+      sh.getRange(1, 1, 1, cols).setValues([spec.headers]).setFontWeight('bold').setBackground(spec.bg);
+      sh.setFrozenRows(1);
+      repaired.push(spec.name + ':created');
+      continue;
+    }
+
+    var row1 = sh.getRange(1, 1, 1, cols).getValues()[0];
+    var firstCell = String(row1[0] || '').trim().toUpperCase();
+    var secondCell = String(row1[1] || '').trim().toUpperCase();
+    var expectedFirst = String(spec.headers[0] || '').trim().toUpperCase();
+    var expectedSecond = String(spec.headers[1] || '').trim().toUpperCase();
+
+    if (firstCell !== expectedFirst || secondCell !== expectedSecond) {
+      // Missing or misaligned Row 1 header (e.g. data started at Row 1 or vertical header artifact)
+      sh.insertRowBefore(1);
+      sh.getRange(1, 1, 1, cols).setValues([spec.headers]).setFontWeight('bold').setBackground(spec.bg);
+      sh.setFrozenRows(1);
+      repaired.push(spec.name + ':header_repaired');
+    } else {
+      sh.setFrozenRows(1);
+    }
+  }
+  return repaired;
+}
+
 function optimizeSheetsStorage() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetNames = ['EXAMS', 'QUESTIONS', 'SUBMISSIONS', 'CHEATLOGS', 'PRACTICE_QUESTIONS', 'STUDENT_PROGRESS'];
   var report = {};
+  var repairedHeaders = repairSheetsHeaders_(ss);
+
+  // Deduplicate EXAMS by EXAM_CODE (keep newest / last row)
+  var sheetE = getFlexibleSheet(ss, ['EXAMS', 'Exams', 'exams']);
+  var dedupedExams = 0;
+  if (sheetE && sheetE.getLastRow() > 2) {
+    var lastERow = sheetE.getLastRow();
+    var dataE = sheetE.getRange(2, 1, lastERow - 1, 11).getValues();
+    var seenExamMap = {};
+    var uniqueExamsRev = [];
+    for (var ei = dataE.length - 1; ei >= 0; ei--) {
+      var eCodeKey = String(dataE[ei][0] || '').trim().toUpperCase();
+      if (!eCodeKey) continue;
+      if (!seenExamMap[eCodeKey]) {
+        seenExamMap[eCodeKey] = true;
+        uniqueExamsRev.push(normalizeRowWidth_(dataE[ei], 11));
+      } else {
+        dedupedExams++;
+      }
+    }
+    if (dedupedExams > 0) {
+      uniqueExamsRev.reverse();
+      if (uniqueExamsRev.length > 0) {
+        sheetE.getRange(2, 1, uniqueExamsRev.length, 11).setValues(uniqueExamsRev);
+      }
+      if (dataE.length > uniqueExamsRev.length) {
+        sheetE.getRange(2 + uniqueExamsRev.length, 1, dataE.length - uniqueExamsRev.length, 11).clearContent();
+      }
+    }
+  }
 
   // Deduplicate SUBMISSIONS by SUBMISSION_ID (keep newest / last row)
   var sheetS = getFlexibleSheet(ss, ['SUBMISSIONS', 'Submissions', 'submissions']);
@@ -366,6 +476,8 @@ function optimizeSheetsStorage() {
   return {
     status: 'success',
     success: true,
+    repaired_headers: repairedHeaders,
+    deduplicated_exams: dedupedExams,
     deduplicated_submissions: dedupedCount,
     compacted: report
   };
@@ -1409,6 +1521,39 @@ function doPost(e) {
         success: true,
         deck_id: delDeckId,
         message: 'Practice deck deleted from Google Sheets successfully!'
+      };
+    }
+
+    // 5C. LOG CHEAT / PROCTORING EVENT (Batch append to 7-column CHEATLOGS tab)
+    else if (action === 'logcheat' || action === 'savecheatlog') {
+      var sheetCheatlogs = ensureSheetWithHeader_(ss, 'CHEATLOGS', [
+        'LOG_ID', 'SUBMISSION_ID', 'SBD', 'EXAM_CODE',
+        'VIOLATION_TYPE', 'VIOLATION_COUNT', 'TIMESTAMP'
+      ], "#e2e8f0");
+
+      var cheatLogId = String(payload.log_id || ('LOG_' + Date.now())).trim();
+      var cheatSubId = String(payload.submission_id || '').trim();
+      var cheatSbd = sanitizeCell_(payload.sbd || 'CANDIDATE', 100, true);
+      var cheatExamCode = sanitizeCell_((payload.exam_code || 'EXAM').toString().trim().toUpperCase(), 50, true);
+      var cheatViolation = sanitizeCell_(payload.violation_type || 'PROCTORING_EVENT', 500, true);
+      var cheatCount = Number(payload.violation_count || payload.violations_count || 1);
+      var cheatTimestamp = payload.timestamp || Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd HH:mm:ss");
+
+      batchAppendRows_(sheetCheatlogs, [[
+        cheatLogId,
+        cheatSubId,
+        cheatSbd,
+        cheatExamCode,
+        cheatViolation,
+        cheatCount,
+        cheatTimestamp
+      ]], 7);
+
+      response = {
+        status: 'success',
+        success: true,
+        log_id: cheatLogId,
+        message: 'Cheat log recorded in CHEATLOGS sheet.'
       };
     }
 
