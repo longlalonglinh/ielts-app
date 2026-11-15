@@ -33,7 +33,7 @@ import {
   parsePdfWithServerGemini
 } from '../../services/gemini';
 import { ExamTestReport, verifyAndOptimizeExam } from '../../services/examVerification';
-import { saveExamToServerDb, uploadAndParseIeltsPdf } from '../../services/api';
+import { saveExamToServerDb, saveExamWithSyncStatus, uploadAndParseIeltsPdf } from '../../services/api';
 import { saveExamToIndexedDB } from '../../services/indexedDb';
 import { sanitizeExamForSkills } from '../../utils/examUtils';
 import { transpileFromCbtEngineSchema } from '../../services/documentExamParser';
@@ -42,6 +42,7 @@ interface UploadModuleProps {
   onParsedData: (data: ExamData) => void;
   onNavigateToPreview?: () => void;
   onTakeExamNow?: (exam: ExamData) => void;
+  gasUrl?: string;
 }
 
 const PRESET_TOPICS = [
@@ -106,7 +107,8 @@ const PRESET_TOPICS = [
 export const UploadModule: React.FC<UploadModuleProps> = ({ 
   onParsedData, 
   onNavigateToPreview,
-  onTakeExamNow 
+  onTakeExamNow,
+  gasUrl
 }) => {
   // Generator Mode Tab: 'generator' (Smart AI) vs 'document' (PDF/Text)
   const [activeMode, setActiveMode] = useState<'generator' | 'document'>('generator');
@@ -206,7 +208,11 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
       setCurrentStep('4/4 Simulating student auto-grading with 100% solvability guarantee...');
       await new Promise(r => setTimeout(r, 300));
 
-      const sanitized = sanitizeExamForSkills(res.exam);
+      const sanitized = sanitizeExamForSkills({
+        ...res.exam,
+        status: 'published',
+        is_draft: false
+      });
       setGeneratedExam(sanitized);
       setTestReport(res.testReport);
       setRawJsonOutput(JSON.stringify(sanitized, null, 2));
@@ -217,10 +223,18 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
       // Propagate to main application state
       onParsedData(sanitized);
 
-      // Persist to Server DB asynchronously
-      saveExamToServerDb(sanitized).catch(() => {});
-
-      setSaveSuccessMsg(`Exam ${sanitized.exam_code} successfully verified and saved to Central Database.`);
+      // Persist to Server DB & relay to Google Sheets
+      const srvRes = await saveExamWithSyncStatus(sanitized, gasUrl);
+      if (srvRes.sheets_synced) {
+        setSaveSuccessMsg(`Exam ${sanitized.exam_code} verified, saved to Server & synced to Google Sheets!`);
+      } else if (srvRes.ok) {
+        setSaveSuccessMsg(`Exam ${sanitized.exam_code} verified & saved to Server (học sinh mọi máy đã làm bài được).`);
+        if (srvRes.sheets_error) {
+          setErrorMsg(`Chưa ghi được lên Google Sheets: ${srvRes.sheets_error}`);
+        }
+      } else {
+        setSaveSuccessMsg(`Exam ${sanitized.exam_code} saved locally in browser IndexedDB.`);
+      }
     } catch (err: any) {
       console.error('Error generating exam:', err);
       setErrorMsg(err.message || 'Error generating IELTS exam via AI. Please check your network connection.');
@@ -325,9 +339,9 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
       const totalQs = (sanitized.reading_questions?.length || 0) + (sanitized.listening_questions?.length || 0) + (sanitized.questions?.length || 0);
       const isWritingOnly = Boolean((sanitized.writing_task1_prompt || sanitized.writing_task2_prompt) && totalQs <= 2);
       if (isWritingOnly && (sanitized.writing_task1_prompt || sanitized.writing_task2_prompt)) {
-        setSaveSuccessMsg(`Successfully extracted IELTS Writing Exam "${sanitized.title}" (Task 1 & Task 2). Auto-saved to draft (student access restricted).`);
+        setSaveSuccessMsg(`Extracted Writing Exam "${sanitized.title}" as DRAFT on Server. Click "Publish" to release to students & write to Google Sheet.`);
       } else {
-        setSaveSuccessMsg(`Successfully extracted ${totalQs} questions from document "${sanitized.title}". Auto-saved to secure draft.`);
+        setSaveSuccessMsg(`Extracted ${totalQs} questions from "${sanitized.title}" as DRAFT on Server. Click "Publish" to release to students & write to Google Sheet.`);
       }
     } catch (err: any) {
       console.error('Error parsing document:', err);
@@ -342,6 +356,8 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
   const handlePublishToDatabase = async () => {
     if (!generatedExam) return;
     setLoading(true);
+    setErrorMsg(null);
+    setSaveSuccessMsg(null);
     try {
       const published = sanitizeExamForSkills({
         ...generatedExam,
@@ -349,12 +365,20 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
         is_draft: false,
         updated_at: new Date().toISOString()
       });
-      await saveExamToServerDb(published);
       await saveExamToIndexedDB(published);
+      const srvRes = await saveExamWithSyncStatus(published, gasUrl);
       setGeneratedExam(published);
       onParsedData(published);
-      setSaveSuccessMsg(`🎉 Exam [${published.exam_code}] published! Students can now enter the exam room.`);
-      setTimeout(() => setSaveSuccessMsg(null), 5000);
+      if (srvRes.sheets_synced) {
+        setSaveSuccessMsg(`🎉 Đã xuất bản đề [${published.exam_code}] lên Server và ghi vào Google Sheets (EXAMS & QUESTIONS)!`);
+      } else if (srvRes.ok) {
+        setSaveSuccessMsg(`✅ Đã xuất bản đề [${published.exam_code}] lên Server (học sinh ở máy khác đã có thể mở làm bài).`);
+        if (srvRes.sheets_error) {
+          setErrorMsg(`⚠️ Chưa ghi được lên Google Sheets: ${srvRes.sheets_error}`);
+        }
+      } else {
+        setErrorMsg(`Không kết nối được Server: ${srvRes.sheets_error || 'Unknown error'}`);
+      }
     } catch (e: any) {
       setErrorMsg('Failed to publish to server database: ' + e.message);
     } finally {

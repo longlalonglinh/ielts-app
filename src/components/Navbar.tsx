@@ -77,35 +77,35 @@ export const Navbar: React.FC<NavbarProps> = ({
   const CurrentTabIcon = currentTabObj.icon;
 
   return (
-    <header className="bg-white/95 backdrop-blur-md border-b border-purple-100/80 text-[#3C2A63] sticky top-0 z-40 shadow-sm transition-all">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-2">
+    <header className="w-full max-w-full overflow-x-clip bg-white/95 backdrop-blur-md border-b border-purple-100/80 text-[#3C2A63] sticky top-0 z-40 shadow-sm transition-all">
+      <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 gap-1.5 sm:gap-2 min-w-0">
           
           {/* Left: Brand Title & Mobile Menu Trigger */}
-          <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+          <div className="flex items-center space-x-1.5 sm:space-x-3 min-w-0 shrink">
             {activeView === 'admin' && (
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#6B51A5] border border-purple-200 transition cursor-pointer"
+                className="lg:hidden p-1.5 sm:p-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#6B51A5] border border-purple-200 transition cursor-pointer shrink-0"
                 aria-label="Toggle Admin Navigation Menu"
               >
-                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
             )}
 
-            <div className="select-none cursor-default">
-              <div className="flex items-center gap-1.5">
-                <h1 className="text-base sm:text-xl font-black tracking-tight text-[#3C2A63] cursor-default">
+            <div className="select-none cursor-default min-w-0">
+              <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                <h1 className="text-sm sm:text-xl font-black tracking-tight text-[#3C2A63] cursor-default truncate">
                   EO EO Testing
                 </h1>
                 {activeView === 'admin' && (
-                  <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-md bg-purple-100 text-[#6B51A5] border border-purple-200 shrink-0">
+                  <span className="text-[9px] sm:text-[10px] uppercase tracking-wider font-extrabold px-1.5 sm:px-2 py-0.5 rounded-md bg-purple-100 text-[#6B51A5] border border-purple-200 shrink-0">
                     Admin
                   </span>
                 )}
               </div>
-              <p className="text-[11px] font-medium text-[#7C68A5] hidden xs:block truncate max-w-[150px] sm:max-w-none">
+              <p className="text-[11px] font-medium text-[#7C68A5] hidden sm:block truncate max-w-[150px] xl:max-w-none">
                 {activeView === 'student' ? 'Student Exam Interface' : 'Teacher & Admin Management'}
               </p>
             </div>
@@ -134,7 +134,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Admin Desktop Sub-Tabs */}
           {activeView === 'admin' && (
-            <div className="hidden lg:flex items-center space-x-1 bg-[#E2DDEC] p-1.5 rounded-2xl">
+            <div className="hidden lg:flex items-center space-x-1 bg-[#E2DDEC] p-1 rounded-2xl min-w-0 overflow-x-auto scrollbar-none">
               {adminTabsConfig.map((tab) => {
                 const IconComponent = tab.icon;
                 const isActive = adminTab === tab.id;
@@ -144,12 +144,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                     onClick={() => {
                       setAdminTab(tab.id as any);
                     }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    className={`px-2.5 xl:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
                       isActive ? 'bg-[#6B51A5] text-white shadow-md' : 'text-[#3C2A63] hover:text-[#503A7A]'
                     }`}
                   >
-                    <IconComponent className="w-3.5 h-3.5" />
-                    <span>{tab.label}</span>
+                    <IconComponent className="w-3.5 h-3.5 shrink-0" />
+                    <span className="2xl:hidden">{tab.shortLabel}</span>
+                    <span className="hidden 2xl:inline">{tab.label}</span>
                   </button>
                 );
               })}
@@ -157,17 +158,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               {onOpenDiagnostics && (
                 <button
                   onClick={onOpenDiagnostics}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 whitespace-nowrap"
+                  className="px-2.5 xl:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 whitespace-nowrap shrink-0"
                 >
-                  <Activity className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
-                  <span>DB Diagnostics</span>
+                  <Activity className="w-3.5 h-3.5 text-indigo-500 animate-pulse shrink-0" />
+                  <span className="2xl:hidden">DB Stats</span>
+                  <span className="hidden 2xl:inline">DB Diagnostics</span>
                 </button>
               )}
             </div>
           )}
 
           {/* Right Controls: View Switcher & Fullscreen */}
-          <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
+          <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
             
             {/* When in Admin mode: Return to Student view */}
             {activeView === 'admin' && (
@@ -176,10 +178,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setActiveView('student');
                   setMobileMenuOpen(false);
                 }}
-                className="px-3 py-1.5 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-sm bg-purple-100 text-[#503A7A] border border-purple-300/80 hover:bg-purple-200"
+                className="px-2 sm:px-3 py-1.5 rounded-xl sm:rounded-2xl text-xs font-black transition-all flex items-center gap-1 sm:gap-1.5 cursor-pointer shadow-sm bg-purple-100 text-[#503A7A] border border-purple-300/80 hover:bg-purple-200 whitespace-nowrap"
                 title="Return to Student View"
               >
-                <BookOpen className="w-3.5 h-3.5" />
+                <BookOpen className="w-3.5 h-3.5 shrink-0" />
                 <span className="hidden sm:inline">Student View</span>
                 <span className="sm:hidden">Student</span>
               </button>
@@ -192,7 +194,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <button
                     type="button"
                     onClick={onToggleFocusFlowMode}
-                    className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                    className={`px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
                       isFocusFlowMode
                         ? 'bg-purple-900 text-purple-100 border-purple-700 shadow-inner'
                         : 'bg-[#E2DDEC] hover:bg-[#D9D3E4] text-[#3C2A63] border-purple-200'
@@ -209,7 +211,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <button
                     type="button"
                     onClick={onTriggerExit}
-                    className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200/80 hover:border-rose-200"
+                    className="px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200/80 hover:border-rose-200"
                     title="Exit Exam (Progress preserved safely)"
                     aria-label="Exit exam"
                   >
@@ -224,20 +226,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={onTriggerReload}
-                className="p-2 rounded-xl bg-[#E2DDEC] hover:bg-[#D9D3E4] text-[#3C2A63] transition-all cursor-pointer"
+                className="p-1.5 sm:p-2 rounded-xl bg-[#E2DDEC] hover:bg-[#D9D3E4] text-[#3C2A63] transition-all cursor-pointer"
                 title="Reload Page"
                 aria-label="Reload Page"
               >
-                <RotateCcw className="w-4 h-4" />
+                <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
             )}
 
             <button
               onClick={toggleFullscreen}
-              className="p-2 rounded-xl bg-[#E2DDEC] hover:bg-[#D9D3E4] text-[#3C2A63] transition-all cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-xl bg-[#E2DDEC] hover:bg-[#D9D3E4] text-[#3C2A63] transition-all cursor-pointer"
               title="Fullscreen"
             >
-              <Maximize2 className="w-4 h-4" />
+              <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </div>
 

@@ -528,17 +528,40 @@ export function getStoredPracticeDecks(): any[] {
 
 export function saveStoredPracticeDeck(deck: any): any {
   const decks = getStoredPracticeDecks();
-  const deckId = deck.deck_id || `DECK_${Date.now()}`;
+  const deckId = String(deck.deck_id || deck.id || deck.code || `DECK_${Date.now()}`).trim().toUpperCase();
   const record = { ...deck, deck_id: deckId, updated_at: new Date().toISOString() };
 
-  const idx = decks.findIndex((d: any) => d.deck_id === deckId);
+  const idx = decks.findIndex((d: any) => String(d.deck_id || '').trim().toUpperCase() === deckId);
   if (idx >= 0) {
     decks[idx] = record;
   } else {
-    decks.push(record);
+    decks.unshift(record);
   }
 
   cachedPracticeDecks = decks;
   safeWriteJson(PRACTICE_DECKS_FILE, decks);
   return record;
+}
+
+export function deleteStoredPracticeDeck(deckId: string): boolean {
+  const cleanId = String(deckId || '').trim().toUpperCase();
+  if (!cleanId) return false;
+  const decks = getStoredPracticeDecks();
+  const next = decks.filter((d: any) => String(d.deck_id || '').trim().toUpperCase() !== cleanId);
+  if (next.length === decks.length) return false;
+  cachedPracticeDecks = next;
+  safeWriteJson(PRACTICE_DECKS_FILE, next);
+  return true;
+}
+
+export function replaceStoredPracticeDecks(decks: any[]): any[] {
+  const now = new Date().toISOString();
+  const normalized = (Array.isArray(decks) ? decks : []).map((d: any, idx: number) => ({
+    ...d,
+    deck_id: String(d.deck_id || d.id || d.code || `DECK_${Date.now()}_${idx}`).trim().toUpperCase(),
+    updated_at: d.updated_at || now
+  }));
+  cachedPracticeDecks = normalized;
+  safeWriteJson(PRACTICE_DECKS_FILE, normalized);
+  return normalized;
 }

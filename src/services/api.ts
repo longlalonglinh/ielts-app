@@ -1889,7 +1889,7 @@ export async function fetchPracticeDecksFromGAS(
     return { success: true, is_initialized: true, decks: idbDecks };
   }
 
-  return { success: false, error: 'Unable to retrieve practice database from Google Sheets' };
+  return { success: false, error: 'Unable to retrieve practice database from Google Sheets (kiểm tra đã cập nhật mã GAS v3 ở tab GAS Backend chưa).' };
 }
 
 /**
@@ -1899,15 +1899,14 @@ export async function initPracticeDatabaseInGAS(
   apiUrl: string,
   decks: CustomPracticeDeck[],
   mode: 'replace_all' | 'append' = 'replace_all'
-): Promise<{ success: boolean; message?: string; total_cards?: number; error?: string }> {
+): Promise<{ success: boolean; message?: string; total_cards?: number; error?: string; is_opaque?: boolean }> {
   // Always backup to IndexedDB
   await savePracticeDecksToIndexedDB(decks);
 
   if (!apiUrl || apiUrl.includes('mock_ielts_exam_system_gas_url') || apiUrl.includes('AKfycbx_mock')) {
     return { 
-      success: true, 
-      message: 'Practice decks saved into IndexedDB offline vault successfully!', 
-      total_cards: decks.reduce((acc, d) => acc + (d.cards?.length || 0), 0)
+      success: false, 
+      error: 'Google Apps Script URL chưa được cấu hình.'
     };
   }
 
@@ -1918,16 +1917,23 @@ export async function initPracticeDatabaseInGAS(
       decks
     };
     const result = await postToGasWithLockRetry(apiUrl, payload, 2);
-    if (result && (result.status === 'success' || result.success || result.is_opaque)) {
+    if (result && (result.status === 'success' || result.success === true)) {
       return {
         success: true,
         message: result.message || 'Đã khởi tạo và đồng bộ tab PRACTICE_QUESTIONS trên Google Sheets thành công!',
         total_cards: result.total_cards ?? decks.reduce((acc, d) => acc + (d.cards?.length || 0), 0)
       };
     }
+    if (result && result.is_opaque) {
+      return {
+        success: false,
+        is_opaque: true,
+        error: 'Trình duyệt bị CORS chặn đọc phản hồi từ Google Apps Script (no-cors), không xác nhận được Sheet đã ghi hay chưa.'
+      };
+    }
     return {
       success: false,
-      error: result?.message || result?.error || 'Lỗi khởi tạo từ Google Apps Script.'
+      error: result?.error || result?.message || 'Lỗi khởi tạo từ Google Apps Script.'
     };
   } catch (err: any) {
     console.warn('initPracticeDatabaseInGAS failed:', err);
@@ -1944,12 +1950,12 @@ export async function initPracticeDatabaseInGAS(
 export async function savePracticeDeckToGAS(
   apiUrl: string,
   deck: CustomPracticeDeck
-): Promise<{ success: boolean; message?: string; error?: string }> {
+): Promise<{ success: boolean; message?: string; error?: string; is_opaque?: boolean }> {
   // Save to IndexedDB
   await savePracticeDecksToIndexedDB([deck]);
 
   if (!apiUrl || apiUrl.includes('mock_ielts_exam_system_gas_url') || apiUrl.includes('AKfycbx_mock')) {
-    return { success: true, message: 'Practice deck saved to IndexedDB offline vault!' };
+    return { success: false, error: 'Google Apps Script URL chưa được cấu hình.' };
   }
 
   try {
@@ -1959,15 +1965,22 @@ export async function savePracticeDeckToGAS(
       deck
     };
     const result = await postToGasWithLockRetry(apiUrl, payload, 2);
-    if (result && (result.status === 'success' || result.success || result.is_opaque)) {
+    if (result && (result.status === 'success' || result.success === true)) {
       return {
         success: true,
         message: result.message || 'Đã lưu bộ đề lên Google Sheets thành công!'
       };
     }
+    if (result && result.is_opaque) {
+      return {
+        success: false,
+        is_opaque: true,
+        error: 'Trình duyệt bị CORS chặn đọc phản hồi từ Google Apps Script (no-cors).'
+      };
+    }
     return {
       success: false,
-      error: result?.message || result?.error || 'Không thể lưu bộ đề lên Google Sheets'
+      error: result?.error || result?.message || 'Không thể lưu bộ đề lên Google Sheets'
     };
   } catch (err: any) {
     console.warn('savePracticeDeckToGAS failed:', err);
@@ -2043,21 +2056,74 @@ export async function fetchStudentProgressFromGAS(
 }
 
 /**
- * Persist an exam to the Centralized Server Database (/api/exams)
- * Ensures any exam created or downloaded is instantly available across all devices.
+ * Persist an exam to the Centralized Server Database (/api/exams) and relay published exams to Google Sheets.
+ * Returns detailed server + Google Sheets sync outcome for honest Admin UI feedback.
  */
-export async function saveExamToServerDb(exam: ExamData): Promise<boolean> {
+export async function saveExamWithSyncStatus(
+  exam: ExamData,
+  gasUrl?: string
+): Promise<{ ok: boolean; sheets_synced: boolean; sheets_error?: string; is_draft?: boolean }> {
   try {
     const res = await fetch(getApiUrl('/api/exams'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(exam)
+      body: JSON.stringify(gasUrl ? { ...exam, gas_url: gasUrl } : exam)
     });
-    return res.ok;
-  } catch (err) {
+    if (!res.ok) {
+      return { ok: false, sheets_synced: false, sheets_error: `Server HTTP ${res.status}` };
+    }
+    const data = await res.json().catch(() => ({}));
+    return {
+      ok: Boolean(data?.success !== false),
+      sheets_synced: Boolean(data?.sheets_synced),
+      sheets_error: data?.sheets_error,
+      is_draft: Boolean(data?.is_draft)
+    };
+  } catch (err: any) {
     console.warn('Could not save exam to server DB:', err);
+    return { ok: false, sheets_synced: false, sheets_error: err?.message || 'Server unreachable' };
+  }
+}
+
+export async function saveExamToServerDb(exam: ExamData): Promise<boolean> {
+  const outcome = await saveExamWithSyncStatus(exam);
+  return outcome.ok;
+}
+
+export async function checkServerHealth(): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(getApiUrl('/api/health'), { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    return Boolean(data && data.status === 'ok');
+  } catch {
     return false;
   }
+}
+
+export async function fetchPublishedCatalog(): Promise<Array<{
+  exam_code: string;
+  title: string;
+  exam_type?: string;
+  test_type?: string;
+  skills?: string[];
+  has_writing?: boolean;
+}>> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(getApiUrl('/api/exams'), { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) return [];
+    const data = await res.json().catch(() => null);
+    if (data && data.success && Array.isArray(data.exams)) {
+      return data.exams;
+    }
+  } catch {}
+  return [];
 }
 
 /**

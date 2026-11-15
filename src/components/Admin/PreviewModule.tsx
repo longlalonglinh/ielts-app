@@ -40,7 +40,7 @@ import {
   safeSaveExamListToLocalStorage, 
   safeSaveCurrentExamToLocalStorage 
 } from '../../services/indexedDb';
-import { saveExamToServerDb, saveServerConfig, fetchServerConfig, postToGasWithLockRetry } from '../../services/api';
+import { saveExamToServerDb, saveExamWithSyncStatus, saveServerConfig, fetchServerConfig, postToGasWithLockRetry } from '../../services/api';
 import { 
   getStoredSpreadsheetId, 
   setStoredSpreadsheetId, 
@@ -78,6 +78,7 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
   const [builderInitialExam, setBuilderInitialExam] = useState<ExamData>(currentInitial);
   const [activeTab, setActiveTab] = useState<'builder' | 'cbt_preview' | 'vault' | 'preview'>('builder');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveFeedback, setSaveFeedback] = useState<{ type: 'success' | 'warning' | 'error'; message: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Sync if prop initialExamData changes externally
@@ -251,12 +252,13 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
     const sanitizedExam = sanitizeExamForSkills(updatedExam);
     setExam(sanitizedExam);
     setSaveStatus('saving');
+    setSaveFeedback(null);
 
     // Dual persist in IndexedDB
     await saveExamToIndexedDB(sanitizedExam);
 
-    // Save to Centralized Server Database so all devices can access immediately
-    await saveExamToServerDb(sanitizedExam);
+    // Save to Centralized Server Database & relay published exam to Google Sheets
+    const srvRes = await saveExamWithSyncStatus(sanitizedExam, gasUrl);
 
     // Dual persist in localStorage (stripped of heavy base64 to avoid 5MB quota limit)
     try {
@@ -279,19 +281,78 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
       onSaveToGas(sanitizedExam);
     }
 
-    // Direct push to GAS with 302/CORS & lock retry resilience
+    if (srvRes.ok) {
+      if (srvRes.is_draft) {
+        setSaveStatus('saved');
+        setSaveFeedback({
+          type: 'warning',
+          message: `Đã lưu bản Nháp [${sanitizedExam.exam_code}] trên Server. Học sinh chưa vào làm được và Google Sheet chưa ghi — hãy bấm "Publish for Students" để xuất bản.`
+        });
+      } else if (srvRes.sheets_synced) {
+        setSaveStatus('saved');
+        setSaveFeedback({
+          type: 'success',
+          message: `Đã xuất bản [${sanitizedExam.exam_code}] lên Server và đồng bộ thành công vào Google Sheets (EXAMS & QUESTIONS)!`
+        });
+      } else {
+        setSaveStatus('error');
+        setSaveFeedback({
+          type: 'warning',
+          message: `Đã xuất bản [${sanitizedExam.exam_code}] trên Server (học sinh mọi máy đã làm bài được), NHƯNG chưa ghi được lên Google Sheets: ${srvRes.sheets_error || 'Kiểm tra lại URL/phiên bản GAS Backend.'}`
+        });
+      }
+      setTimeout(() => setSaveStatus('idle'), 3500);
+      return;
+    }
+
+    // Fallback when running as Pure Static SPA without Express server
+    const isDraft = sanitizedExam.status === 'draft' || Boolean(sanitizedExam.is_draft);
+    if (isDraft) {
+      setSaveStatus('saved');
+      setSaveFeedback({
+        type: 'warning',
+        message: `Đã lưu bản Nháp [${sanitizedExam.exam_code}] cục bộ. Bấm "Publish for Students" để đẩy lên Google Sheets.`
+      });
+      setTimeout(() => setSaveStatus('idle'), 3000);
+      return;
+    }
+
     try {
       if (gasUrl && !gasUrl.includes('AKfycbx_mock')) {
-        await postToGasWithLockRetry(gasUrl, {
+        const gasRes = await postToGasWithLockRetry(gasUrl, {
           action: 'upload_exam',
           exam_data: sanitizedExam
         }, 2);
+        if (gasRes && !gasRes.is_opaque && (gasRes.success === true || gasRes.status === 'success')) {
+          setSaveStatus('saved');
+          setSaveFeedback({
+            type: 'success',
+            message: `Đã gửi đề [${sanitizedExam.exam_code}] lên Google Sheets thành công!`
+          });
+        } else {
+          setSaveStatus('error');
+          setSaveFeedback({
+            type: 'warning',
+            message: gasRes?.is_opaque
+              ? `Đã gửi [${sanitizedExam.exam_code}] qua chế độ no-cors nhưng trình duyệt không đọc được xác nhận từ Google Sheets (kiểm tra quyền Web App "Anyone" và bản GAS V3.0).`
+              : `Google Sheets báo lỗi: ${gasRes?.error || gasRes?.message || 'Không thể ghi đề'}`
+          });
+        }
+      } else {
+        setSaveStatus('error');
+        setSaveFeedback({
+          type: 'warning',
+          message: 'Chưa kết nối Server và chưa cấu hình Google Apps Script URL hợp lệ.'
+        });
       }
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 3000);
-    } catch {
-      setSaveStatus('saved'); // Offline / IndexedDB fallback preserved
-      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch (err: any) {
+      setSaveStatus('error');
+      setSaveFeedback({
+        type: 'error',
+        message: `Lỗi kết nối Google Sheets: ${err?.message || 'Network error'}`
+      });
+    } finally {
+      setTimeout(() => setSaveStatus('idle'), 3500);
     }
   };
 
@@ -435,6 +496,33 @@ export const PreviewModule: React.FC<PreviewModuleProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Honest Server & Google Sheets Sync Feedback Banner */}
+      {saveFeedback && (
+        <div className={`p-4 rounded-2xl border text-xs font-semibold flex items-start justify-between gap-3 ${
+          saveFeedback.type === 'success'
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+            : saveFeedback.type === 'warning'
+            ? 'bg-amber-50 border-amber-300 text-amber-950'
+            : 'bg-rose-50 border-rose-200 text-rose-900'
+        }`}>
+          <div className="flex items-start gap-2">
+            {saveFeedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            ) : (
+              <XCircle className={`w-4 h-4 shrink-0 mt-0.5 ${saveFeedback.type === 'warning' ? 'text-amber-600' : 'text-rose-600'}`} />
+            )}
+            <span className="leading-relaxed">{saveFeedback.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSaveFeedback(null)}
+            className="text-xs font-black opacity-60 hover:opacity-100 px-1.5 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* ACTIVE TAB 1: VISUAL EXAM BUILDER (Preserve Form State via CSS hidden) */}
       <div className={activeTab === 'builder' ? 'block' : 'hidden'}>

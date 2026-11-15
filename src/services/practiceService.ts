@@ -126,27 +126,196 @@ export const practiceService = {
     return { is_on_sheets: false, total_cards: 0 };
   },
 
-  // Initialize PRACTICE_QUESTIONS tab on Google Sheets and push starter/custom decks
-  async initDatabaseOnSheets(gasUrl: string): Promise<{ success: boolean; message?: string; total_cards?: number; error?: string }> {
-    const all = this.getAllDecks();
-    const res = await initPracticeDatabaseInGAS(gasUrl, all, 'replace_all');
-    if (res.success) {
-      const totalCards = all.reduce((acc, d) => acc + (d.cards?.length || 0), 0);
-      localStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(all));
-      localStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
-        is_on_sheets: true,
-        total_cards: totalCards,
-        last_synced: new Date().toISOString()
-      }));
+  // Fetch practice decks from centralized Node.js Server (/api/practice-decks)
+  async fetchFromServer(gasUrl?: string): Promise<{ success: boolean; decks: CustomPracticeDeck[]; error?: string }> {
+    try {
+      const qs = gasUrl ? `?gas_url=${encodeURIComponent(gasUrl)}` : '';
+      const res = await fetch(getApiUrl(`/api/practice-decks${qs}`), {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!res.ok) {
+        return { success: false, decks: [], error: `Server returned HTTP ${res.status}` };
+      }
+      const json = await res.json();
+      const serverDecks: CustomPracticeDeck[] = Array.isArray(json?.data) ? json.data : [];
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_WIPE_FLAG, 'true');
+        localStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(serverDecks));
+        if (serverDecks.length > 0) {
+          const totalCards = serverDecks.reduce((acc, d) => acc + (d.cards?.length || 0), 0);
+          const curStatus = this.getDatabaseStatus();
+          localStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
+            ...curStatus,
+            total_cards: totalCards,
+            last_synced: new Date().toISOString()
+          }));
+        }
+      }
+      return { success: true, decks: serverDecks };
+    } catch (err: any) {
+      return { success: false, decks: [], error: err?.message || 'Unable to connect to server' };
     }
-    return res;
   },
 
-  // Fetch practice decks directly from Google Sheets tab PRACTICE_QUESTIONS
+  // Sync a single deck to Server (/api/practice-decks) AND Google Sheets (via server proxy, fallback GAS)
+  async syncDeckToServerAndSheets(
+    gasUrl: string,
+    deck: CustomPracticeDeck
+  ): Promise<{ success: boolean; server_saved: boolean; sheets_synced: boolean; sheets_error?: string; error?: string }> {
+    this.saveDeck(deck);
+    try {
+      const res = await fetch(getApiUrl('/api/practice-decks'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...deck, gas_url: gasUrl })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const sheetsSynced = Boolean(data?.sheets_synced);
+        if (sheetsSynced && typeof localStorage !== 'undefined') {
+          const totalCards = this.getAllDecks().reduce((acc, d) => acc + (d.cards?.length || 0), 0);
+          localStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
+            is_on_sheets: true,
+            total_cards: totalCards,
+            last_synced: new Date().toISOString()
+          }));
+        }
+        return {
+          success: true,
+          server_saved: true,
+          sheets_synced: sheetsSynced,
+          sheets_error: data?.sheets_error
+        };
+      }
+    } catch (err) {
+      console.warn('Server /api/practice-decks unavailable, falling back to direct GAS:', err);
+    }
+
+    const gasRes = await savePracticeDeckToGAS(gasUrl, deck);
+    return {
+      success: gasRes.success,
+      server_saved: false,
+      sheets_synced: gasRes.success,
+      sheets_error: gasRes.error,
+      error: gasRes.error
+    };
+  },
+
+  // Sync multiple decks (JSON import / full DB init) to Server AND Google Sheets
+  async syncBatchToServerAndSheets(
+    gasUrl: string,
+    decks: CustomPracticeDeck[],
+    replaceAll: boolean = false
+  ): Promise<{ success: boolean; server_saved: boolean; sheets_synced: boolean; sheets_error?: string; error?: string }> {
+    if (replaceAll && typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_WIPE_FLAG, 'true');
+      localStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(decks));
+    } else {
+      decks.forEach(d => this.saveDeck(d));
+    }
+
+    try {
+      const res = await fetch(getApiUrl('/api/practice-decks/batch'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decks, replace_all: replaceAll, gas_url: gasUrl })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const sheetsSynced = Boolean(data?.sheets_synced);
+        const totalCards = this.getAllDecks().reduce((acc, d) => acc + (d.cards?.length || 0), 0);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
+            is_on_sheets: sheetsSynced,
+            total_cards: totalCards,
+            last_synced: new Date().toISOString()
+          }));
+        }
+        return {
+          success: true,
+          server_saved: true,
+          sheets_synced: sheetsSynced,
+          sheets_error: data?.sheets_error
+        };
+      }
+    } catch (err) {
+      console.warn('Server /api/practice-decks/batch unavailable, falling back to direct GAS:', err);
+    }
+
+    const gasRes = await initPracticeDatabaseInGAS(gasUrl, decks, replaceAll ? 'replace_all' : 'append');
+    return {
+      success: gasRes.success,
+      server_saved: false,
+      sheets_synced: gasRes.success,
+      sheets_error: gasRes.error,
+      error: gasRes.error
+    };
+  },
+
+  async deleteDeckEverywhere(gasUrl: string, deckId: string): Promise<{ server_deleted: boolean; sheets_synced: boolean; sheets_error?: string }> {
+    this.deleteDeck(deckId);
+    try {
+      const qs = gasUrl ? `?gas_url=${encodeURIComponent(gasUrl)}` : '';
+      const res = await fetch(getApiUrl(`/api/practice-decks/${encodeURIComponent(deckId.trim().toUpperCase())}${qs}`), {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          server_deleted: true,
+          sheets_synced: Boolean(data?.sheets_synced),
+          sheets_error: data?.sheets_error
+        };
+      }
+    } catch {}
+    return { server_deleted: false, sheets_synced: false };
+  },
+
+  async clearAllPracticeDecksEverywhere(gasUrl: string): Promise<{ server_cleared: boolean; sheets_synced: boolean; sheets_error?: string }> {
+    this.clearAllPracticeDecks();
+    try {
+      const qs = gasUrl ? `?gas_url=${encodeURIComponent(gasUrl)}` : '';
+      const res = await fetch(getApiUrl(`/api/practice-decks${qs}`), { method: 'DELETE' });
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          server_cleared: true,
+          sheets_synced: Boolean(data?.sheets_synced),
+          sheets_error: data?.sheets_error
+        };
+      }
+    } catch {}
+    return { server_cleared: false, sheets_synced: false };
+  },
+
+  // Initialize PRACTICE_QUESTIONS tab on Google Sheets and push starter/custom decks
+  async initDatabaseOnSheets(gasUrl: string): Promise<{ success: boolean; message?: string; total_cards?: number; error?: string; server_saved?: boolean }> {
+    const all = this.getAllDecks();
+    const batchRes = await this.syncBatchToServerAndSheets(gasUrl, all, true);
+    const totalCards = all.reduce((acc, d) => acc + (d.cards?.length || 0), 0);
+    if (batchRes.sheets_synced) {
+      return {
+        success: true,
+        server_saved: batchRes.server_saved,
+        total_cards: totalCards,
+        message: 'Đã đồng bộ toàn bộ kho bài tập lên Server và tab PRACTICE_QUESTIONS trên Google Sheets thành công!'
+      };
+    }
+    return {
+      success: false,
+      server_saved: batchRes.server_saved,
+      total_cards: totalCards,
+      error: batchRes.sheets_error || batchRes.error || 'Chưa đồng bộ được lên Google Sheets.'
+    };
+  },
+
+  // Fetch practice decks directly from Google Sheets tab PRACTICE_QUESTIONS (and merge with server)
   async fetchFromSheets(gasUrl: string): Promise<{ success: boolean; decks?: CustomPracticeDeck[]; error?: string; is_initialized?: boolean }> {
     const res = await fetchPracticeDecksFromGAS(gasUrl);
     if (res.success) {
       const decks = res.decks || [];
+      localStorage.setItem(STORAGE_WIPE_FLAG, 'true');
       localStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(decks));
       const totalCards = decks.reduce((acc, d) => acc + (d.cards?.length || 0), 0);
       localStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
@@ -163,13 +332,24 @@ export const practiceService = {
     };
   },
 
-  // Save / push single deck to Google Sheets
-  async saveDeckToSheets(gasUrl: string, deck: CustomPracticeDeck): Promise<{ success: boolean; message?: string; error?: string }> {
-    this.saveDeck(deck);
-    return await savePracticeDeckToGAS(gasUrl, deck);
+  // Save / push single deck to Server + Google Sheets
+  async saveDeckToSheets(gasUrl: string, deck: CustomPracticeDeck): Promise<{ success: boolean; message?: string; error?: string; server_saved?: boolean }> {
+    const res = await this.syncDeckToServerAndSheets(gasUrl, deck);
+    if (res.sheets_synced) {
+      return {
+        success: true,
+        server_saved: res.server_saved,
+        message: `Đã lưu bộ đề [${deck.deck_id}] lên Server và Google Sheets thành công!`
+      };
+    }
+    return {
+      success: false,
+      server_saved: res.server_saved,
+      error: res.sheets_error || res.error || 'Không thể lưu bộ đề lên Google Sheets.'
+    };
   },
 
-  // Get single deck by ID or code, with optional GAS fetch
+  // Get single deck by ID or code, checking local, server, then GAS
   async getDeckById(deckId: string, gasUrl?: string): Promise<CustomPracticeDeck | null> {
     const cleanId = deckId.trim().toUpperCase();
 
@@ -178,7 +358,14 @@ export const practiceService = {
     const localDeck = all.find(d => d.deck_id.toUpperCase() === cleanId);
     if (localDeck) return localDeck;
 
-    // 2. Try fetching from GAS API if configured
+    // 2. Check centralized Server (/api/practice-decks)
+    const serverRes = await this.fetchFromServer(gasUrl);
+    if (serverRes.success && serverRes.decks.length > 0) {
+      const serverMatch = serverRes.decks.find(d => d.deck_id.toUpperCase() === cleanId);
+      if (serverMatch) return serverMatch;
+    }
+
+    // 3. Try fetching from GAS API if configured
     if (gasUrl && !gasUrl.includes('AKfycbx_mock')) {
       try {
         const url = `${gasUrl}?action=get_practice_deck&deck_code=${encodeURIComponent(cleanId)}`;
@@ -206,8 +393,9 @@ export const practiceService = {
       }
     }
 
-    // 3. Fallback: if not found, return first starter deck
-    return STARTER_PRACTICE_DECKS[0] || null;
+    // 4. Fallback: if not found, return first available deck
+    const refreshed = this.getAllDecks();
+    return refreshed[0] || STARTER_PRACTICE_DECKS[0] || null;
   },
 
   // Save or update custom deck

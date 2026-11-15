@@ -48,7 +48,8 @@ import {
   Download
 } from 'lucide-react';
 
-import { DEFAULT_API_URL, fetchExam, prefetchExam, submitExamPayload, syncPendingSubmissions, clearExamCache, clearSessionTimers, fetchServerConfig, saveServerConfig } from './services/api';
+import { DEFAULT_API_URL, fetchExam, prefetchExam, submitExamPayload, syncPendingSubmissions, clearExamCache, clearSessionTimers, fetchServerConfig, saveServerConfig, checkServerHealth } from './services/api';
+import { setStoredSpreadsheetId } from './services/gvizService';
 import { gradeExamAnswers } from './services/answerScoring';
 import { getCurrentAnswersFromIndexedDB, getWritingDraftFromIndexedDB, saveWritingDraftToIndexedDB, saveCurrentAnswersToIndexedDB, clearCurrentAnswersFromIndexedDB, createCandidateDraftBackup } from './services/indexedDb';
 import { DEFAULT_EXAMS } from './data/defaultExams';
@@ -118,15 +119,19 @@ export default function App() {
     };
   }, []);
   
-  // GAS Web App URL
+  // GAS Web App URL & Central Server Connection State
   const [gasUrl, setGasUrl] = useState<string>(() => {
     return localStorage.getItem('ielts_gas_url') || DEFAULT_GAS_URL;
   });
+  const [isServerConnected, setIsServerConnected] = useState<boolean | null>(null);
+  const [gasConfigSyncState, setGasConfigSyncState] = useState<'idle' | 'saving' | 'synced' | 'error'>('idle');
 
-  // Automatically fetch centralized GAS URL from server database on mount (Cross-Device Sync)
+  // Automatically detect Central Server & sync GAS URL / Spreadsheet ID on mount (Cross-Device Sync)
   useEffect(() => {
+    checkServerHealth().then(ok => setIsServerConnected(ok)).catch(() => setIsServerConnected(false));
     fetchServerConfig().then(cfg => {
-      if (cfg && cfg.gas_url && cfg.gas_url.trim() && !cfg.gas_url.includes('mock_ielts_exam_system_gas_url')) {
+      if (!cfg) return;
+      if (cfg.gas_url && cfg.gas_url.trim() && !cfg.gas_url.includes('mock_ielts_exam_system_gas_url')) {
         const remoteUrl = cfg.gas_url.trim();
         setGasUrl(prev => {
           if (!prev || prev === DEFAULT_GAS_URL || prev.includes('mock_ielts_exam_system_gas_url')) {
@@ -135,6 +140,9 @@ export default function App() {
           }
           return prev;
         });
+      }
+      if (cfg.spreadsheet_id && cfg.spreadsheet_id.trim()) {
+        setStoredSpreadsheetId(cfg.spreadsheet_id.trim());
       }
     }).catch(() => {});
   }, []);
@@ -458,10 +466,13 @@ export default function App() {
   const [copiedGasCode, setCopiedGasCode] = useState(false);
 
   // Save GAS URL to LocalStorage & Central Server Database
-  const handleSaveGasUrl = (url: string) => {
+  const handleSaveGasUrl = async (url: string) => {
     setGasUrl(url);
     localStorage.setItem('ielts_gas_url', url);
-    saveServerConfig(url).catch(() => {});
+    setGasConfigSyncState('saving');
+    const ok = await saveServerConfig(url).catch(() => false);
+    setGasConfigSyncState(ok ? 'synced' : 'error');
+    setTimeout(() => setGasConfigSyncState('idle'), 3000);
   };
 
   // Determine TEST vs PRACTICE Mode:
@@ -1526,34 +1537,64 @@ export default function App() {
         {activeView === 'admin' && (
           <div className="space-y-6 min-w-0 max-w-full overflow-x-hidden">
             
-            {/* GitHub Pages Static Mode Info Alert */}
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-              <div className="flex items-center space-x-3">
-                <div className="p-2.5 bg-amber-500/20 text-amber-300 rounded-2xl">
-                  <AlertTriangle className="w-5 h-5 text-amber-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-amber-300 text-xs uppercase tracking-wide">
-                      Running on GitHub Pages (Static Mode)
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-200 border border-amber-500/40">
-                      Pure Static SPA
-                    </span>
+            {/* Runtime Architecture Status Banner (Server Hybrid vs Pure Static SPA) */}
+            {isServerConnected === false ? (
+              <div className="bg-amber-50 border border-amber-300 rounded-3xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 bg-amber-100 text-amber-800 rounded-2xl">
+                    <AlertTriangle className="w-5 h-5 text-amber-700" />
                   </div>
-                  <p className="text-amber-200/90 text-[11px] mt-0.5">
-                    Requires Google Sheet to have <strong>&quot;Anyone with the link can view&quot;</strong> permission enabled so GViz can load questions directly without backend servers.
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-extrabold text-amber-950 text-xs uppercase tracking-wide">
+                        Running in Static Mode (No Central Server)
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-200/70 text-amber-950 border border-amber-300">
+                        Pure Static SPA
+                      </span>
+                    </div>
+                    <p className="text-amber-900 text-[11px] mt-0.5">
+                      Requires Google Sheet to have <strong>&quot;Anyone with the link can view&quot;</strong> and updated Apps Script (<strong>Deploy &rarr; Anyone</strong>) so students on other machines can fetch exams directly.
+                    </p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDiagnosticsOpen(true)}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-[11px] transition shrink-0 cursor-pointer shadow-sm"
+                >
+                  Configure Sheet &amp; GViz
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsDiagnosticsOpen(true)}
-                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-[11px] transition shrink-0 cursor-pointer shadow-md"
-              >
-                Configure Sheet &amp; GViz
-              </button>
-            </div>
+            ) : (
+              <div className="bg-emerald-50/90 border border-emerald-200 rounded-3xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 bg-emerald-100 text-emerald-700 rounded-2xl">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-extrabold text-emerald-950 text-xs uppercase tracking-wide">
+                        Central Server + Google Sheets Sync Active
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        Cross-Device Enabled
+                      </span>
+                    </div>
+                    <p className="text-emerald-900/90 text-[11px] mt-0.5">
+                      Published exams, Practice Sets, and GAS config sync via Server across all student devices. To also record rows into Google Sheets, deploy the latest code from <strong>GAS Backend</strong>.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDiagnosticsOpen(true)}
+                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-[11px] transition shrink-0 cursor-pointer shadow-sm"
+                >
+                  DB &amp; Sheet Diagnostics
+                </button>
+              </div>
+            )}
 
             {/* GAS Endpoint URL Config Bar */}
             <div className="bg-white/90 border border-purple-100/80 rounded-3xl p-5 shadow-xl shadow-purple-950/5 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -1563,7 +1604,7 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-[#3C2A63]">Google Apps Script (GAS) Web App Endpoint</h3>
-                  <p className="text-xs text-[#7C68A5]">Live Google Sheets backend endpoint integration</p>
+                  <p className="text-xs text-[#7C68A5]">Live Google Sheets backend endpoint integration (synced across devices via Server)</p>
                 </div>
               </div>
 
@@ -1575,8 +1616,20 @@ export default function App() {
                   placeholder="https://script.google.com/macros/s/.../exec"
                   className="px-4 py-2.5 bg-[#E2DDEC] border border-purple-200/80 rounded-2xl text-xs text-[#3C2A63] font-medium w-full md:w-96 focus:outline-none focus:ring-2 focus:ring-[#6B51A5]"
                 />
-                <span className="text-xs px-3 py-1.5 bg-emerald-100 text-emerald-800 font-extrabold border border-emerald-200 rounded-xl shrink-0">
-                  Active
+                <span className={`text-xs px-3 py-1.5 font-extrabold border rounded-xl shrink-0 ${
+                  gasConfigSyncState === 'saving'
+                    ? 'bg-purple-100 text-purple-800 border-purple-200'
+                    : gasConfigSyncState === 'error'
+                    ? 'bg-amber-100 text-amber-900 border-amber-200'
+                    : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                }`}>
+                  {gasConfigSyncState === 'saving'
+                    ? 'Saving...'
+                    : gasConfigSyncState === 'synced'
+                    ? 'Synced to Server'
+                    : gasConfigSyncState === 'error'
+                    ? 'Local Only'
+                    : 'Active'}
                 </span>
               </div>
             </div>
@@ -1586,6 +1639,7 @@ export default function App() {
             {adminTab === 'grading' && <ManualGrading gasUrl={gasUrl} />}
             {adminTab === 'upload' && (
               <UploadModule 
+                gasUrl={gasUrl}
                 onParsedData={(parsed) => handleSetExamData(parsed)} 
                 onNavigateToPreview={() => setAdminTab('preview')}
                 onTakeExamNow={(exam) => handleLaunchStudentExam(exam)}

@@ -94,6 +94,12 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
 
   useEffect(() => {
     refreshDecks();
+    practiceService.fetchFromServer(effectiveGasUrl).then((res) => {
+      if (res.success && res.decks.length > 0) {
+        refreshDecks();
+        setDbStatus(practiceService.getDatabaseStatus());
+      }
+    }).catch(() => {});
   }, []);
 
   const refreshDecks = (preferredDeckId?: string) => {
@@ -131,12 +137,15 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
     setSuccessMsg(null);
     try {
       const res = await practiceService.initDatabaseOnSheets(effectiveGasUrl);
+      setDbStatus(practiceService.getDatabaseStatus());
+      refreshDecks();
       if (res.success) {
-        setSuccessMsg(res.message || 'Cơ sở dữ liệu Practice đã khởi tạo thành công trên Google Sheets (Tab PRACTICE_QUESTIONS)!');
-        setDbStatus(practiceService.getDatabaseStatus());
-        refreshDecks();
+        setSuccessMsg(res.message || 'Cơ sở dữ liệu Practice đã khởi tạo thành công trên Server và Google Sheets (Tab PRACTICE_QUESTIONS)!');
       } else {
-        setErrorMsg(res.error || 'Khởi tạo database trên Google Sheets thất bại. Vui lòng kiểm tra quyền truy cập Web App Anyone.');
+        if (res.server_saved) {
+          setSuccessMsg('Đã đồng bộ toàn bộ kho bài tập lên Server (học sinh mọi máy đã truy cập được).');
+        }
+        setErrorMsg(res.error || 'Khởi tạo database trên Google Sheets thất bại. Vui lòng kiểm tra mã GAS Backend và quyền Anyone.');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Lỗi kết nối khi khởi tạo database.');
@@ -153,6 +162,9 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
       const res = await practiceService.fetchFromSheets(effectiveGasUrl);
       if (res.success) {
         const count = res.decks?.length || 0;
+        if (count > 0 && res.decks) {
+          await practiceService.syncBatchToServerAndSheets(effectiveGasUrl, res.decks, false).catch(() => {});
+        }
         setSuccessMsg(
           count > 0
             ? `Đã tải thành công ${count} bộ đề từ tab PRACTICE_QUESTIONS!`
@@ -161,7 +173,13 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
         setDbStatus(practiceService.getDatabaseStatus());
         refreshDecks();
       } else {
-        setErrorMsg(res.error || 'Chưa tìm thấy tab PRACTICE_QUESTIONS.');
+        const srvRes = await practiceService.fetchFromServer(effectiveGasUrl);
+        if (srvRes.success && srvRes.decks.length > 0) {
+          refreshDecks();
+          setDbStatus(practiceService.getDatabaseStatus());
+          setSuccessMsg(`Đã tải ${srvRes.decks.length} bộ đề từ Server.`);
+        }
+        setErrorMsg(res.error || 'Chưa tìm thấy tab PRACTICE_QUESTIONS trên Google Sheets.');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Lỗi khi tải dữ liệu từ Google Sheets.');
@@ -177,10 +195,13 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
     setSuccessMsg(null);
     try {
       const res = await practiceService.saveDeckToSheets(effectiveGasUrl, selectedDeck);
+      setDbStatus(practiceService.getDatabaseStatus());
       if (res.success) {
-        setSuccessMsg(`Đã đồng bộ bộ đề [${selectedDeck.deck_id}] lên Google Sheets thành công!`);
-        setDbStatus(practiceService.getDatabaseStatus());
+        setSuccessMsg(`Đã đồng bộ bộ đề [${selectedDeck.deck_id}] lên Server và Google Sheets thành công!`);
       } else {
+        if (res.server_saved) {
+          setSuccessMsg(`Đã lưu bộ đề [${selectedDeck.deck_id}] lên Server (học sinh mọi máy đã truy cập được).`);
+        }
         setErrorMsg(res.error || 'Lỗi khi đồng bộ bộ đề lên Google Sheets.');
       }
     } catch (err: any) {
@@ -280,12 +301,21 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
   };
 
   // Duplicate current deck
-  const handleDuplicateDeck = () => {
+  const handleDuplicateDeck = async () => {
     if (!selectedDeck) return;
     const cloned = practiceService.duplicateDeck(selectedDeck.deck_id);
     if (cloned) {
-      setSuccessMsg(`Đã nhân bản bộ đề thành [${cloned.deck_id}] thành công!`);
       refreshDecks(cloned.deck_id);
+      const syncRes = await practiceService.syncDeckToServerAndSheets(effectiveGasUrl, cloned);
+      setDbStatus(practiceService.getDatabaseStatus());
+      setSuccessMsg(
+        syncRes.sheets_synced
+          ? `Đã nhân bản và đồng bộ bộ đề [${cloned.deck_id}] lên Server & Google Sheets thành công!`
+          : `Đã nhân bản bộ đề [${cloned.deck_id}] lên Server thành công!`
+      );
+      if (!syncRes.sheets_synced && syncRes.sheets_error) {
+        setErrorMsg(`Lưu ý Google Sheets: ${syncRes.sheets_error}`);
+      }
       setTimeout(() => setSuccessMsg(null), 4000);
     } else {
       setErrorMsg('Không thể nhân bản bộ đề.');
@@ -299,18 +329,23 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
   };
 
   // Confirm Delete
-  const confirmDeleteDeck = () => {
+  const confirmDeleteDeck = async () => {
     if (!deckToDelete) return;
     const idToDelete = deckToDelete.deck_id;
     const ok = practiceService.deleteDeck(idToDelete);
     if (ok) {
       setShowDeleteModal(false);
       setDeckToDelete(null);
-      setSuccessMsg(`Đã xóa bộ đề [${idToDelete}] thành công.`);
       refreshDecks();
       if (selectedDeck?.deck_id === idToDelete) {
         setSelectedDeck(null);
       }
+      const delSync = await practiceService.deleteDeckEverywhere(effectiveGasUrl, idToDelete);
+      setSuccessMsg(
+        delSync.sheets_synced
+          ? `Đã xóa bộ đề [${idToDelete}] khỏi Server & Google Sheets thành công.`
+          : `Đã xóa bộ đề [${idToDelete}] khỏi Server thành công.`
+      );
       setTimeout(() => setSuccessMsg(null), 4000);
     } else {
       setErrorMsg('Lỗi khi xóa bộ đề.');
@@ -318,14 +353,14 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
   };
 
   // Confirm Clear All Decks
-  const handleClearAllDecks = () => {
-    practiceService.clearAllPracticeDecks();
+  const handleClearAllDecks = async () => {
+    await practiceService.clearAllPracticeDecksEverywhere(effectiveGasUrl);
     setDecks([]);
     setSelectedDeck(null);
     setCards([]);
     setIsEditing(false);
     setShowClearAllModal(false);
-    setSuccessMsg('Đã xóa sạch tất cả mã đề practice hiện có. Kho câu hỏi hiện trống để giáo viên làm lại từ đầu!');
+    setSuccessMsg('Đã xóa sạch tất cả mã đề practice hiện có trên máy và Server!');
     setDbStatus(practiceService.getDatabaseStatus());
     setTimeout(() => setSuccessMsg(null), 4000);
   };
@@ -540,7 +575,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
   };
 
   // Save Deck Handler
-  const handleSaveDeck = () => {
+  const handleSaveDeck = async () => {
     if (!deckId.trim() || !title.trim()) {
       setErrorMsg('Vui lòng nhập đầy đủ Mã bộ đề (Set Code) và Tiêu đề (Set Title).');
       return;
@@ -566,15 +601,31 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
       updated_at: new Date().toISOString()
     };
 
-    const saved = practiceService.saveDeck(newDeck);
-    if (saved) {
-      setSuccessMsg(`Đã lưu thành công bộ đề [${newDeck.deck_id}].`);
+    setIsSyncingSheets(true);
+    setErrorMsg(null);
+    try {
+      const syncRes = await practiceService.syncDeckToServerAndSheets(effectiveGasUrl, newDeck);
       refreshDecks(newDeck.deck_id);
       setSelectedDeck(newDeck);
       setIsEditing(false);
-      setTimeout(() => setSuccessMsg(null), 4000);
-    } else {
-      setErrorMsg('Lỗi khi lưu bộ đề vào bộ nhớ máy.');
+      setDbStatus(practiceService.getDatabaseStatus());
+
+      if (syncRes.sheets_synced) {
+        setSuccessMsg(`Đã lưu bộ đề [${newDeck.deck_id}] lên Server và Google Sheets thành công!`);
+      } else if (syncRes.server_saved) {
+        setSuccessMsg(`Đã lưu bộ đề [${newDeck.deck_id}] lên Server (học sinh mọi máy đã thấy được ngay).`);
+        if (syncRes.sheets_error) {
+          setErrorMsg(`Chưa ghi được vào Google Sheet: ${syncRes.sheets_error}`);
+        }
+      } else {
+        setSuccessMsg(`Đã lưu bộ đề [${newDeck.deck_id}] vào bộ nhớ máy.`);
+        if (syncRes.sheets_error) {
+          setErrorMsg(`Chưa đồng bộ được lên Server/Sheet: ${syncRes.sheets_error}`);
+        }
+      }
+      setTimeout(() => setSuccessMsg(null), 5000);
+    } finally {
+      setIsSyncingSheets(false);
     }
   };
 
@@ -594,11 +645,20 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
       );
 
       if (generated) {
+        const syncRes = await practiceService.syncDeckToServerAndSheets(effectiveGasUrl, generated);
+        setDbStatus(practiceService.getDatabaseStatus());
         setIsAiModalOpen(false);
         setAiTopic('');
         refreshDecks(generated.deck_id);
         handleSelectDeck(generated);
-        setSuccessMsg(`AI Gemini đã sinh thành công bộ bài tập [${generated.deck_id}] với ${generated.cards.length} câu hỏi đa dạng định dạng!`);
+        setSuccessMsg(
+          syncRes.sheets_synced
+            ? `AI Gemini đã sinh bộ [${generated.deck_id}] (${generated.cards.length} câu) và đồng bộ lên Server & Google Sheets!`
+            : `AI Gemini đã sinh bộ [${generated.deck_id}] (${generated.cards.length} câu) và lưu lên Server!`
+        );
+        if (!syncRes.sheets_synced && syncRes.sheets_error) {
+          setErrorMsg(`Chưa ghi được vào Google Sheet: ${syncRes.sheets_error}`);
+        }
         setTimeout(() => setSuccessMsg(null), 5000);
       } else {
         setErrorMsg('Không thể sinh bộ bài tập vào lúc này. Vui lòng thử lại.');
@@ -630,7 +690,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const content = event.target?.result as string;
         if (!content || !content.trim()) {
@@ -860,14 +920,31 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
           };
         });
 
-        // 3. Save each sanitized deck to practiceService
-        sanitizedDecks.forEach(d => {
-          practiceService.saveDeck(d);
-        });
+        // 3. Save locally AND automatically sync to Server (/api/practice-decks) + Google Sheets
+        setErrorMsg(null);
+        setIsSyncingSheets(true);
+        try {
+          const syncRes = await practiceService.syncBatchToServerAndSheets(effectiveGasUrl, sanitizedDecks, false);
+          refreshDecks(sanitizedDecks[0]?.deck_id);
+          setDbStatus(practiceService.getDatabaseStatus());
 
-        refreshDecks(sanitizedDecks[0]?.deck_id);
-        setSuccessMsg(`Đã nhập thành công ${sanitizedDecks.length} bộ bài tập (${totalImportedQuestions} câu hỏi)!`);
-        setTimeout(() => setSuccessMsg(null), 5000);
+          if (syncRes.sheets_synced) {
+            setSuccessMsg(`Đã nhập ${sanitizedDecks.length} bộ đề (${totalImportedQuestions} câu hỏi), lưu lên Server & đồng bộ Google Sheets thành công!`);
+          } else if (syncRes.server_saved) {
+            setSuccessMsg(`Đã nhập ${sanitizedDecks.length} bộ đề (${totalImportedQuestions} câu hỏi) và lưu lên Server thành công (học sinh mọi máy đã xem được ngay).`);
+            if (syncRes.sheets_error) {
+              setErrorMsg(`Chưa ghi được vào Google Sheet: ${syncRes.sheets_error}`);
+            }
+          } else {
+            setSuccessMsg(`Đã nhập ${sanitizedDecks.length} bộ đề (${totalImportedQuestions} câu hỏi) vào máy hiện tại.`);
+            if (syncRes.sheets_error) {
+              setErrorMsg(`Chưa đồng bộ được lên Server/Sheet: ${syncRes.sheets_error}`);
+            }
+          }
+          setTimeout(() => setSuccessMsg(null), 6000);
+        } finally {
+          setIsSyncingSheets(false);
+        }
       } catch (err: any) {
         console.error('Chi tiết lỗi import JSON:', err);
         setErrorMsg(`Lỗi nhập tệp JSON: ${err.message || 'Tệp JSON không hợp lệ'}`);

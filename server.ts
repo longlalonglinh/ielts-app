@@ -23,7 +23,9 @@ import {
   getStoredConfig, 
   saveStoredConfig,
   getStoredPracticeDecks,
-  saveStoredPracticeDeck
+  saveStoredPracticeDeck,
+  deleteStoredPracticeDeck,
+  replaceStoredPracticeDecks
 } from './server/storage';
 import { verifyAndOptimizeExam } from './src/services/examVerification';
 import { synthesizeTopicExam } from './server/examSynthesizer';
@@ -1549,26 +1551,39 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
 
   app.post('/api/exams', async (req, res) => {
     try {
-      const exam = req.body;
-      if (!exam || !exam.exam_code) {
+      const { gas_url: explicitGasUrl, ...examBody } = req.body || {};
+      if (!examBody || !examBody.exam_code) {
         return res.status(400).json({ success: false, error: 'Missing exam_code in body' });
       }
-      const saved = saveStoredExam(exam);
+      const saved = saveStoredExam(examBody);
       // Keep Server RAM Cache immediately synchronized (prevents stale draft status in RAM)
       setCachedExam(saved.exam_code, saved);
 
-      // Asynchronously push ONLY published exams to Google Apps Script (prevents draft exams from appearing live on Sheet while blocked by 403)
+      // Push ONLY published exams to Google Apps Script (prevents draft exams from appearing live on Sheet while blocked by 403)
       const isDraft = saved.status === 'draft' || Boolean(saved.is_draft);
-      const config = getStoredConfig();
-      if (!isDraft && config.gas_url && !config.gas_url.includes('AKfycbx_mock')) {
-        fetch(config.gas_url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'upload_exam', exam_data: saved })
-        }).catch(err => console.warn('[GAS Async Push Error]:', err.message));
+      if (isDraft) {
+        return res.json({
+          success: true,
+          exam: saved,
+          is_draft: true,
+          sheets_synced: false,
+          sheets_error: 'Đề đang ở trạng thái Nháp (Draft). Bấm Publish để mở cho học sinh và ghi lên Google Sheet.'
+        });
       }
 
-      res.json({ success: true, exam: saved });
+      const gasOutcome = await pushPayloadToGas(
+        explicitGasUrl,
+        { action: 'upload_exam', exam_data: saved },
+        'EXAMS & QUESTIONS'
+      );
+
+      res.json({
+        success: true,
+        exam: saved,
+        is_draft: false,
+        sheets_synced: gasOutcome.ok,
+        sheets_error: gasOutcome.error
+      });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -2161,14 +2176,153 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     }
   });
 
+  // Helper: Server-side push to Google Apps Script (bypasses browser CORS & detects legacy GAS errors accurately)
+  const pushPayloadToGas = async (
+    explicitGasUrl: string | undefined,
+    payload: any,
+    targetTabHint: string = 'PRACTICE_QUESTIONS'
+  ): Promise<{ ok: boolean; error?: string; data?: any }> => {
+    const config = getStoredConfig();
+    const targetGasUrl = String(explicitGasUrl || config.gas_url || '').trim();
+    if (!targetGasUrl || targetGasUrl.includes('AKfycbx_mock') || targetGasUrl.includes('mock_ielts_exam_system')) {
+      return { ok: false, error: 'Chưa cấu hình Google Apps Script URL hợp lệ.' };
+    }
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const gasRes = await fetch(targetGasUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        redirect: 'follow',
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      const rawText = await gasRes.text();
+      let parsed: any = null;
+      try {
+        parsed = JSON.parse(rawText);
+      } catch {
+        return { ok: false, error: 'Google Apps Script trả về HTML/văn bản thay vì JSON (kiểm tra quyền Web App Anyone hoặc Deploy lại).' };
+      }
+      if (parsed && (parsed.success === true || parsed.status === 'success')) {
+        return { ok: true, data: parsed };
+      }
+      const gasErr = String(parsed?.error || parsed?.message || 'Unknown GAS error');
+      if (/invalid action trigger|missing exam_code|unknown action/i.test(gasErr)) {
+        return {
+          ok: false,
+          error: `Google Apps Script hiện tại (${gasErr}) là phiên bản cũ chưa hỗ trợ ghi ${targetTabHint}. Hãy copy code mới ở tab "GAS Backend", dán vào Extensions > Apps Script và Deploy > New version (Anyone).`
+        };
+      }
+      return { ok: false, error: gasErr };
+    } catch (err: any) {
+      return { ok: false, error: err?.message || 'Lỗi kết nối tới Google Apps Script từ máy chủ.' };
+    }
+  };
+
   // Centralized Practice Decks API
-  app.get('/api/practice-decks', (req, res) => {
-    res.json({ success: true, data: getStoredPracticeDecks() });
+  app.get('/api/practice-decks', async (req, res) => {
+    let decks = getStoredPracticeDecks();
+    if (decks.length === 0) {
+      const config = getStoredConfig();
+      const targetGasUrl = String(req.query.gas_url || config.gas_url || '').trim();
+      if (targetGasUrl && !targetGasUrl.includes('AKfycbx_mock')) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
+          const gasRes = await fetch(`${targetGasUrl}?action=GET_PRACTICE_DECKS`, { redirect: 'follow', signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (gasRes.ok) {
+            const parsed = await gasRes.json().catch(() => null);
+            if (parsed && (parsed.success || parsed.status === 'success') && Array.isArray(parsed.decks) && parsed.decks.length > 0) {
+              decks = replaceStoredPracticeDecks(parsed.decks);
+            }
+          }
+        } catch {}
+      }
+    }
+    res.json({ success: true, data: decks });
   });
 
-  app.post('/api/practice-decks', (req, res) => {
-    const saved = saveStoredPracticeDeck(req.body);
-    res.json({ success: true, deck: saved });
+  app.post('/api/practice-decks', async (req, res) => {
+    const { gas_url, skip_gas, ...deckPayload } = req.body || {};
+    if (!deckPayload || (!deckPayload.deck_id && !deckPayload.title && !Array.isArray(deckPayload.cards))) {
+      return res.status(400).json({ success: false, error: 'Missing practice deck payload' });
+    }
+    const saved = saveStoredPracticeDeck(deckPayload);
+    if (skip_gas) {
+      return res.json({ success: true, deck: saved, sheets_synced: false });
+    }
+    const gasOutcome = await pushPayloadToGas(gas_url, {
+      action: 'SAVE_PRACTICE_DECK',
+      mode: 'append',
+      deck: saved
+    });
+    res.json({
+      success: true,
+      deck: saved,
+      sheets_synced: gasOutcome.ok,
+      sheets_error: gasOutcome.error
+    });
+  });
+
+  app.post('/api/practice-decks/batch', async (req, res) => {
+    const { decks, replace_all, gas_url, skip_gas } = req.body || {};
+    if (!Array.isArray(decks)) {
+      return res.status(400).json({ success: false, error: 'decks array is required' });
+    }
+    const savedDecks = replace_all
+      ? replaceStoredPracticeDecks(decks)
+      : decks.map((d: any) => saveStoredPracticeDeck(d));
+
+    if (skip_gas) {
+      return res.json({ success: true, decks: savedDecks, sheets_synced: false });
+    }
+
+    const gasOutcome = await pushPayloadToGas(gas_url, {
+      action: 'INIT_PRACTICE_DB',
+      mode: replace_all ? 'replace_all' : 'append',
+      decks: savedDecks
+    });
+    res.json({
+      success: true,
+      decks: savedDecks,
+      sheets_synced: gasOutcome.ok,
+      sheets_error: gasOutcome.error
+    });
+  });
+
+  app.delete('/api/practice-decks/:id', async (req, res) => {
+    const deckId = String(req.params.id || '').trim().toUpperCase();
+    const deleted = deleteStoredPracticeDeck(deckId);
+    const gasUrl = typeof req.query.gas_url === 'string' ? req.query.gas_url : undefined;
+    const gasOutcome = await pushPayloadToGas(gasUrl, {
+      action: 'DELETE_PRACTICE_DECK',
+      deck_id: deckId
+    });
+    res.json({
+      success: true,
+      deleted,
+      deck_id: deckId,
+      sheets_synced: gasOutcome.ok,
+      sheets_error: gasOutcome.error
+    });
+  });
+
+  app.delete('/api/practice-decks', async (req, res) => {
+    replaceStoredPracticeDecks([]);
+    const gasUrl = typeof req.query.gas_url === 'string' ? req.query.gas_url : undefined;
+    const gasOutcome = await pushPayloadToGas(gasUrl, {
+      action: 'INIT_PRACTICE_DB',
+      mode: 'replace_all',
+      decks: []
+    });
+    res.json({
+      success: true,
+      sheets_synced: gasOutcome.ok,
+      sheets_error: gasOutcome.error
+    });
   });
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

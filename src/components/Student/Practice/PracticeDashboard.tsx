@@ -199,8 +199,20 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
   useEffect(() => {
     loadDeckData(initialDeckId);
     setUserStats(practiceService.getUserStats(currentLearner.student_id));
-    
-    // Auto-sync questions in background if gasUrl is available
+
+    // Auto-sync from centralized server (/api/practice-decks) so students on any machine immediately see uploaded decks
+    practiceService.fetchFromServer(gasUrl).then(srvRes => {
+      if (srvRes.success && srvRes.decks.length > 0) {
+        const updatedDecks = practiceService.getAllDecks();
+        setAllDecks(updatedDecks);
+        setDbStatus(practiceService.getDatabaseStatus());
+        setLoadError(null);
+        const matched = updatedDecks.find(d => d.deck_id.toUpperCase() === initialDeckId.toUpperCase()) || updatedDecks[0];
+        if (matched) setActiveDeck(matched);
+      }
+    }).catch(err => console.debug('Initial server practice fetch note:', err));
+
+    // Auto-sync questions in background from Google Sheets if gasUrl is available
     if (gasUrl) {
       practiceService.fetchFromSheets(gasUrl).then(res => {
         if (res.success && res.decks && res.decks.length > 0) {
