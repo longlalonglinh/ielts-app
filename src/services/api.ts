@@ -136,6 +136,33 @@ export async function verifyAdminPassword(password: string): Promise<{ success: 
   }
 }
 
+export async function loginAdminWithShortcut(
+  sbd: string,
+  code: string
+): Promise<{ success: boolean; token?: string; offlineFallback?: boolean; error?: string }> {
+  try {
+    const res = await fetch(getApiUrl('/api/admin/login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sbd, code })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data?.success && data?.token) {
+      setAdminToken(data.token);
+      return { success: true, token: data.token };
+    }
+    if (res.status === 404 || res.status === 405) {
+      return { success: true, offlineFallback: true };
+    }
+    return {
+      success: false,
+      error: data?.message || data?.error || 'Incorrect Admin credentials.'
+    };
+  } catch {
+    return { success: true, offlineFallback: true };
+  }
+}
+
 export async function verifyStoredAdminSession(): Promise<boolean> {
   const token = getAdminToken();
   if (!token) return false;

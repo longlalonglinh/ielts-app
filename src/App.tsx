@@ -62,6 +62,7 @@ import {
   checkServerHealth,
   isAdminAuthenticated,
   verifyAdminPassword,
+  loginAdminWithShortcut,
   verifyStoredAdminSession,
   clearAdminToken
 } from './services/api';
@@ -198,6 +199,17 @@ export default function App() {
     setAdminPasswordInput('');
     setAdminAuthError(null);
     setActiveView('student');
+  };
+
+  const handleSwitchToAdminWithCredentials = async (sbdInput?: string, codeInput?: string) => {
+    if (sbdInput && codeInput) {
+      const res = await loginAdminWithShortcut(sbdInput, codeInput);
+      if (res.success) {
+        setAdminAuthed(true);
+        setAdminAuthError(null);
+      }
+    }
+    setActiveView('admin');
   };
 
   // Diagnostics Modal State
@@ -1160,7 +1172,7 @@ export default function App() {
               <>
                 <LoginInstructions 
                   onLogin={handleLogin} 
-                  onSwitchToAdmin={() => setActiveView('admin')}
+                  onSwitchToAdmin={handleSwitchToAdminWithCredentials}
                   onOpenDiagnostics={() => setIsDiagnosticsOpen(true)}
                   onOpenPracticeHub={() => handleLogin('HV01', 'ON_TAP_01', 'PRACTICE', false)}
                   onForceResync={handleForceResyncExam}

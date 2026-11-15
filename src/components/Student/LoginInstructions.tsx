@@ -31,9 +31,14 @@ const isPracticeDeckCode = (code: string): boolean => {
   return practiceService.getAllDecks().some(d => d.deck_id.toUpperCase() === upper);
 };
 
+const isAdminShortcutCode = (code: string): boolean => {
+  const upper = (code || '').trim().toUpperCase();
+  return upper === 'ADMIN' || upper === 'ADMIN123' || upper === 'TEACHER' || upper === '123456';
+};
+
 interface LoginInstructionsProps {
   onLogin: (sbd: string, code: string, mode: 'TEST' | 'PRACTICE', reviewPrevious: boolean) => void;
-  onSwitchToAdmin?: () => void;
+  onSwitchToAdmin?: (sbd?: string, code?: string) => void | Promise<void>;
   onOpenPracticeHub?: () => void;
   onOpenDiagnostics?: () => void;
   onForceResync?: (code: string) => void;
@@ -81,14 +86,14 @@ export const LoginInstructions: React.FC<LoginInstructionsProps> = ({
 
   // Prefetch exam when component mounts so data is ready in memory
   useEffect(() => {
-    if (activeCode && !isPracticeDeckCode(activeCode)) {
+    if (activeCode && !isPracticeDeckCode(activeCode) && !isAdminShortcutCode(activeCode)) {
       prefetchExam(gasUrl, activeCode).catch(() => {});
     }
   }, [gasUrl]);
 
   // Debounced prefetch whenever student types or updates the exam code
   useEffect(() => {
-    if (!activeCode || isPracticeDeckCode(activeCode)) return;
+    if (!activeCode || isPracticeDeckCode(activeCode) || isAdminShortcutCode(activeCode)) return;
     const timer = setTimeout(() => {
       prefetchExam(gasUrl, activeCode).catch(() => {});
     }, 350);
@@ -139,10 +144,11 @@ export const LoginInstructions: React.FC<LoginInstructionsProps> = ({
     const upperCode = cleanCode.toUpperCase();
     if (
       (upperSbd === 'ADMIN' || upperSbd === 'ADMIN123' || upperSbd === 'TEACHER') &&
-      (upperCode === 'ADMIN' || upperCode === 'ADMIN123' || upperCode === 'TEACHER' || upperCode === '123456')
+      isAdminShortcutCode(upperCode)
     ) {
       if (onSwitchToAdmin) {
-        onSwitchToAdmin();
+        setErrorMsg('');
+        onSwitchToAdmin(cleanSbd, cleanCode);
         return;
       }
     }
