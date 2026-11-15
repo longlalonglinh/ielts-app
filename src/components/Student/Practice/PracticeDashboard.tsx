@@ -79,7 +79,6 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
   const [sessionResults, setSessionResults] = useState<Record<string, boolean>>({});
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [sessionCardsOverride, setSessionCardsOverride] = useState<PracticeCard[] | null>(null);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Security / Proctoring Integrity Tracker
   const [securityViolations, setSecurityViolations] = useState<number>(0);
@@ -401,7 +400,7 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
                   <h2 className="text-sm font-bold text-[#3C2A63] tracking-tight">
                     {activeDeck?.title || 'Practice Deck'}
                   </h2>
-                  <span className="text-[10px] px-2 py-0.2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-bold">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-bold">
                     {activeDeck?.level || 'B1-B2'}
                   </span>
                 </div>

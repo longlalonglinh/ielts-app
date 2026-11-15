@@ -663,16 +663,26 @@ export default function App() {
     setCompletedSkills({ listening: false, reading: false, writing: false });
     setSkillNotice(null);
 
-    // Check if entered code corresponds to a Custom Practice Deck
+    // Check if entered code corresponds to a Custom Practice Deck (local or central server)
     const upperCode = cleanCode;
-    const allPracticeDecks = practiceService.getAllDecks();
-    const isPracticeDeck = allPracticeDecks.some(d => d.deck_id.toUpperCase() === upperCode) ||
+    let allPracticeDecks = practiceService.getAllDecks();
+    let isPracticeDeck = allPracticeDecks.some(d => d.deck_id.toUpperCase() === upperCode) ||
       upperCode.startsWith('ON_TAP') ||
       upperCode.startsWith('VOCAB') ||
       upperCode.startsWith('GRAMMAR') ||
       upperCode.startsWith('COMMUNICATION') ||
       upperCode.startsWith('DECK_') ||
-      upperCode.startsWith('PRAC_SET');
+      upperCode.startsWith('PRAC_SET') ||
+      upperCode.startsWith('PRACTICE_');
+
+    if (!isPracticeDeck && chosenMode === 'PRACTICE' && !upperCode.startsWith('WT')) {
+      try {
+        const srvRes = await practiceService.fetchFromServer(gasUrl);
+        if (srvRes.success && srvRes.decks.some(d => d.deck_id.toUpperCase() === upperCode)) {
+          isPracticeDeck = true;
+        }
+      } catch {}
+    }
 
     if (isPracticeDeck) {
       if (cleanSbd) {
@@ -1743,7 +1753,15 @@ export default function App() {
                       </span>
                     </div>
                     <p className="text-emerald-900/90 text-[11px] mt-0.5">
-                      Published exams, Practice Sets, and GAS config sync via Server across all student devices. To also record rows into Google Sheets, deploy the latest code from <strong>GAS Backend</strong>.
+                      Published exams, Practice Sets, and GAS config sync via Server across all student devices. To also record rows into Google Sheets, deploy the latest code from{' '}
+                      <button
+                        type="button"
+                        onClick={() => setAdminTab('gas_setup')}
+                        className="font-extrabold underline decoration-emerald-600/60 hover:text-emerald-950 cursor-pointer"
+                      >
+                        GAS Backend
+                      </button>
+                      .
                     </p>
                   </div>
                 </div>
@@ -1769,13 +1787,13 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 w-full md:w-auto">
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                 <input
                   type="text"
                   value={gasUrl}
                   onChange={(e) => handleSaveGasUrl(e.target.value)}
                   placeholder="https://script.google.com/macros/s/.../exec"
-                  className="px-4 py-2.5 bg-[#E2DDEC] border border-purple-200/80 rounded-2xl text-xs text-[#3C2A63] font-medium w-full md:w-96 focus:outline-none focus:ring-2 focus:ring-[#6B51A5]"
+                  className="px-4 py-2.5 bg-[#E2DDEC] border border-purple-200/80 rounded-2xl text-xs text-[#3C2A63] font-medium flex-1 min-w-[200px] md:w-80 focus:outline-none focus:ring-2 focus:ring-[#6B51A5]"
                 />
                 <span className={`text-xs px-3 py-1.5 font-extrabold border rounded-xl shrink-0 ${
                   gasConfigSyncState === 'saving'
@@ -1792,6 +1810,18 @@ export default function App() {
                     ? 'Local Only'
                     : 'Active'}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setAdminTab('gas_setup')}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer border ${
+                    adminTab === 'gas_setup'
+                      ? 'bg-[#6B51A5] text-white border-[#6B51A5]'
+                      : 'bg-purple-50 hover:bg-purple-100 text-[#503A7A] border-purple-200'
+                  }`}
+                >
+                  <Code className="w-3.5 h-3.5" />
+                  <span>GAS Backend</span>
+                </button>
               </div>
             </div>
 

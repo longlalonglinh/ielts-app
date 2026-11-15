@@ -516,12 +516,12 @@ export const practiceService = {
     }
 
     return {
-      daily_streak: 1,
-      last_streak_date: new Date().toISOString().split('T')[0],
+      daily_streak: 0,
+      last_streak_date: '',
       words_practiced_today: 0,
-      best_streak: 3,
-      correct_repeats_pct: 88,
-      total_cards_mastered: 14,
+      best_streak: 0,
+      correct_repeats_pct: 0,
+      total_cards_mastered: 0,
       cards_state: {},
       history_logs: []
     };
@@ -586,7 +586,10 @@ export const practiceService = {
 
     const totalMastered = Object.values(updatedCardsState).filter((c: CardReviewState) => Boolean(c && c.mastered)).length;
     const sessionPct = cardsPracticed > 0 ? Math.round((correctAnswers / cardsPracticed) * 100) : 100;
-    const overallPct = Math.round((currentStats.correct_repeats_pct * 0.7) + (sessionPct * 0.3));
+    const isFirstSession = (!currentStats.history_logs || currentStats.history_logs.length === 0) && currentStats.correct_repeats_pct === 0;
+    const overallPct = isFirstSession
+      ? sessionPct
+      : Math.round((currentStats.correct_repeats_pct * 0.7) + (sessionPct * 0.3));
 
     const newLog = {
       timestamp: new Date().toISOString(),
@@ -899,6 +902,23 @@ export const practiceService = {
           { id: 'opt_4', text: 'Notwithstanding -> Concession (Nhượng bộ)', isCorrect: true, category: 'Concession (Nhượng bộ)', distractorRationale: 'Chính xác. "Notwithstanding" thể hiện quan hệ nhượng bộ học thuật.' }
         ],
         exp: 'Phân loại chính xác các liên từ giúp nâng cao điểm số tiêu chí Coherence and Cohesion trong IELTS Writing.'
+      },
+      {
+        type: 'drag-and-drop' as const,
+        cognitive: 'applying' as const,
+        en: `Effective policies on ${cleanTopic} must _____ immediate risks while researchers _____ long-term outcomes.`,
+        vi: `Các chính sách hiệu quả về ${cleanTopic} phải giảm thiểu rủi ro trước mắt đồng thời các nhà nghiên cứu đánh giá kết quả dài hạn.`,
+        target: 'mitigate, evaluate',
+        pos: 'verb collocation',
+        ipa: '/ˈmɪt.ɪ.ɡeɪt/',
+        hints: 'kéo thả 2 động từ học thuật vào đúng 2 ô trống theo trật tự logic',
+        options: [
+          { id: 'opt_1', text: 'mitigate', isCorrect: true, distractorRationale: 'Chính xác ở ô [1]: "mitigate risks" (giảm thiểu rủi ro) là collocation học thuật chuẩn.' },
+          { id: 'opt_2', text: 'evaluate', isCorrect: true, distractorRationale: 'Chính xác ở ô [2]: "evaluate outcomes" (đánh giá kết quả) phù hợp ngữ cảnh nghiên cứu.' },
+          { id: 'opt_3', text: 'exaggerate', isCorrect: false, distractorRationale: 'Bẫy ngữ nghĩa: "exaggerate" nghĩa là phóng đại, trái ngược với mục tiêu chính sách.' },
+          { id: 'opt_4', text: 'neglect', isCorrect: false, distractorRationale: 'Bẫy ngữ nghĩa: "neglect" nghĩa là bỏ mặc/xao nhãng, không hợp với vai trò nhà nghiên cứu.' }
+        ],
+        exp: 'Cặp động từ "mitigate risks" và "evaluate outcomes" tạo lập mạch văn học thuật chuẩn xác cho IELTS Academic.'
       }
     ];
 
@@ -933,7 +953,7 @@ export const practiceService = {
       deck_id: newDeckId,
       title: `${cleanTopic} - Academic Mastery`,
       category: cleanCategory as any,
-      description: `Bộ bài tập luyện tập chuyên sâu cho ${cleanTopic} (${cleanLevel}) bao gồm 4 định dạng câu hỏi và phân tích bẫy chi tiết.`,
+      description: `Bộ bài tập luyện tập chuyên sâu cho ${cleanTopic} (${cleanLevel}) bao gồm 5 định dạng câu hỏi và phân tích bẫy chi tiết.`,
       target_language: 'English',
       native_language: 'Vietnamese',
       level: cleanLevel as any,

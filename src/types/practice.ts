@@ -2,7 +2,8 @@ export type PracticeQuestionType =
   | 'multiple-choice'      // Chọn 1 đáp án
   | 'multiple-response'    // Chọn nhiều phương án đúng
   | 'true-false-not-given' // Dạng Đúng / Sai / Không có trong bài
-  | 'category-matching';   // Phân loại / Nối nhóm từ loại
+  | 'category-matching'    // Phân loại / Nối nhóm từ loại
+  | 'drag-and-drop';       // Kéo thả từ vào ô trống / phân loại nhóm
 
 export interface PracticeOption {
   id: string;

@@ -24,7 +24,8 @@ const isPracticeDeckCode = (code: string): boolean => {
     upper.startsWith('GRAMMAR') ||
     upper.startsWith('COMMUNICATION') ||
     upper.startsWith('DECK_') ||
-    upper.startsWith('PRAC_SET')
+    upper.startsWith('PRAC_SET') ||
+    upper.startsWith('PRACTICE_')
   ) {
     return true;
   }

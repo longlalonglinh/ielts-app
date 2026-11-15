@@ -75,7 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'upload', label: 'AI Exam Generator', icon: Upload, shortLabel: 'AI Generator' },
     { id: 'custom_practice', label: 'Practice Sets', icon: BookOpen, shortLabel: 'Practice Sets' },
     { id: 'preview', label: 'Exam Preview & Builder', icon: FileText, shortLabel: 'Exam Builder' },
-    { id: 'gas_setup', label: 'GAS Config', icon: Settings, shortLabel: 'GAS Backend' }
+    { id: 'gas_setup', label: 'GAS Backend', icon: Settings, shortLabel: 'GAS Backend' }
   ] as const;
 
   const currentTabObj = adminTabsConfig.find(t => t.id === adminTab) || adminTabsConfig[0];
@@ -137,41 +137,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           )}
 
-          {/* Admin Desktop Sub-Tabs */}
-          {activeView === 'admin' && isAdminAuthed && (
-            <div className="hidden lg:flex items-center space-x-1 bg-[#E2DDEC] p-1 rounded-2xl min-w-0 overflow-x-auto scrollbar-none">
-              {adminTabsConfig.map((tab) => {
-                const IconComponent = tab.icon;
-                const isActive = adminTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      setAdminTab(tab.id as any);
-                    }}
-                    className={`px-2.5 xl:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
-                      isActive ? 'bg-[#6B51A5] text-white shadow-md' : 'text-[#3C2A63] hover:text-[#503A7A]'
-                    }`}
-                  >
-                    <IconComponent className="w-3.5 h-3.5 shrink-0" />
-                    <span className="2xl:hidden">{tab.shortLabel}</span>
-                    <span className="hidden 2xl:inline">{tab.label}</span>
-                  </button>
-                );
-              })}
-
-              {onOpenDiagnostics && (
-                <button
-                  onClick={onOpenDiagnostics}
-                  className="px-2.5 xl:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 whitespace-nowrap shrink-0"
-                >
-                  <Activity className="w-3.5 h-3.5 text-indigo-500 animate-pulse shrink-0" />
-                  <span className="2xl:hidden">DB Stats</span>
-                  <span className="hidden 2xl:inline">DB Diagnostics</span>
-                </button>
-              )}
-            </div>
-          )}
+          {/* Top row intentionally stays clean; Admin tabs live in the dedicated full-width bar below */}
 
           {/* Right Controls: View Switcher & Fullscreen */}
           <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
@@ -284,43 +250,51 @@ export const Navbar: React.FC<NavbarProps> = ({
         )}
       </div>
 
-      {/* Admin Mobile Horizontal Scroll Tab Bar (< lg) */}
+      {/* Admin Full-Width Sub-Navigation Bar (Always Visible, Zero Clipping on All Viewports) */}
       {activeView === 'admin' && isAdminAuthed && (
-        <div className="lg:hidden border-t border-purple-100/80 bg-[#F8F6FC] px-2 py-2 overflow-x-auto scrollbar-none flex items-center gap-1.5 shadow-inner">
-          {adminTabsConfig.map((tab) => {
-            const IconComponent = tab.icon;
-            const isActive = adminTab === tab.id;
-            return (
+        <div className="border-t border-purple-100/80 bg-[#F8F6FC]/95">
+          <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-2">
+            <nav aria-label="Admin sections" className="flex flex-wrap items-center gap-1.5 bg-[#E2DDEC]/80 p-1 rounded-2xl">
+              {adminTabsConfig.map((tab) => {
+                const IconComponent = tab.icon;
+                const isActive = adminTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setAdminTab(tab.id as any);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                      isActive
+                        ? 'bg-[#6B51A5] text-white shadow-sm'
+                        : 'text-[#3C2A63] hover:bg-white/80 hover:text-[#503A7A]'
+                    }`}
+                  >
+                    <IconComponent className="w-3.5 h-3.5 shrink-0" />
+                    <span className="xl:hidden">{tab.shortLabel}</span>
+                    <span className="hidden xl:inline">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            {onOpenDiagnostics && (
               <button
-                key={tab.id}
+                type="button"
                 onClick={() => {
-                  setAdminTab(tab.id as any);
+                  onOpenDiagnostics();
                   setMobileMenuOpen(false);
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
-                  isActive
-                    ? 'bg-[#6B51A5] text-white shadow-sm'
-                    : 'bg-white text-[#503A7A] border border-purple-100 hover:bg-purple-50'
-                }`}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 whitespace-nowrap shrink-0"
               >
-                <IconComponent className="w-3.5 h-3.5" />
-                <span>{tab.shortLabel}</span>
+                <Activity className="w-3.5 h-3.5 text-indigo-500 animate-pulse shrink-0" />
+                <span className="xl:hidden">DB Stats</span>
+                <span className="hidden xl:inline">DB Diagnostics</span>
               </button>
-            );
-          })}
-
-          {onOpenDiagnostics && (
-            <button
-              onClick={() => {
-                onOpenDiagnostics();
-                setMobileMenuOpen(false);
-              }}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap shrink-0"
-            >
-              <Activity className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
-              <span>DB Stats</span>
-            </button>
-          )}
+            )}
+          </div>
         </div>
       )}
 

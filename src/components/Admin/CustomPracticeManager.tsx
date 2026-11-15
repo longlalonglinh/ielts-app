@@ -369,6 +369,14 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
   const handleAddCard = (type: PracticeQuestionType = 'multiple-choice') => {
     const timestamp = Date.now();
     let defaultOptions: PracticeOption[] = [];
+    let defaultSentenceEn = 'This is a sample sentence with a _____ blank for testing.';
+    let defaultSentenceVi = 'Đây là câu ví dụ mẫu có ô trống để kiểm tra kiến thức.';
+    let defaultTargetWord = 'sample';
+    let defaultPos = 'adjective';
+    let defaultPhonetic = '/ˈsɑːm.pəl/';
+    let defaultHints = 'gợi ý ngữ cảnh';
+    let defaultExplanation = 'Giải thích cấu trúc ngữ pháp và cụm từ cố định tại đây...';
+    let defaultCategories: Array<{ id: string; name: string }> | undefined = undefined;
 
     if (type === 'true-false-not-given') {
       defaultOptions = [
@@ -376,6 +384,9 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
         { id: 'opt_2', text: 'FALSE', isCorrect: false, distractorRationale: 'Nhận định mâu thuẫn hoặc phủ định trực tiếp thông tin trong văn bản.' },
         { id: 'opt_3', text: 'NOT GIVEN', isCorrect: false, distractorRationale: 'Thông tin này không được đề cập hoặc kiểm chứng trong bài đọc.' }
       ];
+      defaultTargetWord = 'TRUE';
+      defaultPos = 'discourse verification';
+      defaultPhonetic = '';
     } else if (type === 'multiple-response') {
       defaultOptions = [
         { id: 'opt_1', text: 'compelling', isCorrect: true, distractorRationale: 'Chính xác. Tạo thành cụm kết hợp từ học thuật tự nhiên.' },
@@ -383,13 +394,39 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
         { id: 'opt_3', text: 'doubtfully', isCorrect: false, distractorRationale: 'Sai từ loại: Là phó từ không bổ nghĩa trực tiếp cho danh từ.' },
         { id: 'opt_4', text: 'narrowly', isCorrect: false, distractorRationale: 'Sai ngữ nghĩa học thuật trong ngữ cảnh bài thi.' }
       ];
+      defaultTargetWord = 'compelling, conclusive';
     } else if (type === 'category-matching') {
+      defaultSentenceEn = 'Categorize each transitional phrase according to its rhetorical function:';
+      defaultSentenceVi = 'Phân loại các cụm từ nối theo đúng chức năng lập luận học thuật.';
+      defaultCategories = [
+        { id: 'Addition (Bổ sung)', name: 'Addition (Bổ sung)' },
+        { id: 'Contrast (Tương phản)', name: 'Contrast (Tương phản)' },
+        { id: 'Result (Kết quả)', name: 'Result (Kết quả)' },
+        { id: 'Concession (Nhượng bộ)', name: 'Concession (Nhượng bộ)' }
+      ];
       defaultOptions = [
         { id: 'opt_1', text: 'Furthermore', category: 'Addition (Bổ sung)', isCorrect: true, distractorRationale: 'Chính xác. Dùng để bổ sung luận cứ củng cố.' },
         { id: 'opt_2', text: 'In contrast', category: 'Contrast (Tương phản)', isCorrect: true, distractorRationale: 'Chính xác. Dùng để so sánh đối lập trực tiếp.' },
         { id: 'opt_3', text: 'Consequently', category: 'Result (Kết quả)', isCorrect: true, distractorRationale: 'Chính xác. Chỉ kết quả hoặc hệ quả phát sinh.' },
         { id: 'opt_4', text: 'Notwithstanding', category: 'Concession (Nhượng bộ)', isCorrect: true, distractorRationale: 'Chính xác. Dùng để thiết lập mệnh đề nhượng bộ.' }
       ];
+      defaultTargetWord = 'Addition (Bổ sung), Contrast (Tương phản), Result (Kết quả), Concession (Nhượng bộ)';
+      defaultPos = 'discourse marker';
+      defaultPhonetic = '';
+    } else if (type === 'drag-and-drop') {
+      defaultSentenceEn = 'Governments must _____ carbon emissions and _____ renewable energy to meet climate targets.';
+      defaultSentenceVi = 'Chính phủ phải cắt giảm khí thải carbon và trợ cấp năng lượng tái tạo để đạt mục tiêu khí hậu.';
+      defaultOptions = [
+        { id: 'opt_1', text: 'curb', isCorrect: true, distractorRationale: 'Chính xác ở ô [1]: "curb carbon emissions" là collocation chuẩn nghĩa cắt giảm khí thải.' },
+        { id: 'opt_2', text: 'subsidize', isCorrect: true, distractorRationale: 'Chính xác ở ô [2]: "subsidize renewable energy" mang nghĩa trợ cấp năng lượng tái tạo.' },
+        { id: 'opt_3', text: 'exaggerate', isCorrect: false, distractorRationale: 'Bẫy ngữ nghĩa: "exaggerate" nghĩa là phóng đại, không phù hợp với hành động giảm phát thải.' },
+        { id: 'opt_4', text: 'neglect', isCorrect: false, distractorRationale: 'Bẫy ngữ nghĩa: "neglect" nghĩa là bỏ mặc, trái ngược với mục tiêu khí hậu.' }
+      ];
+      defaultTargetWord = 'curb, subsidize';
+      defaultPos = 'verb collocation';
+      defaultPhonetic = '/kɜːb/ • /ˈsʌb.sɪ.daɪz/';
+      defaultHints = 'Kéo đúng 2 động từ học thuật vào 2 ô trống theo trật tự logic câu.';
+      defaultExplanation = 'Cụm từ "curb emissions" và "subsidize renewable energy" thường xuyên xuất hiện trong IELTS Reading/Writing chủ đề Environment.';
     } else {
       defaultOptions = [
         { id: 'opt_1', text: 'sample', isCorrect: true, distractorRationale: 'Đáp án chính xác hoàn thành câu văn hoàn chỉnh.' },
@@ -399,22 +436,24 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
       ];
     }
 
+    const correctTexts = defaultOptions.filter(o => o.isCorrect).map(o => o.text);
     const newCard: PracticeCard = {
       id: `c_${timestamp}_${cards.length + 1}`,
       type: type,
       cognitive_level: 'applying',
-      sentence_en: 'This is a sample sentence with a _____ blank for testing.',
-      sentence_vi: 'Đây là câu ví dụ mẫu có ô trống để kiểm tra kiến thức.',
-      cloze_target: defaultOptions.find(o => o.isCorrect)?.text || 'sample',
-      target_word: 'sample',
-      part_of_speech: 'adjective',
-      phonetic: '/ˈsɑːm.pəl/',
-      hints: 'gợi ý ngữ cảnh',
-      accepted_answers: defaultOptions.filter(o => o.isCorrect).map(o => o.text),
-      explanation: 'Giải thích cấu trúc ngữ pháp và cụm từ cố định tại đây...',
+      sentence_en: defaultSentenceEn,
+      sentence_vi: defaultSentenceVi,
+      cloze_target: defaultTargetWord,
+      target_word: defaultTargetWord.split(',')[0].trim(),
+      part_of_speech: defaultPos,
+      phonetic: defaultPhonetic,
+      hints: defaultHints,
+      accepted_answers: correctTexts.length > 0 ? correctTexts : [defaultTargetWord],
+      explanation: defaultExplanation,
       grammar_points: ['Điểm ngữ pháp cần lưu ý'],
       options: defaultOptions.map(o => o.text),
       options_data: defaultOptions,
+      categories: defaultCategories,
       min_selections: type === 'multiple-response' ? 2 : 1,
       max_selections: type === 'multiple-response' ? 2 : 1,
       difficulty: 'medium'
@@ -785,6 +824,8 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
               qType = 'multiple-response';
             } else if (rawType.includes('true-false') || rawType.includes('tfng') || rawType.includes('t/f/ng') || rawType.includes('true_false')) {
               qType = 'true-false-not-given';
+            } else if (rawType.includes('drag') || rawType.includes('drop')) {
+              qType = 'drag-and-drop';
             } else if (rawType.includes('category') || rawType.includes('matching')) {
               qType = 'category-matching';
             } else {
@@ -895,6 +936,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
               cognitive_level: cogLevel,
               options_data: normalizedOptions,
               options: normalizedOptions.map(o => o.text),
+              categories: q.categories,
               min_selections: minSel,
               max_selections: maxSel,
               item
@@ -977,7 +1019,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
             Kho Bài Tập Thông Minh (Practice Decks CRUD)
           </h2>
           <p className="text-xs text-slate-400">
-            Toàn quyền tạo mới, chỉnh sửa, xóa bộ đề và câu hỏi. Tích hợp 4 dạng bài tập chuẩn khảo thí và sinh đề bằng Gemini AI.
+            Toàn quyền tạo mới, chỉnh sửa, xóa bộ đề và câu hỏi. Tích hợp 5 dạng bài tập chuẩn khảo thí (bao gồm Kéo Thả) và sinh đề bằng Gemini AI.
           </p>
         </div>
 
@@ -1034,7 +1076,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
               </h3>
               {dbStatus.is_on_sheets ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                   Đã đồng bộ lên Sheets ({dbStatus.total_cards} câu hỏi)
                 </span>
               ) : (
@@ -1424,46 +1466,56 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
                 <span>Danh Sách Câu Hỏi ({cards.length})</span>
               </h4>
 
-              {/* Add Card dropdown buttons */}
-              <div className="flex items-center gap-1.5">
+              {/* Add Card buttons */}
+              <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => handleAddCard('multiple-choice')}
-                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-300 font-semibold rounded-lg text-xs flex items-center gap-1 border border-slate-700 transition"
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-300 font-semibold rounded-lg text-xs flex items-center gap-1 border border-slate-700 transition cursor-pointer"
                   title="Thêm câu hỏi Chọn 1 đáp án"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Multiple Choice</span>
+                  <span>Multiple Choice</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleAddCard('multiple-response')}
-                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 font-semibold rounded-lg text-xs flex items-center gap-1 border border-slate-700 transition"
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 font-semibold rounded-lg text-xs flex items-center gap-1 border border-slate-700 transition cursor-pointer"
                   title="Thêm câu hỏi Chọn nhiều đáp án"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Multi Response</span>
+                  <span>Multi Response</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleAddCard('true-false-not-given')}
-                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold rounded-lg text-xs flex items-center gap-1 border border-slate-700 transition"
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold rounded-lg text-xs flex items-center gap-1 border border-slate-700 transition cursor-pointer"
                   title="Thêm câu hỏi True/False/Not Given"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ TFNG</span>
+                  <span>TFNG</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleAddCard('category-matching')}
-                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 font-semibold rounded-lg text-xs flex items-center gap-1 border border-slate-700 transition"
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 font-semibold rounded-lg text-xs flex items-center gap-1 border border-slate-700 transition cursor-pointer"
                   title="Thêm câu hỏi Phân loại nhóm"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Matching</span>
+                  <span>Matching</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleAddCard('drag-and-drop')}
+                  className="px-2.5 py-1.5 bg-indigo-950/70 hover:bg-indigo-900 text-sky-300 font-semibold rounded-lg text-xs flex items-center gap-1 border border-indigo-700/60 transition cursor-pointer"
+                  title="Thêm câu hỏi Kéo thả từ vào ô trống hoặc phân loại nhóm"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Drag &amp; Drop</span>
                 </button>
               </div>
             </div>
@@ -1491,6 +1543,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
                           cardType === 'multiple-choice' ? 'bg-sky-500/10 text-sky-300 border border-sky-500/30' :
                           cardType === 'multiple-response' ? 'bg-purple-500/10 text-purple-300 border border-purple-500/30' :
                           cardType === 'true-false-not-given' ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30' :
+                          cardType === 'drag-and-drop' ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/30' :
                           'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
                         }`}>
                           {cardType}
@@ -1556,6 +1609,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
                           <option value="multiple-response">2. multiple-response (Chọn nhiều đáp án)</option>
                           <option value="true-false-not-given">3. true-false-not-given (Đúng / Sai / Không có thông tin)</option>
                           <option value="category-matching">4. category-matching (Phân loại / Nối nhóm từ loại)</option>
+                          <option value="drag-and-drop">5. drag-and-drop (Kéo thả từ vào ô trống / phân loại)</option>
                         </select>
                       </div>
 
@@ -1633,6 +1687,12 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
                             className="w-full px-3 py-1.5 bg-slate-900 border border-purple-500/40 rounded-lg text-white text-xs focus:outline-none"
                           />
                         </div>
+                      </div>
+                    )}
+
+                    {cardType === 'drag-and-drop' && (
+                      <div className="p-3 bg-indigo-950/30 border border-indigo-500/30 rounded-xl text-[11px] text-indigo-200 leading-relaxed">
+                        <strong className="text-sky-300">Cách soạn bài Kéo Thả (Drag &amp; Drop):</strong> Đặt ký hiệu <code className="px-1 py-0.5 bg-slate-900 rounded text-sky-300">_____</code> tại mỗi vị trí cần thả từ (hỗ trợ 1 hoặc nhiều ô trống). Đánh dấu <strong>ĐÚNG</strong> cho các từ khớp với từng ô trống theo thứ tự từ trái sang phải, và để <strong>SAI</strong> cho các từ gây nhiễu. Nếu không dùng <code className="px-1 py-0.5 bg-slate-900 rounded text-sky-300">_____</code> mà điền cột <strong>Nhóm</strong> ở mỗi phương án, học sinh sẽ kéo thẻ vào các ô nhóm tương ứng.
                       </div>
                     )}
 
@@ -1725,13 +1785,13 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
                                 className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-white font-semibold text-xs focus:outline-none focus:border-indigo-500"
                               />
 
-                              {/* Category input for category-matching */}
-                              {cardType === 'category-matching' && (
+                              {/* Category input for category-matching or drag-and-drop group mode */}
+                              {(cardType === 'category-matching' || cardType === 'drag-and-drop') && (
                                 <input
                                   type="text"
                                   value={opt.category || ''}
                                   onChange={(e) => handleOptionChange(idx, optIdx, 'category', e.target.value)}
-                                  placeholder="Nhóm/Từ loại (VD: Noun, Verb, Addition)..."
+                                  placeholder={cardType === 'drag-and-drop' ? 'Nhóm (tùy chọn nếu kéo vào nhóm)...' : 'Nhóm/Từ loại (VD: Noun, Verb, Addition)...'}
                                   className="w-48 px-2.5 py-1.5 bg-slate-950 border border-emerald-700/50 rounded-lg text-emerald-300 text-xs focus:outline-none"
                                 />
                               )}
@@ -1838,7 +1898,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">Sinh Đề Tự Động Bằng Gemini AI</h3>
-                  <p className="text-xs text-slate-400">Kết hợp 4 dạng bài tập chuẩn và giải thích phương án bẫy chi tiết</p>
+                  <p className="text-xs text-slate-400">Kết hợp 5 dạng bài tập chuẩn (bao gồm Kéo Thả) và giải thích phương án bẫy chi tiết</p>
                 </div>
               </div>
 

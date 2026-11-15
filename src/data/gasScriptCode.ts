@@ -554,6 +554,8 @@ function buildPracticeDecksResponse_(ss) {
 
     var optionsData = undefined;
     var optionsPlain = undefined;
+    var derivedCategories = [];
+    var seenCategoryNames = {};
     if (Array.isArray(optionsParsed) && optionsParsed.length > 0) {
       var seenOptIds = {};
       optionsData = [];
@@ -570,27 +572,55 @@ function buildPracticeDecksResponse_(ss) {
         if (!oText) oText = 'Option ' + (idx + 1);
 
         var isCor = false;
+        var hasExplicitBool = false;
         if (typeof item === 'object' && item !== null) {
-          if (typeof item.isCorrect === 'boolean') isCor = item.isCorrect;
-          else if (typeof item.is_correct === 'boolean') isCor = item.is_correct;
-          else if (typeof item.correct === 'boolean') isCor = item.correct;
+          if (typeof item.isCorrect === 'boolean') { isCor = item.isCorrect; hasExplicitBool = true; }
+          else if (typeof item.is_correct === 'boolean') { isCor = item.is_correct; hasExplicitBool = true; }
+          else if (typeof item.correct === 'boolean') { isCor = item.correct; hasExplicitBool = true; }
         }
-        if (!isCor && targetClean) {
+        if (!hasExplicitBool && targetClean) {
           var lowText = oText.toLowerCase();
-          if (lowText === targetClean || targetClean.indexOf(lowText) !== -1 || lowText.indexOf(targetClean) !== -1) {
-            isCor = true;
+          var targetParts = targetClean.split(/[,|]/);
+          for (var tp = 0; tp < targetParts.length; tp++) {
+            if (targetParts[tp].trim() === lowText) {
+              isCor = true;
+              break;
+            }
           }
+        }
+
+        var optCategory = (typeof item === 'object' && item !== null && item.category)
+          ? String(item.category).trim()
+          : undefined;
+        if (optCategory && !seenCategoryNames[optCategory.toLowerCase()]) {
+          seenCategoryNames[optCategory.toLowerCase()] = true;
+          derivedCategories.push({ id: optCategory, name: optCategory });
         }
 
         optionsData.push({
           id: oId,
           text: oText,
           isCorrect: isCor,
+          category: optCategory,
           distractorRationale: (typeof item === 'object' && item !== null && (item.distractorRationale || item.explanation))
             ? String(item.distractorRationale || item.explanation)
             : ''
         });
         optionsPlain.push(oText);
+      }
+    }
+
+    var acceptedArr = [];
+    if (optionsData) {
+      for (var ca = 0; ca < optionsData.length; ca++) {
+        if (optionsData[ca].isCorrect) acceptedArr.push(optionsData[ca].text);
+      }
+    }
+    if (acceptedArr.length === 0 && targetWordStr) {
+      var splitTargets = targetWordStr.split(/[,|]/);
+      for (var st = 0; st < splitTargets.length; st++) {
+        var cleanT = splitTargets[st].trim();
+        if (cleanT) acceptedArr.push(cleanT);
       }
     }
 
@@ -607,9 +637,10 @@ function buildPracticeDecksResponse_(ss) {
       phonetic: String(pRow[15] || ''),
       hints: String(pRow[16] || ''),
       explanation: String(pRow[17] || ''),
-      accepted_answers: targetWordStr ? [targetWordStr] : [],
+      accepted_answers: acceptedArr,
       options_data: optionsData,
       options: optionsPlain,
+      categories: derivedCategories.length > 0 ? derivedCategories : undefined,
       updated_at: String(pRow[18] || '')
     };
 
@@ -626,7 +657,8 @@ function buildPracticeDecksResponse_(ss) {
         maxSelections: cardObj.max_selections,
         targetWord: cardObj.target_word,
         explanation: cardObj.explanation,
-        hints: cardObj.hints
+        hints: cardObj.hints,
+        categories: cardObj.categories
       };
     }
 

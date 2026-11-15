@@ -351,7 +351,7 @@ export const DatabaseDiagnosticsModal: React.FC<DatabaseDiagnosticsModalProps> =
           >
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             <span>Private Sheets (Service Account API v4 &amp; Webhook)</span>
-            <span className="text-[9px] px-1.5 py-0.2 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
               Enterprise Security
             </span>
           </button>

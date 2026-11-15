@@ -1032,11 +1032,12 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
 - DANH MỤC: ${cleanCategory}
 - CẤP ĐỘ: ${cleanLevel} (IELTS Academic)
 - SỐ CÂU HỎI: ${count} câu
-- ĐA DẠNG HÓA ĐỊNH DẠNG: Bộ bài tập PHẢI kết hợp cân bằng giữa 4 dạng:
+- ĐA DẠNG HÓA ĐỊNH DẠNG: Bộ bài tập PHẢI kết hợp cân bằng giữa 5 dạng:
   1. multiple-choice: Chọn 1 đáp án chính xác trong 4 lựa chọn. Các phương án nhiễu (distractors) phải là từ cùng từ loại hoặc biến thể hậu tố/tiền tố dễ gây nhầm lẫn.
   2. multiple-response: Chọn 2 đến 3 đáp án đúng. Phải chỉ định rõ min_selections và max_selections.
   3. true-false-not-given: Đưa ra ngữ cảnh học thuật ngắn và một nhận định cần kiểm chứng.
-  4. category-matching: Phân loại danh sách từ vựng vào các nhóm chức năng/từ loại tương ứng.
+  4. category-matching: Phân loại danh sách từ vựng vào các nhóm chức năng/từ loại tương ứng (mỗi option ghi rõ trường category và thẻ có mảng categories).
+  5. drag-and-drop: Kéo thả từ vào 1 hoặc 2 ô trống _____ trong câu (đánh dấu isCorrect: true cho các từ điền đúng thứ tự ô trống từ trái sang phải, kèm các từ gây nhiễu isCorrect: false).
 - PHÂN HÓA NHẬN THỨC (BLOOM'S TAXONOMY): Gán nhãn cognitive_level rõ ràng cho từng câu (remembering, understanding, applying, analyzing).
 - BẮT BUỘC GIẢI THÍCH CHI TIẾT: Mỗi phương án trong options_data bắt buộc phải có distractorRationale giải thích cặn kẽ tại sao đúng hoặc phân tích bẫy ngữ pháp/từ vựng nếu sai.
 
