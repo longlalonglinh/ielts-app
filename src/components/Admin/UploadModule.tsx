@@ -262,9 +262,11 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
       if (selectedFile) {
         setCurrentStep('Processing PDF document...');
         let parsedExam: any = null;
+        let pdfEndpointError: any = null;
         try {
           parsedExam = await uploadAndParseIeltsPdf(selectedFile);
-        } catch (uploadErr) {
+        } catch (uploadErr: any) {
+          pdfEndpointError = uploadErr;
           console.warn('Backend PDF endpoint unavailable, falling back to client-side pipeline:', uploadErr);
         }
 
@@ -277,13 +279,35 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
           if (parsedExam._testReport) {
             report = parsedExam._testReport;
           }
-        } else if (base64Data || rawTextSyllabus.trim()) {
-          setCurrentStep('Analyzing document structure via Gemini API...');
-          const res = await parsePdfWithServerGemini(base64Data || '', rawTextSyllabus.trim() || undefined);
-          candidateExam = res.exam;
-          report = res.testReport;
         } else {
-          throw new Error('Could not parse PDF. Please paste the exam text directly into the Text/Syllabus tab.');
+          let effectiveB64 = base64Data || '';
+          if (!effectiveB64) {
+            try {
+              const buf = await selectedFile.arrayBuffer();
+              const bytes = new Uint8Array(buf);
+              let binary = '';
+              for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+              effectiveB64 = btoa(binary);
+            } catch {}
+          }
+          if (effectiveB64 || rawTextSyllabus.trim()) {
+            setCurrentStep('Analyzing document structure via Gemini API...');
+            try {
+              const res = await parsePdfWithServerGemini(effectiveB64, rawTextSyllabus.trim() || undefined);
+              candidateExam = res.exam;
+              report = res.testReport;
+            } catch (fallbackErr: any) {
+              const msg = String(fallbackErr?.message || pdfEndpointError?.message || '');
+              if (msg.includes('HTML response') || msg.includes('404')) {
+                throw new Error(
+                  'Không thể trích xuất file PDF vì đang chạy ở chế độ Static SPA (chưa kết nối Express Backend / VITE_API_URL). Hãy truy cập bản có Server (Cloud Run / VPS) hoặc copy nội dung đề dán vào ô văn bản bên dưới.'
+                );
+              }
+              throw new Error(pdfEndpointError?.message || fallbackErr?.message || 'Could not parse PDF.');
+            }
+          } else {
+            throw new Error(pdfEndpointError?.message || 'Could not parse PDF. Please paste the exam text directly into the Text/Syllabus tab.');
+          }
         }
       } else {
         setCurrentStep('Analyzing document structure, passages, questions, and answer keys...');
