@@ -141,7 +141,7 @@ export const ManualGrading: React.FC<ManualGradingProps> = ({ apiUrl, gasUrl }) 
   // Load exam data for prompt and diagram preview
   useEffect(() => {
     if (!selectedSub?.exam_code) return;
-    const code = selectedSub.exam_code.trim().toUpperCase();
+    const code = String(selectedSub.exam_code || '').trim().toUpperCase();
     if (examCache[code]) return;
 
     const defaultMatch = DEFAULT_EXAMS.find(e => e.exam_code.toUpperCase() === code);
@@ -444,7 +444,7 @@ ${gradingForm.feedback || 'The essay meets task requirements. Focus on incorpora
 
               {/* Two-Column Synchronized Grading Workspace */}
               {(() => {
-                const currentExam = examCache[selectedSub.exam_code?.toUpperCase()];
+                const currentExam = examCache[String(selectedSub.exam_code || '').trim().toUpperCase()];
                 const writingSection = currentExam?.sections?.find(s => s.skill === 'writing');
                 const task1Obj = writingSection?.tasks?.find(t => t.task_number === 1) || writingSection?.tasks?.[0];
                 const task2Obj = writingSection?.tasks?.find(t => t.task_number === 2) || writingSection?.tasks?.[1];

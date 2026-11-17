@@ -64,3 +64,40 @@ function formatLocale(d: Date): string {
 
   return `${hours}:${minutes}:${seconds} - ${day}/${month}/${year}`;
 }
+
+/**
+ * Safely normalizes any timestamp representation (ISO string, numeric epoch, Date, DD/MM/YYYY)
+ * into a YYYY-MM-DD key without throwing when external backends return numbers or non-strings.
+ */
+export function toIsoDateKey(val: unknown): string {
+  if (val === undefined || val === null || val === '') return '';
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? '' : val.toISOString().split('T')[0];
+  }
+  if (typeof val === 'number') {
+    if (!Number.isFinite(val)) return '';
+    const ms = val > 0 && val < 1e11 ? val * 1000 : val;
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+  }
+  if (typeof val !== 'string') {
+    return '';
+  }
+  const str = val.trim();
+  if (!str) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.slice(0, 10);
+  }
+  if (/^\d{10,13}$/.test(str)) {
+    const num = Number(str);
+    const d = new Date(str.length === 10 ? num * 1000 : num);
+    return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+  }
+  const ddmmyyyy = str.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (ddmmyyyy) {
+    return `${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2, '0')}-${ddmmyyyy[1].padStart(2, '0')}`;
+  }
+  const parsed = new Date(str);
+  return isNaN(parsed.getTime()) ? '' : parsed.toISOString().split('T')[0];
+}
+

@@ -312,16 +312,28 @@ export function deduplicateSubmissions(list: SubmissionRecord[]): SubmissionReco
   list.forEach((sub, idx) => {
     if (!sub) return;
     const rawId = String(sub.submission_id ?? '').trim();
+    const sbdStr = String(sub.sbd ?? '').trim();
+    const examCodeStr = String(sub.exam_code ?? '').trim();
     const id = (!rawId || rawId === '#ERROR!')
-      ? `sub_fallback_${String(sub.sbd || 'cand')}_${String(sub.exam_code || 'code')}_${idx}`
+      ? `sub_fallback_${sbdStr || 'cand'}_${examCodeStr || 'code'}_${idx}`
       : rawId;
 
     if (!seen.has(id)) {
       seen.add(id);
+      const rawSubmittedAt = (sub as any).submitted_at;
+      const rawReceivedAt = (sub as any).received_at;
       result.push({
         ...sub,
-        submission_id: id
-      });
+        submission_id: id,
+        sbd: sbdStr,
+        exam_code: examCodeStr,
+        ...(rawSubmittedAt !== undefined && rawSubmittedAt !== null
+          ? { submitted_at: typeof rawSubmittedAt === 'number' && rawSubmittedAt > 1e9 ? new Date(rawSubmittedAt < 1e11 ? rawSubmittedAt * 1000 : rawSubmittedAt).toISOString() : String(rawSubmittedAt) }
+          : {}),
+        ...(rawReceivedAt !== undefined && rawReceivedAt !== null
+          ? { received_at: typeof rawReceivedAt === 'number' && rawReceivedAt > 1e9 ? new Date(rawReceivedAt < 1e11 ? rawReceivedAt * 1000 : rawReceivedAt).toISOString() : String(rawReceivedAt) }
+          : {})
+      } as SubmissionRecord);
     }
   });
   return result;
@@ -360,15 +372,23 @@ export function deduplicateCheatLogs(list: CheatLog[]): CheatLog[] {
   list.forEach((log, idx) => {
     if (!log) return;
     const rawId = String(log.log_id ?? '').trim();
+    const sbdStr = String(log.sbd ?? '').trim();
+    const examCodeStr = String(log.exam_code ?? '').trim();
     const id = (!rawId || rawId === '#ERROR!')
-      ? `log_fallback_${String(log.sbd || 'cand')}_${String(log.exam_code || 'code')}_${idx}`
+      ? `log_fallback_${sbdStr || 'cand'}_${examCodeStr || 'code'}_${idx}`
       : rawId;
 
     if (!seen.has(id)) {
       seen.add(id);
+      const rawTimestamp = (log as any).timestamp;
       result.push({
         ...log,
-        log_id: id
+        log_id: id,
+        sbd: sbdStr,
+        exam_code: examCodeStr,
+        ...(rawTimestamp !== undefined && rawTimestamp !== null
+          ? { timestamp: typeof rawTimestamp === 'number' && rawTimestamp > 1e9 ? new Date(rawTimestamp < 1e11 ? rawTimestamp * 1000 : rawTimestamp).toISOString() : String(rawTimestamp) }
+          : {})
       });
     }
   });
@@ -2521,8 +2541,24 @@ export async function uploadAndParseIeltsPdf(file: File): Promise<any> {
   const response = await fetch(getApiUrl('/api/admin/parse-pdf'), fetchInit);
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || 'FAILED_TO_EXTRACT_PDF');
+    const rawText = await response.text().catch(() => '');
+    let errorData: any = {};
+    try {
+      errorData = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      const trimmed = rawText.trim().toLowerCase();
+      if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html') || response.status === 404) {
+        throw new Error(`HTML response from /api/admin/parse-pdf (HTTP ${response.status}).`);
+      }
+    }
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(
+        errorData.message ||
+          errorData.error ||
+          'Phiên đăng nhập Admin chưa được Server xác thực (HTTP 401). Hãy đăng xuất và đăng nhập lại bằng ADMIN123.'
+      );
+    }
+    throw new Error(errorData.error || errorData.message || 'FAILED_TO_EXTRACT_PDF');
   }
 
   const result = await response.json();

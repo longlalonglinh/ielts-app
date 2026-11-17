@@ -45,7 +45,7 @@ import {
   fetchPublishedCatalog
 } from '../../services/api';
 import { DEFAULT_EXAMS } from '../../data/defaultExams';
-import { formatSubmissionTime } from '../../utils/dateFormatter';
+import { formatSubmissionTime, toIsoDateKey } from '../../utils/dateFormatter';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
 
 export interface QuestionItemAnalysisRow {
@@ -465,7 +465,9 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
 
   // Database KPI Calculations
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayCount = submissions.filter(s => (s.submitted_at || (s as any).received_at || '').startsWith(todayStr)).length;
+  const todayCount = submissions.filter(
+    s => toIsoDateKey(s?.submitted_at ?? (s as any)?.received_at) === todayStr
+  ).length;
   const gradedWritingCount = submissions.filter(s => s.writing_status === 'GRADED').length;
   const pendingWritingCount = submissions.filter(s => s.writing_status !== 'GRADED').length;
   

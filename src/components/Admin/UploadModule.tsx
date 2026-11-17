@@ -285,9 +285,12 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
             try {
               const buf = await selectedFile.arrayBuffer();
               const bytes = new Uint8Array(buf);
-              let binary = '';
-              for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-              effectiveB64 = btoa(binary);
+              const chunks: string[] = [];
+              const chunkSize = 0x8000;
+              for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+                chunks.push(String.fromCharCode(...bytes.subarray(i, i + chunkSize)));
+              }
+              effectiveB64 = btoa(chunks.join(''));
             } catch {}
           }
           if (effectiveB64 || rawTextSyllabus.trim()) {
@@ -297,13 +300,19 @@ export const UploadModule: React.FC<UploadModuleProps> = ({
               candidateExam = res.exam;
               report = res.testReport;
             } catch (fallbackErr: any) {
-              const msg = String(fallbackErr?.message || pdfEndpointError?.message || '');
-              if (msg.includes('HTML response') || msg.includes('404')) {
+              const fallbackMsg = String(fallbackErr?.message || '');
+              const endpointMsg = String(pdfEndpointError?.message || '');
+              const combined = `${endpointMsg} ${fallbackMsg}`;
+              if (combined.includes('HTML response') || combined.includes('404')) {
                 throw new Error(
                   'Không thể trích xuất file PDF vì đang chạy ở chế độ Static SPA (chưa kết nối Express Backend / VITE_API_URL). Hãy truy cập bản có Server (Cloud Run / VPS) hoặc copy nội dung đề dán vào ô văn bản bên dưới.'
                 );
               }
-              throw new Error(pdfEndpointError?.message || fallbackErr?.message || 'Could not parse PDF.');
+              const preferredMsg =
+                fallbackMsg && endpointMsg === 'FAILED_TO_EXTRACT_PDF'
+                  ? fallbackMsg
+                  : (endpointMsg && endpointMsg !== 'FAILED_TO_EXTRACT_PDF' ? endpointMsg : fallbackMsg);
+              throw new Error(preferredMsg || 'Could not parse PDF.');
             }
           } else {
             throw new Error(pdfEndpointError?.message || 'Could not parse PDF. Please paste the exam text directly into the Text/Syllabus tab.');

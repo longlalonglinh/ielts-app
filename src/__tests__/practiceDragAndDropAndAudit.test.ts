@@ -12,6 +12,7 @@ import {
 } from '../utils/practiceHelpers';
 import { PracticeCard } from '../types/practice';
 import { practiceService } from '../services/practiceService';
+import { toIsoDateKey } from '../utils/dateFormatter';
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -186,5 +187,19 @@ describe('Practice Audit Fixes & Drag-and-Drop Question Type', () => {
 
     const generated = await practiceService.generateDeck('Climate Policy', 'Vocabulary', 'B1-B2', 5);
     expect(generated.cards.some(c => c.type === 'drag-and-drop')).toBe(true);
+  });
+
+  it('excludes dropdown from drag-and-drop and safely normalizes numeric/object timestamps via toIsoDateKey', () => {
+    expect(normalizeQuestionType('dropdown')).toBe('multiple-choice');
+    expect(normalizeQuestionType('dnd')).toBe('drag-and-drop');
+
+    expect(toIsoDateKey('2026-11-16T15:00:00.000Z')).toBe('2026-11-16');
+    expect(toIsoDateKey(1794841200000)).toBe('2026-11-16');
+    expect(toIsoDateKey(1794841200)).toBe('2026-11-16');
+    expect(toIsoDateKey('18:50:00 16/11/2026')).toBe('2026-11-16');
+    expect(toIsoDateKey(new Date('2026-11-16T00:00:00.000Z'))).toBe('2026-11-16');
+    expect(toIsoDateKey(null)).toBe('');
+    expect(toIsoDateKey(undefined)).toBe('');
+    expect(toIsoDateKey({ bad: true })).toBe('');
   });
 });

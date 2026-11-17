@@ -425,7 +425,16 @@ export function getSubmissionsStats(): {
   const overallBands: number[] = [];
 
   for (const s of submissions) {
-    const subDate = (s.submitted_at || s.received_at || '').split('T')[0];
+    const rawDate = s?.submitted_at ?? s?.received_at;
+    let subDate = '';
+    if (typeof rawDate === 'number' && Number.isFinite(rawDate)) {
+      const d = new Date(rawDate > 0 && rawDate < 1e11 ? rawDate * 1000 : rawDate);
+      if (!isNaN(d.getTime())) subDate = d.toISOString().split('T')[0];
+    } else if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
+      subDate = rawDate.toISOString().split('T')[0];
+    } else if (rawDate !== undefined && rawDate !== null) {
+      subDate = String(rawDate).split('T')[0];
+    }
     if (subDate === todayStr) {
       todayCount++;
     }

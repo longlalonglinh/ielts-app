@@ -43,7 +43,7 @@ export function normalizeQuestionType(rawType: any): PracticeQuestionType {
   if (t.includes('true-false') || t.includes('tfng') || t.includes('t/f/ng') || t.includes('true_false')) {
     return 'true-false-not-given';
   }
-  if (t.includes('drag') || t.includes('drop')) {
+  if (t === 'dnd' || t.includes('drag') || (t.includes('drop') && !t.includes('dropdown'))) {
     return 'drag-and-drop';
   }
   if (t.includes('category') || t.includes('matching')) {
