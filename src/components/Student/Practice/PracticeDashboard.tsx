@@ -208,7 +208,7 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
         setAllDecks(updatedDecks);
         setDbStatus(practiceService.getDatabaseStatus());
         setLoadError(null);
-        const matched = updatedDecks.find(d => d.deck_id.toUpperCase() === initialDeckId.toUpperCase()) || updatedDecks[0];
+        const matched = updatedDecks.find(d => String(d.deck_id || '').toUpperCase() === String(initialDeckId || '').toUpperCase()) || updatedDecks[0];
         if (matched) setActiveDeck(matched);
       }
     }).catch(err => console.debug('Initial server practice fetch note:', err));
@@ -221,7 +221,7 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
           setAllDecks(updatedDecks);
           setDbStatus(practiceService.getDatabaseStatus());
           setLoadError(null);
-          const matched = updatedDecks.find(d => d.deck_id.toUpperCase() === initialDeckId.toUpperCase()) || updatedDecks[0];
+          const matched = updatedDecks.find(d => String(d.deck_id || '').toUpperCase() === String(initialDeckId || '').toUpperCase()) || updatedDecks[0];
           if (matched) setActiveDeck(prev => prev || matched);
         }
       }).catch(err => console.debug('Initial sheets fetch note:', err));
@@ -341,10 +341,11 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
   // Filter, Search, Sort & Paginate Decks
   const filteredDecks = React.useMemo(() => {
     return allDecks.filter(deck => {
-      const matchSearch = !searchQuery.trim() || 
-        deck.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        deck.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        deck.deck_id.toLowerCase().includes(searchQuery.toLowerCase());
+      const q = searchQuery.trim().toLowerCase();
+      const matchSearch = !q || 
+        String(deck.title || '').toLowerCase().includes(q) ||
+        String(deck.description || '').toLowerCase().includes(q) ||
+        String(deck.deck_id || '').toLowerCase().includes(q);
       
       const matchCategory = selectedCategory === 'ALL' || deck.category === selectedCategory;
       const matchLevel = selectedLevel === 'ALL' || deck.level === selectedLevel;

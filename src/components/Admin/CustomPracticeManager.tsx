@@ -106,7 +106,7 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
     const all = practiceService.getAllDecks();
     setDecks(all);
     if (preferredDeckId) {
-      const match = all.find(d => d.deck_id.toUpperCase() === preferredDeckId.toUpperCase());
+      const match = all.find(d => String(d.deck_id || '').toUpperCase() === preferredDeckId.toUpperCase());
       if (match) {
         handleSelectDeck(match);
         return;
@@ -119,10 +119,11 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
 
   // Filtered decks computation
   const filteredDecks = decks.filter(deck => {
-    const matchesSearch = searchTerm.trim() === '' || 
-      deck.deck_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      deck.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      deck.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const q = searchTerm.trim().toLowerCase();
+    const matchesSearch = q === '' || 
+      String(deck.deck_id || '').toLowerCase().includes(q) ||
+      String(deck.title || '').toLowerCase().includes(q) ||
+      String(deck.description || '').toLowerCase().includes(q);
     
     const matchesLevel = filterLevel === 'ALL' || deck.level === filterLevel;
     const matchesCategory = filterCategory === 'ALL' || deck.category === filterCategory;
@@ -226,15 +227,18 @@ export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ ga
 
       if (!optionsData || optionsData.length === 0) {
         if (c.options && c.options.length > 0) {
-          const target = (c.cloze_target || '').toLowerCase().trim();
-          optionsData = c.options.map((optText, oIdx) => ({
-            id: `opt_${oIdx + 1}`,
-            text: optText,
-            isCorrect: optText.toLowerCase().trim() === target || (c.accepted_answers || []).some(a => a.toLowerCase().trim() === optText.toLowerCase().trim()),
-            distractorRationale: optText.toLowerCase().trim() === target 
-              ? (c.explanation || 'Đáp án chính xác phù hợp với cấu trúc ngữ pháp học thuật.')
-              : 'Phương án nhiễu: Không thỏa mãn ngữ cảnh hoặc sai từ loại.'
-          }));
+          const target = String(c.cloze_target || '').toLowerCase().trim();
+          optionsData = c.options.map((optText, oIdx) => {
+            const cleanOpt = String(optText || '');
+            return {
+              id: `opt_${oIdx + 1}`,
+              text: cleanOpt,
+              isCorrect: cleanOpt.toLowerCase().trim() === target || (c.accepted_answers || []).some(a => String(a || '').toLowerCase().trim() === cleanOpt.toLowerCase().trim()),
+              distractorRationale: cleanOpt.toLowerCase().trim() === target 
+                ? (c.explanation || 'Đáp án chính xác phù hợp với cấu trúc ngữ pháp học thuật.')
+                : 'Phương án nhiễu: Không thỏa mãn ngữ cảnh hoặc sai từ loại.'
+            };
+          });
         } else {
           optionsData = [
             { id: 'opt_1', text: c.cloze_target || 'Option A', isCorrect: true, distractorRationale: 'Đáp án chính xác.' },

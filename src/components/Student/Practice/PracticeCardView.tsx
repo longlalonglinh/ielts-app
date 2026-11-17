@@ -272,8 +272,8 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
         const trimmed = userInput.trim().toLowerCase();
         if (!trimmed) return;
         const validAnswers = [
-          (legacyCard.cloze_target || '').toLowerCase().trim(),
-          ...(legacyCard.accepted_answers || []).map(a => a.toLowerCase().trim())
+          String(legacyCard.cloze_target || '').toLowerCase().trim(),
+          ...(legacyCard.accepted_answers || []).map(a => String(a || '').toLowerCase().trim())
         ];
         itemCorrect = validAnswers.some(a => a === trimmed);
       }
@@ -287,7 +287,7 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
       itemCorrect = result.isFullyCorrect || result.score >= 0.8;
     } else if (item.type === 'true-false-not-given') {
       if (!selectedTfng) return;
-      const targetAns = (legacyCard.cloze_target || (item.options.find(o => o.isCorrect)?.text) || (item.options[0]?.text) || 'TRUE').toUpperCase().trim();
+      const targetAns = String(legacyCard.cloze_target || (item.options.find(o => o.isCorrect)?.text) || (item.options[0]?.text) || 'TRUE').toUpperCase().trim();
       const normalizedTarget = targetAns.includes('NOT') ? 'NOT_GIVEN' : targetAns.includes('FALSE') ? 'FALSE' : 'TRUE';
       itemCorrect = selectedTfng === normalizedTarget;
     } else if (item.type === 'category-matching') {
@@ -632,7 +632,7 @@ export const PracticeCardView: React.FC<PracticeCardViewProps> = ({
 
     // 3. True / False / Not Given (Row of 3 semantic buttons)
     if (item.type === 'true-false-not-given') {
-      const targetAns = (legacyCard.cloze_target || (item.options[0]?.text) || 'TRUE').toUpperCase().trim();
+      const targetAns = String(legacyCard.cloze_target || (item.options[0]?.text) || 'TRUE').toUpperCase().trim();
       const normalizedTarget = targetAns.includes('NOT') ? 'NOT_GIVEN' : targetAns.includes('FALSE') ? 'FALSE' : 'TRUE';
 
       const tfngOptions: Array<{
