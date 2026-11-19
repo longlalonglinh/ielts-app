@@ -37,6 +37,7 @@ export const ManualGrading: React.FC<ManualGradingProps> = ({ apiUrl, gasUrl }) 
   const [zoomDiagramUrl, setZoomDiagramUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copiedZalo, setCopiedZalo] = useState(false);
+  const [statusBanner, setStatusBanner] = useState<{ type: 'success' | 'warning' | 'error'; message: string } | null>(null);
   const [mobileTab, setMobileTab] = useState<'list' | 'grading'>('list');
   const [filterPendingOnly, setFilterPendingOnly] = useState(false);
   const [gradingForm, setGradingForm] = useState<GradingForm>({
@@ -207,19 +208,32 @@ export const ManualGrading: React.FC<ManualGradingProps> = ({ apiUrl, gasUrl }) 
         const draftKey = `WRITING_GRADE_DRAFT_${selectedSub.submission_id}`;
         try {
           localStorage.removeItem(draftKey);
-        } catch (e) {}
-        alert(`✅ Writing score for candidate ${selectedSub.sbd} saved successfully!`);
+        } catch {}
+        setStatusBanner({
+          type: 'success',
+          message: `Writing score for candidate ${selectedSub.sbd} saved successfully.`
+        });
         loadSubmissions();
       } else {
         if (res.conflict) {
-          alert(`⚠️ DATA HAS BEEN UPDATED BY ANOTHER EXAMINER. PLEASE RELOAD THE PAGE.\n\n(Another examiner has submitted grades for candidate ${selectedSub.sbd}. The latest data will now be reloaded.)`);
+          setStatusBanner({
+            type: 'warning',
+            message: `Another examiner has updated grades for candidate ${selectedSub.sbd}. The latest data has been reloaded.`
+          });
           loadSubmissions();
         } else {
-          alert(`❌ Failed to save score: ${res.message}`);
+          setStatusBanner({
+            type: 'error',
+            message: `Failed to save score: ${res.message || 'Unknown error'}`
+          });
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving score:', err);
+      setStatusBanner({
+        type: 'error',
+        message: `Failed to save score: ${err?.message || 'Unexpected error'}`
+      });
     } finally {
       setLoading(false);
     }
@@ -253,13 +267,31 @@ ${gradingForm.feedback || 'The essay meets task requirements. Focus on incorpora
 `.trim();
   };
 
-  const handleCopyZalo = () => {
+  const handleCopyZalo = async () => {
     const zaloText = generateZaloFormattedText();
-    navigator.clipboard.writeText(zaloText);
-    setCopiedZalo(true);
-    setTimeout(() => {
-      setCopiedZalo(false);
-    }, 3000);
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(zaloText);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = zaloText;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopiedZalo(true);
+      setTimeout(() => {
+        setCopiedZalo(false);
+      }, 3000);
+    } catch {
+      setStatusBanner({
+        type: 'warning',
+        message: 'Clipboard access is restricted in this browser sandbox. Please copy the feedback manually.'
+      });
+    }
   };
 
   const pendingCount = submissions.filter((s) => s.writing_status === 'PENDING_TEACHER').length;
@@ -304,6 +336,37 @@ ${gradingForm.feedback || 'The essay meets task requirements. Focus on incorpora
           </button>
         )}
       </div>
+
+      {/* Inline Status Banner (iframe-safe replacement for window.alert) */}
+      {statusBanner && (
+        <div
+          role="status"
+          className={`flex items-start justify-between gap-3 px-4 py-3 rounded-2xl border text-xs font-bold shadow-sm ${
+            statusBanner.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : statusBanner.type === 'warning'
+              ? 'bg-amber-50 border-amber-200 text-amber-900'
+              : 'bg-rose-50 border-rose-200 text-rose-900'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {statusBanner.type === 'success' ? (
+              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertTriangle className={`w-4 h-4 shrink-0 ${statusBanner.type === 'warning' ? 'text-amber-600' : 'text-rose-600'}`} />
+            )}
+            <span>{statusBanner.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStatusBanner(null)}
+            className="p-1 rounded-lg hover:bg-black/5 transition cursor-pointer shrink-0"
+            aria-label="Dismiss status message"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Mobile Tab Switcher (< lg) */}
       <div className="lg:hidden flex items-center bg-[#E2DDEC] p-1.5 rounded-2xl">
