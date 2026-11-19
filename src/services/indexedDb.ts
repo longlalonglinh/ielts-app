@@ -19,7 +19,14 @@ let dbInstance: IDBDatabase | null = null;
  */
 export function openIndexedDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined' || !window.indexedDB) {
+    let idbFactory: IDBFactory | undefined;
+    try {
+      idbFactory = typeof window !== 'undefined' ? window.indexedDB : undefined;
+    } catch (err) {
+      return reject(err);
+    }
+
+    if (!idbFactory) {
       return reject(new Error('IndexedDB is not supported in this environment'));
     }
 
@@ -27,7 +34,12 @@ export function openIndexedDB(): Promise<IDBDatabase> {
       return resolve(dbInstance);
     }
 
-    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+    let request: IDBOpenDBRequest;
+    try {
+      request = idbFactory.open(DB_NAME, DB_VERSION);
+    } catch (err) {
+      return reject(err);
+    }
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;

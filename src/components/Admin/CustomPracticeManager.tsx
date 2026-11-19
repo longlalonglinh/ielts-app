@@ -8,6 +8,7 @@ import {
 } from '../../types/practice';
 import { practiceService } from '../../services/practiceService';
 import { DEFAULT_API_URL } from '../../services/api';
+import { safeLocalStorage } from '../../utils/safeStorage';
 import { 
   Sparkles, 
   Plus, 
@@ -48,7 +49,7 @@ interface CustomPracticeManagerProps {
 }
 
 export const CustomPracticeManager: React.FC<CustomPracticeManagerProps> = ({ gasUrl }) => {
-  const effectiveGasUrl = gasUrl || localStorage.getItem('ielts_gas_url') || DEFAULT_API_URL;
+  const effectiveGasUrl = gasUrl || safeLocalStorage.getItem('ielts_gas_url') || DEFAULT_API_URL;
 
   const [decks, setDecks] = useState<CustomPracticeDeck[]>([]);
   const [selectedDeck, setSelectedDeck] = useState<CustomPracticeDeck | null>(null);

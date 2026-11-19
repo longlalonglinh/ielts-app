@@ -36,6 +36,7 @@ import {
   extractSpreadsheetId, 
   testGvizConnection 
 } from './gvizService';
+import { safeLocalStorage, safeSessionStorage, safeJsonParse } from '../utils/safeStorage';
 
 export { 
   fetchExamViaGviz, 
@@ -75,32 +76,19 @@ export const getApiUrl = (path: string): string => {
 const ADMIN_TOKEN_STORAGE_KEY = 'ielts_admin_session_token';
 
 export function getAdminToken(): string {
-  try {
-    if (typeof sessionStorage !== 'undefined') {
-      return (sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || '').trim();
-    }
-  } catch {}
-  return '';
+  return (safeSessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || '').trim();
 }
 
 export function setAdminToken(token: string): void {
-  try {
-    if (typeof sessionStorage !== 'undefined') {
-      if (token && token.trim()) {
-        sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token.trim());
-      } else {
-        sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-      }
-    }
-  } catch {}
+  if (token && token.trim()) {
+    safeSessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token.trim());
+  } else {
+    safeSessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+  }
 }
 
 export function clearAdminToken(): void {
-  try {
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-    }
-  } catch {}
+  safeSessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
 }
 
 export function isAdminAuthenticated(): boolean {
@@ -402,8 +390,9 @@ export async function fetchSubmissions(
   apiUrl: string = DEFAULT_API_URL
 ): Promise<{ success: boolean; data?: SubmissionRecord[]; error?: string; source?: 'gas' | 'idb' | 'local' | 'server' }> {
   // Load local backups first
-  const localSaved = localStorage.getItem('ielts_student_submissions');
-  const localData: SubmissionRecord[] = localSaved ? JSON.parse(localSaved) : [];
+  const localSaved = safeLocalStorage.getItem('ielts_student_submissions');
+  const parsedLocal = safeJsonParse<SubmissionRecord[]>(localSaved, []);
+  const localData: SubmissionRecord[] = Array.isArray(parsedLocal) ? parsedLocal : [];
   const idbData = await getAllSubmissionsFromIndexedDB();
 
   // Combine unique local & idb submissions
@@ -466,8 +455,9 @@ export async function fetchSubmissions(
 export async function fetchCheatLogs(
   apiUrl: string
 ): Promise<{ success: boolean; data?: CheatLog[]; error?: string; source?: 'gas' | 'idb' | 'local' | 'server' }> {
-  const localLogs = localStorage.getItem('ielts_cheat_logs');
-  const logsArr: CheatLog[] = localLogs ? JSON.parse(localLogs) : [];
+  const localLogs = safeLocalStorage.getItem('ielts_cheat_logs');
+  const parsedLogs = safeJsonParse<CheatLog[]>(localLogs, []);
+  const logsArr: CheatLog[] = Array.isArray(parsedLogs) ? parsedLogs : [];
   const idbLogs = await getAllCheatLogsFromIndexedDB();
 
   let combinedLogs = deduplicateCheatLogs([...logsArr, ...idbLogs]);
@@ -505,7 +495,7 @@ export async function fetchCheatLogs(
         allMerged.forEach(log => {
           saveCheatLogToIndexedDB(log).catch(() => {});
         });
-        localStorage.setItem('ielts_cheat_logs', JSON.stringify(allMerged.slice(0, 100)));
+        safeLocalStorage.setItem('ielts_cheat_logs', JSON.stringify(allMerged.slice(0, 100)));
 
         return { success: true, data: allMerged, source: 'gas' };
       }
@@ -558,9 +548,10 @@ export async function saveWritingScore(
   }
 
   // Update in LocalStorage & IndexedDB
-  const localSaved = localStorage.getItem('ielts_student_submissions');
+  const localSaved = safeLocalStorage.getItem('ielts_student_submissions');
   if (localSaved) {
-    const localData: SubmissionRecord[] = JSON.parse(localSaved);
+    const parsedSaved = safeJsonParse<SubmissionRecord[]>(localSaved, []);
+    const localData: SubmissionRecord[] = Array.isArray(parsedSaved) ? parsedSaved : [];
     const updated = localData.map(sub => {
       if (sub.submission_id === submissionId) {
         const gradedSub: SubmissionRecord = {
@@ -936,8 +927,9 @@ export async function submitExamPayload(
 
   // 2. Persistence to LocalStorage
   try {
-    const existing = localStorage.getItem('ielts_student_submissions');
-    const subsArr: SubmissionRecord[] = existing ? JSON.parse(existing) : [];
+    const existing = safeLocalStorage.getItem('ielts_student_submissions');
+    const parsedExisting = safeJsonParse<SubmissionRecord[]>(existing, []);
+    const subsArr: SubmissionRecord[] = Array.isArray(parsedExisting) ? parsedExisting : [];
     if (!subsArr.some(s => s.submission_id === record.submission_id)) {
       subsArr.unshift(record);
     }
@@ -988,11 +980,12 @@ export async function submitExamPayload(
         await removePendingSubmissionFromIndexedDB(submissionId);
 
         try {
-          const existing = localStorage.getItem('ielts_student_submissions');
-          const subsArr: SubmissionRecord[] = existing ? JSON.parse(existing) : [];
+          const existing = safeLocalStorage.getItem('ielts_student_submissions');
+          const parsedExisting = safeJsonParse<SubmissionRecord[]>(existing, []);
+          const subsArr: SubmissionRecord[] = Array.isArray(parsedExisting) ? parsedExisting : [];
           const updated = subsArr.map(s => s.submission_id === certifiedRecord.submission_id ? certifiedRecord : s);
           safeSaveSubmissionsToLocalStorage(updated);
-        } catch (e) {}
+        } catch {}
 
         return {
           ...responseObj,
@@ -1038,11 +1031,12 @@ export async function submitExamPayload(
       await removePendingSubmissionFromIndexedDB(submissionId);
 
       try {
-        const existing = localStorage.getItem('ielts_student_submissions');
-        const subsArr: SubmissionRecord[] = existing ? JSON.parse(existing) : [];
+        const existing = safeLocalStorage.getItem('ielts_student_submissions');
+        const parsedExisting = safeJsonParse<SubmissionRecord[]>(existing, []);
+        const subsArr: SubmissionRecord[] = Array.isArray(parsedExisting) ? parsedExisting : [];
         const updated = subsArr.map(s => s.submission_id === record.submission_id ? record : s);
         safeSaveSubmissionsToLocalStorage(updated);
-      } catch (e) {}
+      } catch {}
 
       return {
         ...responseObj,
@@ -1116,11 +1110,12 @@ export async function syncPendingSubmissions(gasUrl?: string): Promise<{
 
             // Update LocalStorage cache
             try {
-              const existing = localStorage.getItem('ielts_student_submissions');
-              const subsArr: SubmissionRecord[] = existing ? JSON.parse(existing) : [];
+              const existing = safeLocalStorage.getItem('ielts_student_submissions');
+              const parsedExisting = safeJsonParse<SubmissionRecord[]>(existing, []);
+              const subsArr: SubmissionRecord[] = Array.isArray(parsedExisting) ? parsedExisting : [];
               const updated = subsArr.map(s => s.submission_id === certifiedSub.submission_id ? certifiedSub : s);
               safeSaveSubmissionsToLocalStorage(updated);
-            } catch (e) {}
+            } catch {}
 
             results.push({
               success: true,
@@ -1349,7 +1344,7 @@ if (typeof window !== 'undefined') {
     } catch (e) {}
 
     try {
-      const localRaw = localStorage.getItem('ielts_saved_exams');
+      const localRaw = safeLocalStorage.getItem('ielts_saved_exams');
       if (localRaw) {
         const parsed = JSON.parse(localRaw);
         if (Array.isArray(parsed)) {
@@ -1604,7 +1599,7 @@ export function prefetchExam(
 
     // 3. Check LocalStorage
     try {
-      const localExamsRaw = localStorage.getItem('ielts_saved_exams');
+      const localExamsRaw = safeLocalStorage.getItem('ielts_saved_exams');
       if (localExamsRaw) {
         const localList = JSON.parse(localExamsRaw);
         if (Array.isArray(localList)) {
@@ -1676,17 +1671,11 @@ export function prefetchExam(
 export function clearSessionTimers(examCode?: string): void {
   try {
     const cleanCode = examCode ? examCode.trim().toUpperCase().replace(/[^a-zA-Z0-9]/g, '_') : '';
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const k = sessionStorage.key(i);
-      if (k && k.startsWith('ielts_timer_target_')) {
-        if (!cleanCode || k.includes(cleanCode)) {
-          keysToRemove.push(k);
-        }
-      }
-    }
-    keysToRemove.forEach(k => sessionStorage.removeItem(k));
-  } catch (e) {}
+    const keysToRemove = safeSessionStorage.keys().filter(k =>
+      k.startsWith('ielts_timer_target_') && (!cleanCode || k.includes(cleanCode))
+    );
+    keysToRemove.forEach(k => safeSessionStorage.removeItem(k));
+  } catch {}
 }
 
 /**
@@ -1702,7 +1691,7 @@ export async function clearExamCache(examCode: string): Promise<void> {
     await deleteExamFromIndexedDB(cleanCode);
   } catch (e) {}
   try {
-    const localRaw = localStorage.getItem('ielts_saved_exams');
+    const localRaw = safeLocalStorage.getItem('ielts_saved_exams');
     if (localRaw) {
       const arr = JSON.parse(localRaw);
       if (Array.isArray(arr)) {
@@ -1834,7 +1823,7 @@ export async function fetchExam(
   // Tier 5: Saved LocalStorage Exams (~1-2ms)
   if (!forceFresh) {
     try {
-      const localExamsRaw = localStorage.getItem('ielts_saved_exams');
+      const localExamsRaw = safeLocalStorage.getItem('ielts_saved_exams');
       if (localExamsRaw) {
         const localList = JSON.parse(localExamsRaw);
         if (Array.isArray(localList)) {
@@ -2467,7 +2456,7 @@ export async function deleteExam(examCode: string): Promise<boolean> {
 
   // 3. Remove from LocalStorage
   try {
-    const raw = localStorage.getItem('ielts_saved_exams');
+    const raw = safeLocalStorage.getItem('ielts_saved_exams');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
@@ -2704,8 +2693,9 @@ export async function importSubmissionsJSON(
       await saveSubmissionToIndexedDB(subRecord);
 
       try {
-        const local = localStorage.getItem('ielts_student_submissions');
-        const list: SubmissionRecord[] = local ? JSON.parse(local) : [];
+        const local = safeLocalStorage.getItem('ielts_student_submissions');
+        const parsedList = safeJsonParse<SubmissionRecord[]>(local, []);
+        const list: SubmissionRecord[] = Array.isArray(parsedList) ? parsedList : [];
         const exists = list.some(s => s.submission_id === subRecord.submission_id);
         if (exists) {
           updatedCount++;

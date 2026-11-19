@@ -8,6 +8,7 @@ import {
   EyeOff, 
   CheckCircle2 
 } from 'lucide-react';
+import { safeSessionStorage } from '../../utils/safeStorage';
 
 interface CountdownTimerProps {
   initialMinutes: number;
@@ -34,7 +35,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   const totalSeconds = Math.max(1, initialMinutes * 60);
 
   const getOrInitEndTime = (): number => {
-    const existing = sessionStorage.getItem(storageKey);
+    const existing = safeSessionStorage.getItem(storageKey);
     if (existing) {
       const parsed = parseInt(existing, 10);
       if (!isNaN(parsed) && parsed > Date.now()) {
@@ -42,7 +43,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
       }
     }
     const newEndTime = Date.now() + totalSeconds * 1000;
-    sessionStorage.setItem(storageKey, newEndTime.toString());
+    safeSessionStorage.setItem(storageKey, newEndTime.toString());
     return newEndTime;
   };
 
@@ -91,7 +92,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   const handleResetTimer = (e: React.MouseEvent) => {
     e.stopPropagation();
     const newTarget = Date.now() + totalSeconds * 1000;
-    sessionStorage.setItem(storageKey, newTarget.toString());
+    safeSessionStorage.setItem(storageKey, newTarget.toString());
     setEndTime(newTarget);
     setSecondsLeft(totalSeconds);
     hasExpiredRef.current = false;

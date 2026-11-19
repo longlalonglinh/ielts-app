@@ -1,4 +1,5 @@
 import { ExamData, Question, QuestionType, ReadingPassageItem } from '../types';
+import { safeLocalStorage } from '../utils/safeStorage';
 
 /**
  * Extracts a valid Google Spreadsheet ID from either a raw ID string
@@ -39,7 +40,7 @@ export function extractSpreadsheetId(input?: string | null): string | null {
  */
 export function getStoredSpreadsheetId(): string {
   if (typeof window === 'undefined') return '';
-  const fromStorage = localStorage.getItem('ielts_spreadsheet_id') || '';
+  const fromStorage = safeLocalStorage.getItem('ielts_spreadsheet_id') || '';
   const fromStorageClean = extractSpreadsheetId(fromStorage);
   if (fromStorageClean) return fromStorageClean;
   
@@ -64,9 +65,9 @@ export function setStoredSpreadsheetId(idOrUrl: string): void {
   if (typeof window === 'undefined') return;
   const cleanId = extractSpreadsheetId(idOrUrl);
   if (cleanId) {
-    localStorage.setItem('ielts_spreadsheet_id', cleanId);
+    safeLocalStorage.setItem('ielts_spreadsheet_id', cleanId);
   } else {
-    localStorage.removeItem('ielts_spreadsheet_id');
+    safeLocalStorage.removeItem('ielts_spreadsheet_id');
   }
 }
 

@@ -17,6 +17,7 @@ import { PreviewModule } from './components/Admin/PreviewModule';
 import { PracticeDashboard } from './components/Student/Practice/PracticeDashboard';
 import { CustomPracticeManager } from './components/Admin/CustomPracticeManager';
 import { practiceService } from './services/practiceService';
+import { safeLocalStorage, safeJsonParse } from './utils/safeStorage';
 import { ExamData, SubmissionResponse, SubmissionPayload, CheatLog, Question } from './types';
 import { 
   Headphones, 
@@ -145,7 +146,7 @@ export default function App() {
   
   // GAS Web App URL & Central Server Connection State
   const [gasUrl, setGasUrl] = useState<string>(() => {
-    return localStorage.getItem('ielts_gas_url') || DEFAULT_GAS_URL;
+    return safeLocalStorage.getItem('ielts_gas_url') || DEFAULT_GAS_URL;
   });
   const [isServerConnected, setIsServerConnected] = useState<boolean | null>(null);
   const [gasConfigSyncState, setGasConfigSyncState] = useState<'idle' | 'saving' | 'synced' | 'error'>('idle');
@@ -160,7 +161,7 @@ export default function App() {
         const remoteUrl = cfg.gas_url.trim();
         setGasUrl(prev => {
           if (!prev || prev === DEFAULT_GAS_URL || prev.includes('mock_ielts_exam_system_gas_url')) {
-            localStorage.setItem('ielts_gas_url', remoteUrl);
+            safeLocalStorage.setItem('ielts_gas_url', remoteUrl);
             return remoteUrl;
           }
           return prev;
@@ -550,7 +551,7 @@ export default function App() {
   // Save GAS URL to LocalStorage & Central Server Database
   const handleSaveGasUrl = async (url: string) => {
     setGasUrl(url);
-    localStorage.setItem('ielts_gas_url', url);
+    safeLocalStorage.setItem('ielts_gas_url', url);
     setGasConfigSyncState('saving');
     const ok = await saveServerConfig(url).catch(() => false);
     setGasConfigSyncState(ok ? 'synced' : 'error');
@@ -785,17 +786,17 @@ export default function App() {
 
     // Check if reviewing previous submission in Practice Mode
     if (mode === 'PRACTICE' && reviewPrevious) {
-      const existingSubs = localStorage.getItem('ielts_student_submissions');
+      const existingSubs = safeLocalStorage.getItem('ielts_student_submissions');
       if (existingSubs) {
-        try {
-          const subsArr: SubmissionResponse[] = JSON.parse(existingSubs);
+        const subsArr = safeJsonParse<SubmissionResponse[]>(existingSubs, []);
+        if (Array.isArray(subsArr)) {
           const found = subsArr.find(s => String(s?.sbd ?? '') === cleanSbd && String(s?.exam_code ?? '').toUpperCase() === cleanCode.toUpperCase());
           if (found) {
             setSubmitResult(found);
             setCurrentModule('results');
             return;
           }
-        } catch (e) {}
+        }
       }
     }
 
@@ -945,8 +946,9 @@ export default function App() {
     }
 
     // Retrieve cheat logs from LocalStorage
-    const rawCheatLogs = localStorage.getItem('ielts_cheat_logs');
-    const cheatLogs: CheatLog[] = rawCheatLogs ? JSON.parse(rawCheatLogs) : [];
+    const rawCheatLogs = safeLocalStorage.getItem('ielts_cheat_logs');
+    const parsedCheatLogs = safeJsonParse<CheatLog[]>(rawCheatLogs, []);
+    const cheatLogs: CheatLog[] = Array.isArray(parsedCheatLogs) ? parsedCheatLogs : [];
     const currentLogs = cheatLogs.filter(log => String(log?.sbd ?? '') === String(sbd ?? '') && String(log?.exam_code ?? '').toUpperCase() === String(examCode ?? '').toUpperCase());
 
     const payload: SubmissionPayload = {
@@ -976,8 +978,9 @@ export default function App() {
     const serverResponse = await submitExamPayload(gasUrl, payload, examData);
 
     // Save submission locally
-    const subsRaw = localStorage.getItem('ielts_student_submissions');
-    const subsArr: SubmissionResponse[] = subsRaw ? JSON.parse(subsRaw) : [];
+    const subsRaw = safeLocalStorage.getItem('ielts_student_submissions');
+    const parsedSubs = safeJsonParse<SubmissionResponse[]>(subsRaw, []);
+    const subsArr: SubmissionResponse[] = Array.isArray(parsedSubs) ? parsedSubs : [];
     if (!subsArr.some(s => s.submission_id === serverResponse.submission_id)) {
       subsArr.unshift(serverResponse);
     }
@@ -988,7 +991,7 @@ export default function App() {
       seen.add(id);
       return true;
     });
-    localStorage.setItem('ielts_student_submissions', JSON.stringify(cleanSubs));
+    safeLocalStorage.setItem('ielts_student_submissions', JSON.stringify(cleanSubs));
 
     setSubmitResult(serverResponse);
     setIsSubmitting(false);

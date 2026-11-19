@@ -13,6 +13,8 @@ import {
 import { PracticeCard } from '../types/practice';
 import { practiceService } from '../services/practiceService';
 import { toIsoDateKey } from '../utils/dateFormatter';
+import { safeLocalStorage, safeSessionStorage, safeJsonParse } from '../utils/safeStorage';
+import { deduplicateSubmissions, deduplicateCheatLogs, setAdminToken, getAdminToken, clearAdminToken } from '../services/api';
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -29,6 +31,8 @@ const localStorageMock = (() => {
 
 describe('Practice Audit Fixes & Drag-and-Drop Question Type', () => {
   beforeEach(() => {
+    (globalThis as any).localStorage = localStorageMock;
+    (window as any).localStorage = localStorageMock;
     localStorageMock.clear();
     localStorage.setItem('ielts_practice_wipe_v2_blank_slate', 'true');
   });
@@ -202,4 +206,85 @@ describe('Practice Audit Fixes & Drag-and-Drop Question Type', () => {
     expect(toIsoDateKey(undefined)).toBe('');
     expect(toIsoDateKey({ bad: true })).toBe('');
   });
+
+  it('survives harsh sandboxed iframe storage blocks (SecurityError / QuotaExceededError) and corrupted JSON', () => {
+    const hostileStorage = {
+      getItem: () => { throw new Error('SecurityError: The operation is insecure.'); },
+      setItem: () => { throw new Error('QuotaExceededError: Storage quota exceeded.'); },
+      removeItem: () => { throw new Error('SecurityError'); },
+      key: () => { throw new Error('SecurityError'); },
+      length: 0
+    };
+
+    const prevLocal = (globalThis as any).localStorage;
+    const prevSession = (globalThis as any).sessionStorage;
+    try {
+      (globalThis as any).localStorage = hostileStorage;
+      (globalThis as any).sessionStorage = hostileStorage;
+
+      // safeLocalStorage & safeSessionStorage fall back to memory seamlessly
+      safeLocalStorage.setItem('sandbox_key', 'resilient_val');
+      expect(safeLocalStorage.getItem('sandbox_key')).toBe('resilient_val');
+      safeLocalStorage.removeItem('sandbox_key');
+      expect(safeLocalStorage.getItem('sandbox_key')).toBeNull();
+
+      // Admin token auth still works in-memory even if sessionStorage throws SecurityError
+      setAdminToken('sandbox_admin_token_xyz');
+      expect(getAdminToken()).toBe('sandbox_admin_token_xyz');
+      clearAdminToken();
+      expect(getAdminToken()).toBe('');
+
+      // Learner switching & practice service never throw in hostile sandbox
+      const learners = practiceService.getLearners();
+      expect(learners.length).toBe(3);
+      const switched = practiceService.setCurrentLearner('HV02');
+      expect(switched.student_id).toBe('HV02');
+
+      // safeJsonParse handles malformed JSON gracefully
+      expect(safeJsonParse('{broken json', ['fallback'])).toEqual(['fallback']);
+      expect(safeJsonParse(null, 42)).toBe(42);
+    } finally {
+      (globalThis as any).localStorage = prevLocal;
+      (globalThis as any).sessionStorage = prevSession;
+    }
+  });
+
+  it('coerces adversarial non-string Google Sheets rows in deduplicateSubmissions and deduplicateCheatLogs', () => {
+    const rawSubs: any[] = [
+      null,
+      undefined,
+      {
+        submission_id: 1001,
+        sbd: 998877,
+        exam_code: 202601,
+        submitted_at: 1794841200000,
+        received_at: 1794841200,
+        listening_band: 7.5,
+        reading_band: 8.0
+      }
+    ];
+    const cleanSubs = deduplicateSubmissions(rawSubs);
+    expect(cleanSubs).toHaveLength(1);
+    expect(typeof cleanSubs[0].sbd).toBe('string');
+    expect(cleanSubs[0].sbd).toBe('998877');
+    expect(cleanSubs[0].exam_code).toBe('202601');
+    expect(toIsoDateKey(cleanSubs[0].submitted_at)).toBe('2026-11-16');
+
+    const rawLogs: any[] = [
+      null,
+      {
+        log_id: 505,
+        sbd: 12345,
+        exam_code: 101,
+        event: 'TAB_SWITCH',
+        timestamp: 1794841200000
+      }
+    ];
+    const cleanLogs = deduplicateCheatLogs(rawLogs);
+    expect(cleanLogs).toHaveLength(1);
+    expect(cleanLogs[0].sbd).toBe('12345');
+    expect(cleanLogs[0].exam_code).toBe('101');
+    expect(typeof cleanLogs[0].timestamp).toBe('string');
+  });
 });
+

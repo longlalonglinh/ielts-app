@@ -201,7 +201,8 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
     loadDeckData(initialDeckId);
     setUserStats(practiceService.getUserStats(currentLearner.student_id));
 
-    // Auto-sync from centralized server (/api/practice-decks) so students on any machine immediately see uploaded decks
+    // Auto-sync from centralized server (/api/practice-decks) first so students on any machine immediately see uploaded decks.
+    // Fall back to direct Google Sheets fetch ONLY if the centralized server is unreachable or has no decks yet (prevents race condition overwriting fresh server decks).
     practiceService.fetchFromServer(gasUrl).then(srvRes => {
       if (srvRes.success && srvRes.decks.length > 0) {
         const updatedDecks = practiceService.getAllDecks();
@@ -210,22 +211,21 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
         setLoadError(null);
         const matched = updatedDecks.find(d => String(d.deck_id || '').toUpperCase() === String(initialDeckId || '').toUpperCase()) || updatedDecks[0];
         if (matched) setActiveDeck(matched);
+        return;
+      }
+      if (gasUrl) {
+        practiceService.fetchFromSheets(gasUrl).then(res => {
+          if (res.success && res.decks && res.decks.length > 0) {
+            const updatedDecks = practiceService.getAllDecks();
+            setAllDecks(updatedDecks);
+            setDbStatus(practiceService.getDatabaseStatus());
+            setLoadError(null);
+            const matched = updatedDecks.find(d => String(d.deck_id || '').toUpperCase() === String(initialDeckId || '').toUpperCase()) || updatedDecks[0];
+            if (matched) setActiveDeck(prev => prev || matched);
+          }
+        }).catch(err => console.debug('Initial sheets fetch note:', err));
       }
     }).catch(err => console.debug('Initial server practice fetch note:', err));
-
-    // Auto-sync questions in background from Google Sheets if gasUrl is available
-    if (gasUrl) {
-      practiceService.fetchFromSheets(gasUrl).then(res => {
-        if (res.success && res.decks && res.decks.length > 0) {
-          const updatedDecks = practiceService.getAllDecks();
-          setAllDecks(updatedDecks);
-          setDbStatus(practiceService.getDatabaseStatus());
-          setLoadError(null);
-          const matched = updatedDecks.find(d => String(d.deck_id || '').toUpperCase() === String(initialDeckId || '').toUpperCase()) || updatedDecks[0];
-          if (matched) setActiveDeck(prev => prev || matched);
-        }
-      }).catch(err => console.debug('Initial sheets fetch note:', err));
-    }
   }, [initialDeckId, gasUrl]);
 
   // Anti-Cheat & Security Monitoring
@@ -236,16 +236,21 @@ export const PracticeDashboard: React.FC<PracticeDashboardProps> = ({
       if (document.hidden) {
         setSecurityViolations(prev => {
           const nextCount = prev + 1;
-          const logsRaw = localStorage.getItem('ielts_cheat_logs');
-          const logs = logsRaw ? JSON.parse(logsRaw) : [];
-          logs.push({
-            sbd: currentLearner.student_name || candidateSbd,
-            exam_code: activeDeck?.deck_id || 'PRACTICE',
-            type: 'TAB_SWITCH',
-            timestamp: new Date().toISOString(),
-            message: `Learner ${currentLearner.student_name} (${currentLearner.student_id}) left the practice tab (count: ${nextCount})`
-          });
-          localStorage.setItem('ielts_cheat_logs', JSON.stringify(logs));
+          try {
+            const logsRaw = typeof localStorage !== 'undefined' ? localStorage.getItem('ielts_cheat_logs') : null;
+            const parsedLogs = logsRaw ? JSON.parse(logsRaw) : [];
+            const logs = Array.isArray(parsedLogs) ? parsedLogs : [];
+            logs.push({
+              sbd: currentLearner.student_name || candidateSbd,
+              exam_code: activeDeck?.deck_id || 'PRACTICE',
+              type: 'TAB_SWITCH',
+              timestamp: new Date().toISOString(),
+              message: `Learner ${currentLearner.student_name} (${currentLearner.student_id}) left the practice tab (count: ${nextCount})`
+            });
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('ielts_cheat_logs', JSON.stringify(logs));
+            }
+          } catch {}
           return nextCount;
         });
 

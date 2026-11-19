@@ -2,6 +2,7 @@ import { CustomPracticeDeck, PracticeUserStats, SentenceGrammarAnalysis, CardRev
 import { STARTER_PRACTICE_DECKS } from '../data/practiceDecks';
 import { fetchPracticeDecksFromGAS, initPracticeDatabaseInGAS, savePracticeDeckToGAS, syncStudentProgressToGAS, fetchStudentProgressFromGAS, getApiUrl, getAdminAuthHeaders } from './api';
 import { clearPracticeDecksInIndexedDB } from './indexedDb';
+import { safeLocalStorage } from '../utils/safeStorage';
 
 const STORAGE_CUSTOM_DECKS = 'custom_practice_decks_repo';
 const STORAGE_USER_STATS = 'custom_practice_user_stats';
@@ -21,19 +22,19 @@ export const practiceService = {
   // One-time automatic reset of legacy practice decks so teacher starts with a clean slate
   ensureCleanSlate(): void {
     try {
-      if (!localStorage.getItem(STORAGE_WIPE_FLAG)) {
+      if (!safeLocalStorage.getItem(STORAGE_WIPE_FLAG)) {
         this.clearAllPracticeDecks();
-        localStorage.setItem(STORAGE_WIPE_FLAG, 'true');
+        safeLocalStorage.setItem(STORAGE_WIPE_FLAG, 'true');
       }
-    } catch (e) {}
+    } catch {}
   },
 
   // Clear all practice decks across localStorage & IndexedDB
   clearAllPracticeDecks(): void {
     try {
-      localStorage.removeItem(STORAGE_CUSTOM_DECKS);
-      localStorage.removeItem(STORAGE_SHEETS_DECKS);
-      localStorage.removeItem(STORAGE_DB_STATUS);
+      safeLocalStorage.removeItem(STORAGE_CUSTOM_DECKS);
+      safeLocalStorage.removeItem(STORAGE_SHEETS_DECKS);
+      safeLocalStorage.removeItem(STORAGE_DB_STATUS);
       clearPracticeDecksInIndexedDB().catch(() => {});
     } catch (e) {
       console.warn('clearAllPracticeDecks warning:', e);
@@ -43,34 +44,34 @@ export const practiceService = {
   // 3 Learners Profile Management
   getLearners(): LearnerProfile[] {
     try {
-      const raw = localStorage.getItem(STORAGE_LEARNERS);
+      const raw = safeLocalStorage.getItem(STORAGE_LEARNERS);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
       }
-    } catch (e) {}
-    localStorage.setItem(STORAGE_LEARNERS, JSON.stringify(DEFAULT_3_LEARNERS));
+    } catch {}
+    safeLocalStorage.setItem(STORAGE_LEARNERS, JSON.stringify(DEFAULT_3_LEARNERS));
     return DEFAULT_3_LEARNERS;
   },
 
   getCurrentLearner(): LearnerProfile {
     const learners = this.getLearners();
     try {
-      const currentId = localStorage.getItem(STORAGE_CURRENT_LEARNER);
+      const currentId = safeLocalStorage.getItem(STORAGE_CURRENT_LEARNER);
       if (currentId) {
         const found = learners.find(l => l.student_id === currentId);
         if (found) return found;
       }
-    } catch (e) {}
+    } catch {}
     return learners[0];
   },
 
   setCurrentLearner(studentId: string): LearnerProfile {
     const learners = this.getLearners();
     const found = learners.find(l => l.student_id === studentId) || learners[0];
-    localStorage.setItem(STORAGE_CURRENT_LEARNER, found.student_id);
+    safeLocalStorage.setItem(STORAGE_CURRENT_LEARNER, found.student_id);
     return found;
   },
 
@@ -81,7 +82,7 @@ export const practiceService = {
     if (idx >= 0 && cleanName) {
       learners[idx].student_name = cleanName;
       learners[idx].last_active = new Date().toISOString();
-      localStorage.setItem(STORAGE_LEARNERS, JSON.stringify(learners));
+      safeLocalStorage.setItem(STORAGE_LEARNERS, JSON.stringify(learners));
       return learners[idx];
     }
     return this.getCurrentLearner();
@@ -92,13 +93,15 @@ export const practiceService = {
     this.ensureCleanSlate();
     try {
       // 1. Check if we have decks synced from Google Sheets
-      const sheetsRaw = localStorage.getItem(STORAGE_SHEETS_DECKS);
-      const baseDecks: CustomPracticeDeck[] = (sheetsRaw && JSON.parse(sheetsRaw).length > 0)
-        ? JSON.parse(sheetsRaw)
+      const sheetsRaw = safeLocalStorage.getItem(STORAGE_SHEETS_DECKS);
+      const parsedSheets = sheetsRaw ? JSON.parse(sheetsRaw) : null;
+      const baseDecks: CustomPracticeDeck[] = (Array.isArray(parsedSheets) && parsedSheets.length > 0)
+        ? parsedSheets
         : STARTER_PRACTICE_DECKS;
 
-      const customRaw = localStorage.getItem(STORAGE_CUSTOM_DECKS);
-      const customDecks: CustomPracticeDeck[] = customRaw ? JSON.parse(customRaw) : [];
+      const customRaw = safeLocalStorage.getItem(STORAGE_CUSTOM_DECKS);
+      const parsedCustom = customRaw ? JSON.parse(customRaw) : [];
+      const customDecks: CustomPracticeDeck[] = Array.isArray(parsedCustom) ? parsedCustom : [];
       
       // Combine avoiding duplicate IDs
       const combined = [...baseDecks];
@@ -120,9 +123,9 @@ export const practiceService = {
   // Check current CSDL status
   getDatabaseStatus(): { is_on_sheets: boolean; total_cards: number; last_synced?: string } {
     try {
-      const raw = localStorage.getItem(STORAGE_DB_STATUS);
+      const raw = safeLocalStorage.getItem(STORAGE_DB_STATUS);
       if (raw) return JSON.parse(raw);
-    } catch (e) {}
+    } catch {}
     return { is_on_sheets: false, total_cards: 0 };
   },
 
@@ -139,18 +142,16 @@ export const practiceService = {
       }
       const json = await res.json();
       const serverDecks: CustomPracticeDeck[] = Array.isArray(json?.data) ? json.data : [];
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(STORAGE_WIPE_FLAG, 'true');
-        localStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(serverDecks));
-        if (serverDecks.length > 0) {
-          const totalCards = serverDecks.reduce((acc, d) => acc + (d.cards?.length || 0), 0);
-          const curStatus = this.getDatabaseStatus();
-          localStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
-            ...curStatus,
-            total_cards: totalCards,
-            last_synced: new Date().toISOString()
-          }));
-        }
+      safeLocalStorage.setItem(STORAGE_WIPE_FLAG, 'true');
+      safeLocalStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(serverDecks));
+      if (serverDecks.length > 0) {
+        const totalCards = serverDecks.reduce((acc, d) => acc + (d.cards?.length || 0), 0);
+        const curStatus = this.getDatabaseStatus();
+        safeLocalStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
+          ...curStatus,
+          total_cards: totalCards,
+          last_synced: new Date().toISOString()
+        }));
       }
       return { success: true, decks: serverDecks };
     } catch (err: any) {
@@ -173,9 +174,9 @@ export const practiceService = {
       if (res.ok) {
         const data = await res.json();
         const sheetsSynced = Boolean(data?.sheets_synced);
-        if (sheetsSynced && typeof localStorage !== 'undefined') {
+        if (sheetsSynced) {
           const totalCards = this.getAllDecks().reduce((acc, d) => acc + (d.cards?.length || 0), 0);
-          localStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
+          safeLocalStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
             is_on_sheets: true,
             total_cards: totalCards,
             last_synced: new Date().toISOString()
@@ -208,9 +209,9 @@ export const practiceService = {
     decks: CustomPracticeDeck[],
     replaceAll: boolean = false
   ): Promise<{ success: boolean; server_saved: boolean; sheets_synced: boolean; sheets_error?: string; error?: string }> {
-    if (replaceAll && typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_WIPE_FLAG, 'true');
-      localStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(decks));
+    if (replaceAll) {
+      safeLocalStorage.setItem(STORAGE_WIPE_FLAG, 'true');
+      safeLocalStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(decks));
     } else {
       decks.forEach(d => this.saveDeck(d));
     }
@@ -225,13 +226,11 @@ export const practiceService = {
         const data = await res.json();
         const sheetsSynced = Boolean(data?.sheets_synced);
         const totalCards = this.getAllDecks().reduce((acc, d) => acc + (d.cards?.length || 0), 0);
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
-            is_on_sheets: sheetsSynced,
-            total_cards: totalCards,
-            last_synced: new Date().toISOString()
-          }));
-        }
+        safeLocalStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
+          is_on_sheets: sheetsSynced,
+          total_cards: totalCards,
+          last_synced: new Date().toISOString()
+        }));
         return {
           success: true,
           server_saved: true,
@@ -319,10 +318,10 @@ export const practiceService = {
     const res = await fetchPracticeDecksFromGAS(gasUrl);
     if (res.success) {
       const decks = res.decks || [];
-      localStorage.setItem(STORAGE_WIPE_FLAG, 'true');
-      localStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(decks));
+      safeLocalStorage.setItem(STORAGE_WIPE_FLAG, 'true');
+      safeLocalStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(decks));
       const totalCards = decks.reduce((acc, d) => acc + (d.cards?.length || 0), 0);
-      localStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
+      safeLocalStorage.setItem(STORAGE_DB_STATUS, JSON.stringify({
         is_on_sheets: true,
         total_cards: totalCards,
         last_synced: new Date().toISOString()
@@ -405,8 +404,9 @@ export const practiceService = {
   // Save or update custom deck
   saveDeck(deck: CustomPracticeDeck): boolean {
     try {
-      const customRaw = localStorage.getItem(STORAGE_CUSTOM_DECKS);
-      const customDecks: CustomPracticeDeck[] = customRaw ? JSON.parse(customRaw) : [];
+      const customRaw = safeLocalStorage.getItem(STORAGE_CUSTOM_DECKS);
+      const parsedCustom = customRaw ? JSON.parse(customRaw) : [];
+      const customDecks: CustomPracticeDeck[] = Array.isArray(parsedCustom) ? parsedCustom : [];
       
       const idx = customDecks.findIndex(d => d.deck_id.toUpperCase() === deck.deck_id.toUpperCase());
       const updatedDeck = { ...deck, updated_at: new Date().toISOString() };
@@ -416,19 +416,21 @@ export const practiceService = {
         customDecks.unshift({ ...updatedDeck, created_at: updatedDeck.created_at || new Date().toISOString() });
       }
 
-      localStorage.setItem(STORAGE_CUSTOM_DECKS, JSON.stringify(customDecks));
+      safeLocalStorage.setItem(STORAGE_CUSTOM_DECKS, JSON.stringify(customDecks));
 
       // Also update in sheets local cache if present
-      const sheetsRaw = localStorage.getItem(STORAGE_SHEETS_DECKS);
+      const sheetsRaw = safeLocalStorage.getItem(STORAGE_SHEETS_DECKS);
       if (sheetsRaw) {
         try {
           const sheetsDecks: CustomPracticeDeck[] = JSON.parse(sheetsRaw);
-          const sIdx = sheetsDecks.findIndex(d => d.deck_id.toUpperCase() === deck.deck_id.toUpperCase());
-          if (sIdx >= 0) {
-            sheetsDecks[sIdx] = updatedDeck;
-            localStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(sheetsDecks));
+          if (Array.isArray(sheetsDecks)) {
+            const sIdx = sheetsDecks.findIndex(d => d.deck_id.toUpperCase() === deck.deck_id.toUpperCase());
+            if (sIdx >= 0) {
+              sheetsDecks[sIdx] = updatedDeck;
+              safeLocalStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(sheetsDecks));
+            }
           }
-        } catch (err) {}
+        } catch {}
       }
 
       return true;
@@ -442,21 +444,25 @@ export const practiceService = {
   deleteDeck(deckId: string): boolean {
     try {
       const cleanId = deckId.toUpperCase();
-      const customRaw = localStorage.getItem(STORAGE_CUSTOM_DECKS);
+      const customRaw = safeLocalStorage.getItem(STORAGE_CUSTOM_DECKS);
       if (customRaw) {
         const customDecks: CustomPracticeDeck[] = JSON.parse(customRaw);
-        const filtered = customDecks.filter(d => d.deck_id.toUpperCase() !== cleanId);
-        localStorage.setItem(STORAGE_CUSTOM_DECKS, JSON.stringify(filtered));
+        if (Array.isArray(customDecks)) {
+          const filtered = customDecks.filter(d => d.deck_id.toUpperCase() !== cleanId);
+          safeLocalStorage.setItem(STORAGE_CUSTOM_DECKS, JSON.stringify(filtered));
+        }
       }
 
       // Also clean from sheets local cache so it doesn't re-appear
-      const sheetsRaw = localStorage.getItem(STORAGE_SHEETS_DECKS);
+      const sheetsRaw = safeLocalStorage.getItem(STORAGE_SHEETS_DECKS);
       if (sheetsRaw) {
         try {
           const sheetsDecks: CustomPracticeDeck[] = JSON.parse(sheetsRaw);
-          const filteredSheets = sheetsDecks.filter(d => d.deck_id.toUpperCase() !== cleanId);
-          localStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(filteredSheets));
-        } catch (err) {}
+          if (Array.isArray(sheetsDecks)) {
+            const filteredSheets = sheetsDecks.filter(d => d.deck_id.toUpperCase() !== cleanId);
+            safeLocalStorage.setItem(STORAGE_SHEETS_DECKS, JSON.stringify(filteredSheets));
+          }
+        } catch {}
       }
 
       return true;
@@ -502,12 +508,12 @@ export const practiceService = {
   getUserStats(studentId?: string): PracticeUserStats {
     const activeStudentId = studentId || this.getCurrentLearner().student_id;
     try {
-      const raw = localStorage.getItem(`${STORAGE_USER_STATS}_${activeStudentId}`);
+      const raw = safeLocalStorage.getItem(`${STORAGE_USER_STATS}_${activeStudentId}`);
       if (raw) {
         return JSON.parse(raw);
       }
       // Fallback to legacy global stats if first time
-      const legacyRaw = localStorage.getItem(STORAGE_USER_STATS);
+      const legacyRaw = safeLocalStorage.getItem(STORAGE_USER_STATS);
       if (legacyRaw) {
         return JSON.parse(legacyRaw);
       }
@@ -611,9 +617,9 @@ export const practiceService = {
     };
 
     try {
-      localStorage.setItem(`${STORAGE_USER_STATS}_${activeStudentId}`, JSON.stringify(newStats));
+      safeLocalStorage.setItem(`${STORAGE_USER_STATS}_${activeStudentId}`, JSON.stringify(newStats));
       // Also update legacy key for compatibility
-      localStorage.setItem(STORAGE_USER_STATS, JSON.stringify(newStats));
+      safeLocalStorage.setItem(STORAGE_USER_STATS, JSON.stringify(newStats));
     } catch (e) {
       console.error('Error saving user stats:', e);
     }
