@@ -3,6 +3,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createServer as createViteServer } from 'vite';
 import { GEMINI_MODEL, getServerGeminiClient, isValidGeminiApiKey } from './server/geminiClient';
@@ -41,7 +42,8 @@ import {
   enqueueSubmission,
   flushSubmissionQueue,
   isServiceAccountConfigured,
-  getEffectiveSpreadsheetId
+  getEffectiveSpreadsheetId,
+  resolveSubmissionWriteChannel
 } from './server/googleSheetsService';
 
 const __dirname = process.cwd();
@@ -153,11 +155,24 @@ async function startServer() {
   // Support reverse proxies (Nginx, Cloudflare, VPS, Cloud Run)
   app.set('trust proxy', 1);
 
-  // Cross-Origin Resource Sharing (CORS) support for custom domain & split deployments
+  // Cross-Origin Resource Sharing (CORS) support with optional strict origin allowlist
+  const allowedCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+
   app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
+    const reqOrigin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
+    if (allowedCorsOrigins.length > 0) {
+      if (reqOrigin && allowedCorsOrigins.includes(reqOrigin)) {
+        res.header('Access-Control-Allow-Origin', reqOrigin);
+        res.header('Vary', 'Origin');
+      }
+    } else {
+      res.header('Access-Control-Allow-Origin', '*');
+    }
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-admin-token');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-admin-token, x-submission-token, x-user-sbd');
     if (req.method === 'OPTIONS') {
       return res.sendStatus(200);
     }
@@ -166,52 +181,42 @@ async function startServer() {
 
   app.use(express.json({ limit: '50mb' }));
 
-  // Static uploads directory for cross-device diagram images
-  const uploadsDir = path.join(process.cwd(), 'server_data', 'uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+  // Timing-safe secret comparison helper
+  const safeEqualSecret = (a: string, b: string): boolean => {
+    const bufA = Buffer.from(a, 'utf8');
+    const bufB = Buffer.from(b, 'utf8');
+    if (bufA.length !== bufB.length || bufA.length === 0) return false;
+    return crypto.timingSafeEqual(bufA, bufB);
+  };
+
+  // Centralized Admin Authentication Helper (no hardcoded fallback when ADMIN_TOKEN is configured or in production)
+  const IS_PROD_ENV = process.env.NODE_ENV === 'production';
+  const HAS_EXPLICIT_ADMIN_TOKEN = Boolean(process.env.ADMIN_TOKEN && process.env.ADMIN_TOKEN.trim());
+  const ADMIN_SECRET = HAS_EXPLICIT_ADMIN_TOKEN
+    ? process.env.ADMIN_TOKEN!.trim()
+    : (IS_PROD_ENV ? crypto.randomBytes(24).toString('hex') : 'admin-secret');
+
+  if (IS_PROD_ENV && !HAS_EXPLICIT_ADMIN_TOKEN) {
+    console.warn('[Security] ADMIN_TOKEN is not set in production; generated an ephemeral session secret. Configure ADMIN_TOKEN in environment settings.');
   }
-  app.use('/uploads', express.static(uploadsDir));
 
-  // Image Upload API (Used for Writing Task 1 charts & diagrams)
-  app.post('/api/upload-image', (req, res) => {
-    try {
-      const { image, filename } = req.body;
-      if (!image) {
-        return res.status(400).json({ success: false, error: 'No image provided' });
-      }
+  // HMAC signing secret for candidate submission access tokens (IDOR protection)
+  const SESSION_SIGNING_KEY = (
+    process.env.SESSION_SECRET ||
+    (HAS_EXPLICIT_ADMIN_TOKEN ? ADMIN_SECRET : '') ||
+    crypto.randomBytes(32).toString('hex')
+  ).trim();
 
-      // If already a URL (e.g. http://... or /uploads/...)
-      if (!image.startsWith('data:image/')) {
-        return res.json({ success: true, url: image });
-      }
+  const signSubmissionAccessToken = (submissionId: string, sbd: string): string => {
+    const payload = `${String(submissionId || '').trim()}::${String(sbd || '').trim().toUpperCase()}`;
+    return crypto.createHmac('sha256', SESSION_SIGNING_KEY).update(payload).digest('hex');
+  };
 
-      const matches = image.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
-      if (!matches) {
-        return res.status(400).json({ success: false, error: 'Invalid data URL format' });
-      }
-
-      const rawExt = matches[1].toLowerCase();
-      const ext = rawExt === 'jpeg' ? 'jpg' : rawExt === 'svg+xml' ? 'svg' : rawExt.replace(/[^a-z0-9]/g, '');
-      const cleanName = (filename ? filename.replace(/[^a-zA-Z0-9_-]/g, '_') : 'task1_chart') + `_${Date.now()}.${ext || 'jpg'}`;
-      const filePath = path.join(uploadsDir, cleanName);
-      const buffer = Buffer.from(matches[2], 'base64');
-      fs.writeFileSync(filePath, buffer);
-
-      const fileUrl = `/uploads/${cleanName}`;
-      res.json({ success: true, url: fileUrl });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // Health check
-  app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-  });
-
-  // Centralized Admin Authentication Helper (replaces insecure ?admin=true backdoor)
-  const ADMIN_SECRET = (process.env.ADMIN_TOKEN || 'admin-secret').trim();
+  const verifySubmissionAccessToken = (submissionId: string, sbd: string, token: string): boolean => {
+    if (!token || !submissionId) return false;
+    const expected = signSubmissionAccessToken(submissionId, sbd);
+    return safeEqualSecret(token.trim(), expected);
+  };
 
   const isAuthorizedAdmin = (req: express.Request): boolean => {
     const rawHeader = req.headers['x-admin-token'];
@@ -219,8 +224,8 @@ async function startServer() {
     const authHeader = typeof req.headers['authorization'] === 'string' ? req.headers['authorization'] : '';
     const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
     return (
-      (Boolean(tokenHeader) && tokenHeader.trim() === ADMIN_SECRET) ||
-      (Boolean(bearer) && bearer === ADMIN_SECRET)
+      (Boolean(tokenHeader) && safeEqualSecret(tokenHeader.trim(), ADMIN_SECRET)) ||
+      (Boolean(bearer) && safeEqualSecret(bearer, ADMIN_SECRET))
     );
   };
 
@@ -235,16 +240,104 @@ async function startServer() {
     return next();
   };
 
+  // Static uploads directory for cross-device diagram images (nosniff prevents MIME confusion)
+  const uploadsDir = path.join(process.cwd(), 'server_data', 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use('/uploads', (req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    next();
+  }, express.static(uploadsDir));
+
+  // Image Upload API (Admin-only, strictly raster formats only — blocks raw SVG XSS)
+  const ALLOWED_IMAGE_MIME_TO_EXT: Record<string, string> = {
+    png: 'png',
+    jpeg: 'jpg',
+    jpg: 'jpg',
+    webp: 'webp',
+    gif: 'gif'
+  };
+  const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+
+  app.post('/api/upload-image', requireAdminMiddleware, (req, res) => {
+    try {
+      const { image, filename } = req.body || {};
+      if (!image || typeof image !== 'string') {
+        return res.status(400).json({ success: false, error: 'No image provided' });
+      }
+
+      const trimmedImage = image.trim();
+      // If already a safe URL (e.g. https://... or /uploads/...), pass through cleanly
+      if (!trimmedImage.startsWith('data:image/')) {
+        if (/^(https?:\/\/|\/uploads\/)/i.test(trimmedImage)) {
+          return res.json({ success: true, url: trimmedImage });
+        }
+        return res.status(400).json({ success: false, error: 'Unsupported image URL scheme' });
+      }
+
+      const matches = trimmedImage.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+      if (!matches) {
+        return res.status(400).json({ success: false, error: 'Invalid data URL format' });
+      }
+
+      const rawMime = matches[1].toLowerCase();
+      const ext = ALLOWED_IMAGE_MIME_TO_EXT[rawMime];
+      if (!ext) {
+        return res.status(400).json({
+          success: false,
+          error: 'UNSUPPORTED_IMAGE_FORMAT',
+          message: 'Only raster image formats (PNG, JPG, WEBP, GIF) are permitted.'
+        });
+      }
+
+      const buffer = Buffer.from(matches[2], 'base64');
+      if (buffer.length === 0 || buffer.length > MAX_IMAGE_UPLOAD_BYTES) {
+        return res.status(400).json({
+          success: false,
+          error: 'IMAGE_SIZE_INVALID',
+          message: 'Image size must be between 1 byte and 10 MB.'
+        });
+      }
+
+      const cleanBase = (typeof filename === 'string' && filename.trim()
+        ? filename.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80)
+        : 'task1_chart');
+      const cleanName = `${cleanBase}_${Date.now()}.${ext}`;
+      const resolvedUploadsDir = path.resolve(uploadsDir);
+      const resolvedFilePath = path.resolve(uploadsDir, cleanName);
+      if (!resolvedFilePath.startsWith(resolvedUploadsDir + path.sep)) {
+        return res.status(400).json({ success: false, error: 'Invalid upload destination path' });
+      }
+
+      fs.writeFileSync(resolvedFilePath, buffer);
+
+      const fileUrl = `/uploads/${cleanName}`;
+      res.json({ success: true, url: fileUrl });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Health check
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
   app.post('/api/admin/login', (req, res) => {
     const submitted = String(req.body?.password || req.body?.token || '').trim();
     const shortcutSbd = String(req.body?.sbd || '').trim().toUpperCase();
     const shortcutCode = String(req.body?.code || '').trim().toUpperCase();
+    const allowDevShortcut = !IS_PROD_ENV && !HAS_EXPLICIT_ADMIN_TOKEN;
+
     const isValidShortcut =
+      allowDevShortcut &&
       (shortcutSbd === 'ADMIN' || shortcutSbd === 'ADMIN123' || shortcutSbd === 'TEACHER') &&
       (shortcutCode === 'ADMIN' || shortcutCode === 'ADMIN123' || shortcutCode === 'TEACHER' || shortcutCode === '123456');
+
     const isValidPassword =
       Boolean(submitted) &&
-      (submitted === ADMIN_SECRET || submitted.toUpperCase() === 'ADMIN123');
+      (safeEqualSecret(submitted, ADMIN_SECRET) || (allowDevShortcut && submitted.toUpperCase() === 'ADMIN123'));
 
     if (!isValidShortcut && !isValidPassword) {
       return res.status(401).json({
@@ -1875,7 +1968,32 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
     }
   });
 
-  // TC-SECU-02: IDOR Defense on single submission retrieval
+  // Single-channel Google Sheets submission dispatcher (prevents Sheets API v4 + GAS dual-write race)
+  const dispatchSubmissionToSheets = (savedRecord: any, gasBody: any) => {
+    const config = getStoredConfig();
+    const channel = resolveSubmissionWriteChannel(
+      isServiceAccountConfigured(),
+      getEffectiveSpreadsheetId(),
+      config.gas_url
+    );
+
+    if (channel === 'sheets_api') {
+      enqueueSubmission(savedRecord);
+      return channel;
+    }
+
+    if (channel === 'gas_fallback' && config.gas_url) {
+      fetch(config.gas_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'submit_exam', ...gasBody })
+      }).catch(err => console.warn('[GAS Async Submit Error]:', err.message));
+    }
+
+    return channel;
+  };
+
+  // TC-SECU-02: IDOR Defense on single submission retrieval (requires Admin token OR signed HMAC access token)
   app.get('/api/submissions/:id', (req, res) => {
     const subId = req.params.id;
     const submissions = getStoredSubmissions();
@@ -1884,16 +2002,19 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
       return res.status(404).json({ success: false, error: 'SUBMISSION_NOT_FOUND' });
     }
 
-    const userSbd = (req.headers['x-user-sbd'] || req.query.sbd || '').toString().trim().toUpperCase();
+    const rawTokenHeader = req.headers['x-submission-token'];
+    const tokenFromHeader = Array.isArray(rawTokenHeader) ? rawTokenHeader[0] : (rawTokenHeader || '');
+    const tokenFromQuery = typeof req.query.token === 'string' ? req.query.token : '';
+    const providedToken = (tokenFromHeader || tokenFromQuery || '').trim();
 
     const isAdmin = isAuthorizedAdmin(req);
-    const isOwner = Boolean(userSbd && userSbd === (found.sbd || '').trim().toUpperCase());
+    const hasValidSignedToken = verifySubmissionAccessToken(found.submission_id, found.sbd || '', providedToken);
 
-    if (!isAdmin && !isOwner) {
+    if (!isAdmin && !hasValidSignedToken) {
       return res.status(403).json({
         success: false,
         error: 'ACCESS_DENIED_IDOR_PROTECTION',
-        message: 'Unauthorized access to submission data. Valid candidate session or admin token required.'
+        message: 'Unauthorized access to submission data. Valid signed submission token or admin token required.'
       });
     }
 
@@ -1922,21 +2043,15 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
       }
 
       const saved = saveStoredSubmission(req.body);
+      const syncChannel = dispatchSubmissionToSheets(saved, saved);
+      const accessToken = signSubmissionAccessToken(saved.submission_id, saved.sbd || '');
 
-      // Asynchronously batch-append to Google Sheets API v4 using Service Account Queue
-      enqueueSubmission(saved);
-
-      // Asynchronously forward to GAS as secondary fallback if configured
-      const config = getStoredConfig();
-      if (config.gas_url && !config.gas_url.includes('AKfycbx_mock')) {
-        fetch(config.gas_url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'submit_exam', ...req.body })
-        }).catch(err => console.warn('[GAS Async Submit Error]:', err.message));
-      }
-
-      res.json({ success: true, submission: saved });
+      res.json({
+        success: true,
+        submission: saved,
+        submission_access_token: accessToken,
+        sync_channel: syncChannel
+      });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -2066,26 +2181,19 @@ NHIỆM VỤ CỦA BẠN LÀ TẠO RA MỘT BỘ BÀI TẬP LUYỆN TẬP DẠNG
       // 1. Authoritative persist on server
       const saved = saveStoredSubmission(submissionRecord);
 
-      // 2. Enqueue for Google Sheets API v4 Batch Append (Prevents Rate Limits)
-      enqueueSubmission(saved);
-
-      // 3. Asynchronously forward to Google Apps Script as secondary backup
-      const config = getStoredConfig();
-      if (config.gas_url && !config.gas_url.includes('AKfycbx_mock')) {
-        fetch(config.gas_url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'submit_exam', ...submissionRecord })
-        }).catch(err => console.warn('[GAS Async Submit Error]:', err.message));
-      }
+      // 2. Dispatch to exactly ONE Sheets write channel (Sheets API v4 OR GAS fallback — never both)
+      const syncChannel = dispatchSubmissionToSheets(saved, submissionRecord);
+      const accessToken = signSubmissionAccessToken(saved.submission_id, saved.sbd || '');
 
       return res.json({
         success: true,
         submission: saved,
+        submission_access_token: accessToken,
+        sync_channel: syncChannel,
         grading: gradingResult,
         grading_result: gradingResult,
         server_authoritative: true,
-        message: 'Exam authoritatively graded by server and queued for Google Sheets batch persistence.'
+        message: 'Exam authoritatively graded by server and persisted via single-channel sync.'
       });
     } catch (err: any) {
       console.error('[Grade and Submit Error]:', err);

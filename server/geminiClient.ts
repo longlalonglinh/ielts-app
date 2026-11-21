@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 
-export const GEMINI_MODEL = 'gemini-4-hydrogen';
+export const GEMINI_MODEL = (process.env.GEMINI_MODEL || 'gemini-4-hydrogen').trim();
 
 /**
  * Validates whether a server-side Gemini API key format is acceptable.

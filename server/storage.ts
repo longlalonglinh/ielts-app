@@ -17,6 +17,15 @@ if (!fs.existsSync(UPLOADS_DIR)) {
  * all devices (phones, tablets, PCs) can load them cleanly via static URL
  * without hitting Google Sheets 50,000 character cell limits.
  */
+const ALLOWED_RASTER_MIME_EXT: Record<string, string> = {
+  png: 'png',
+  jpeg: 'jpg',
+  jpg: 'jpg',
+  webp: 'webp',
+  gif: 'gif'
+};
+const MAX_UPLOAD_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+
 export function persistBase64Image(dataUrlOrUrl: string, examCode: string): string {
   if (!dataUrlOrUrl || typeof dataUrlOrUrl !== 'string') return '';
   const trimmed = dataUrlOrUrl.trim();
@@ -28,14 +37,29 @@ export function persistBase64Image(dataUrlOrUrl: string, examCode: string): stri
     const matches = trimmed.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
     if (!matches) return trimmed;
 
-    const rawExt = matches[1].toLowerCase();
-    const ext = rawExt === 'jpeg' ? 'jpg' : rawExt === 'svg+xml' ? 'svg' : rawExt.replace(/[^a-z0-9]/g, '');
-    const safeCode = (examCode || 'EXAM').replace(/[^a-zA-Z0-9_-]/g, '');
-    const filename = `task1_${safeCode}_${Date.now()}.${ext || 'jpg'}`;
-    const filePath = path.join(UPLOADS_DIR, filename);
+    const rawMime = matches[1].toLowerCase();
+    const ext = ALLOWED_RASTER_MIME_EXT[rawMime];
+    if (!ext) {
+      console.warn(`[Server Storage] Rejected unsupported image MIME type: image/${rawMime}`);
+      return '';
+    }
 
     const buffer = Buffer.from(matches[2], 'base64');
-    fs.writeFileSync(filePath, buffer);
+    if (buffer.length === 0 || buffer.length > MAX_UPLOAD_IMAGE_BYTES) {
+      console.warn(`[Server Storage] Rejected image payload outside allowed size bounds (${buffer.length} bytes).`);
+      return '';
+    }
+
+    const safeCode = (examCode || 'EXAM').replace(/[^a-zA-Z0-9_-]/g, '');
+    const filename = `task1_${safeCode}_${Date.now()}.${ext}`;
+    const resolvedUploadsDir = path.resolve(UPLOADS_DIR);
+    const resolvedFilePath = path.resolve(UPLOADS_DIR, filename);
+    if (!resolvedFilePath.startsWith(resolvedUploadsDir + path.sep)) {
+      console.warn('[Server Storage] Rejected image path outside uploads directory.');
+      return '';
+    }
+
+    fs.writeFileSync(resolvedFilePath, buffer);
     return `/uploads/${filename}`;
   } catch (err) {
     console.warn('[Server Storage] Error persisting base64 image:', err);
@@ -50,7 +74,7 @@ const CHEAT_LOGS_FILE = path.join(DATA_DIR, 'cheat_logs.json');
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 const PRACTICE_DECKS_FILE = path.join(DATA_DIR, 'practice_decks.json');
 
-const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbySNk5foVr4UMC5ZVP1YTlxjxT9qFgdI85cH5nyQ63ffqXdYVZ7SJKbmD0B3xNO3DEe/exec";
+const DEFAULT_GAS_URL = (process.env.GAS_WEB_APP_URL || '').trim();
 
 // In-memory cache for ultra-low latency (<1ms)
 let cachedExams: any[] | null = null;
@@ -519,7 +543,9 @@ export function getStoredConfig(): ServerConfig {
     max_violations_limit: 3
   };
   cachedConfig = safeReadJson<ServerConfig>(CONFIG_FILE, def);
-  if (!cachedConfig.gas_url) {
+  if (typeof cachedConfig.gas_url !== 'string') {
+    cachedConfig.gas_url = DEFAULT_GAS_URL;
+  } else if (!cachedConfig.gas_url.trim() && DEFAULT_GAS_URL) {
     cachedConfig.gas_url = DEFAULT_GAS_URL;
   }
   if (typeof cachedConfig.auto_submit_on_violation !== 'boolean') {

@@ -31,6 +31,7 @@ import { gradeExamAnswers, computeAnswersChecksum } from './answerScoring';
 import { DEFAULT_EXAMS } from '../data/defaultExams';
 import { 
   fetchExamViaGviz, 
+  fetchAnswerKeyViaGviz,
   getStoredSpreadsheetId, 
   setStoredSpreadsheetId, 
   extractSpreadsheetId, 
@@ -40,6 +41,7 @@ import { safeLocalStorage, safeSessionStorage, safeJsonParse } from '../utils/sa
 
 export { 
   fetchExamViaGviz, 
+  fetchAnswerKeyViaGviz,
   getStoredSpreadsheetId, 
   setStoredSpreadsheetId, 
   extractSpreadsheetId, 
@@ -1003,7 +1005,119 @@ export async function submitExamPayload(
     console.warn('Backend /api/submit unreachable, falling back to direct GAS webhook:', serverErr);
   }
 
+  const hasPopulatedAnswerKeys = (details?: Record<string, any>): boolean => {
+    if (!details || typeof details !== 'object') return false;
+    return Object.values(details).some((item: any) => {
+      if (!item) return false;
+      if (Array.isArray(item.acceptable_answers) && item.acceptable_answers.some((a: any) => String(a || '').trim().length > 0)) {
+        return true;
+      }
+      return Boolean(item.correct_answer && String(item.correct_answer).trim().length > 0);
+    });
+  };
+
+  const hydrateExamWithAnswerKeys = (
+    sourceExam: ExamData,
+    answerKeys: Record<string, { correct_answer: string; max_score: number }>
+  ): ExamData => {
+    const applyKey = (q: Question): Question => {
+      const found = answerKeys[q.question_id];
+      if (!found) return q;
+      return {
+        ...q,
+        correct_answer: found.correct_answer,
+        max_score: found.max_score || q.max_score || 1
+      };
+    };
+
+    return {
+      ...sourceExam,
+      listening_questions: (sourceExam.listening_questions || []).map(applyKey),
+      reading_questions: (sourceExam.reading_questions || []).map(applyKey),
+      questions: sourceExam.questions ? sourceExam.questions.map(applyKey) : undefined,
+      passages: (sourceExam.passages || []).map(p => ({
+        ...p,
+        questions: (p.questions || []).map(applyKey)
+      }))
+    };
+  };
+
+  const hydrateFromPostSubmitGvizIfNeeded = async (
+    targetResponse: SubmissionResponse,
+    targetRecord: SubmissionRecord
+  ): Promise<void> => {
+    if (!examData || (isRetake && retakeSkill === 'writing')) return;
+    if (hasPopulatedAnswerKeys(targetResponse.detailed_results)) return;
+
+    const spreadsheetId = getStoredSpreadsheetId();
+    if (!spreadsheetId) return;
+
+    try {
+      const keyRes = await fetchAnswerKeyViaGviz(spreadsheetId, payload.exam_code);
+      if (!keyRes.success || Object.keys(keyRes.answerKeys).length === 0) return;
+
+      const hydratedExam = hydrateExamWithAnswerKeys(examData, keyRes.answerKeys);
+      const reGraded = gradeExamAnswers(hydratedExam, userAnswers);
+
+      let nextListeningRaw = reGraded.listening_raw;
+      let nextListeningMax = reGraded.listening_max;
+      let nextListeningBand = reGraded.listening_band;
+      let nextReadingRaw = reGraded.reading_raw;
+      let nextReadingMax = reGraded.reading_max;
+      let nextReadingBand = reGraded.reading_band;
+      let nextOverallBand: number | undefined = undefined;
+
+      if (isRetake && retakeSkill === 'listening') {
+        nextReadingRaw = 0;
+        nextReadingMax = 0;
+        nextReadingBand = 0;
+        nextOverallBand = nextListeningBand;
+      } else if (isRetake && retakeSkill === 'reading') {
+        nextListeningRaw = 0;
+        nextListeningMax = 0;
+        nextListeningBand = 0;
+        nextOverallBand = nextReadingBand;
+      } else if (nextListeningMax > 0 && nextReadingMax > 0) {
+        nextOverallBand = Math.round(((nextListeningBand + nextReadingBand) / 2) * 2) / 2;
+      } else if (nextReadingMax > 0) {
+        nextOverallBand = nextReadingBand;
+      } else if (nextListeningMax > 0) {
+        nextOverallBand = nextListeningBand;
+      }
+
+      targetResponse.listening_raw_score = nextListeningRaw;
+      targetResponse.listening_max_score = nextListeningMax;
+      targetResponse.listening_band = nextListeningBand;
+      targetResponse.reading_raw_score = nextReadingRaw;
+      targetResponse.reading_max_score = nextReadingMax;
+      targetResponse.reading_band = nextReadingBand;
+      targetResponse.overall_band = nextOverallBand;
+      targetResponse.detailed_results = reGraded.results;
+
+      targetRecord.listening_raw_score = nextListeningRaw;
+      targetRecord.listening_max_score = nextListeningMax;
+      targetRecord.listening_band = nextListeningBand;
+      targetRecord.reading_raw_score = nextReadingRaw;
+      targetRecord.reading_max_score = nextReadingMax;
+      targetRecord.reading_band = nextReadingBand;
+      targetRecord.overall_band = nextOverallBand;
+      targetRecord.detailed_results = reGraded.results;
+
+      await saveSubmissionToIndexedDB(targetRecord);
+      try {
+        const existing = safeLocalStorage.getItem('ielts_student_submissions');
+        const parsedExisting = safeJsonParse<SubmissionRecord[]>(existing, []);
+        const subsArr: SubmissionRecord[] = Array.isArray(parsedExisting) ? parsedExisting : [];
+        const updated = subsArr.map(s => s.submission_id === targetRecord.submission_id ? targetRecord : s);
+        safeSaveSubmissionsToLocalStorage(updated);
+      } catch {}
+    } catch (gvizKeyErr) {
+      console.warn('[Post-Submit GViz Answer Key Fallback] Skipped:', gvizKeyErr);
+    }
+  };
+
   if (!apiUrl || apiUrl.includes('mock_ielts_exam_system_gas_url') || apiUrl.includes('AKfycbx_mock')) {
+    await hydrateFromPostSubmitGvizIfNeeded(responseObj, record);
     return responseObj;
   }
 
@@ -1023,6 +1137,65 @@ export async function submitExamPayload(
 
     const gasRes = await postToGasWithLockRetry(apiUrl, postData, 3);
     if (gasRes && (gasRes.status === 'success' || gasRes.success === true || gasRes.is_opaque || gasRes.submission_id)) {
+      // Extract authoritative detailed_results / question_results returned by GAS when readable (non-opaque)
+      let gasDetailedResults: Record<string, any> | undefined =
+        gasRes.detailed_results && typeof gasRes.detailed_results === 'object'
+          ? { ...gasRes.detailed_results }
+          : undefined;
+
+      if ((!gasDetailedResults || Object.keys(gasDetailedResults).length === 0) && Array.isArray(gasRes.question_results)) {
+        gasDetailedResults = {};
+        gasRes.question_results.forEach((item: any) => {
+          if (item && item.question_id) {
+            gasDetailedResults![item.question_id] = item;
+          }
+        });
+      }
+
+      if (hasPopulatedAnswerKeys(gasDetailedResults)) {
+        record.detailed_results = gasDetailedResults;
+        responseObj.detailed_results = gasDetailedResults;
+        if (gasRes.listening_raw_score !== undefined || gasRes.listening_raw !== undefined) {
+          const lr = Number(gasRes.listening_raw_score ?? gasRes.listening_raw);
+          record.listening_raw_score = lr;
+          responseObj.listening_raw_score = lr;
+        }
+        if (gasRes.listening_max_score !== undefined) {
+          const lm = Number(gasRes.listening_max_score);
+          record.listening_max_score = lm;
+          responseObj.listening_max_score = lm;
+        }
+        if (gasRes.listening_band !== undefined) {
+          const lb = Number(gasRes.listening_band);
+          record.listening_band = lb;
+          responseObj.listening_band = lb;
+        }
+        if (gasRes.reading_raw_score !== undefined || gasRes.reading_raw !== undefined) {
+          const rr = Number(gasRes.reading_raw_score ?? gasRes.reading_raw);
+          record.reading_raw_score = rr;
+          responseObj.reading_raw_score = rr;
+        }
+        if (gasRes.reading_max_score !== undefined) {
+          const rm = Number(gasRes.reading_max_score);
+          record.reading_max_score = rm;
+          responseObj.reading_max_score = rm;
+        }
+        if (gasRes.reading_band !== undefined) {
+          const rb = Number(gasRes.reading_band);
+          record.reading_band = rb;
+          responseObj.reading_band = rb;
+        }
+        if (gasRes.overall_band !== undefined) {
+          const ob = Number(gasRes.overall_band);
+          record.overall_band = ob;
+          responseObj.overall_band = ob;
+        }
+      } else {
+        // Static GitHub Pages fallback (e.g., GAS opaque no-cors redirect or older GAS script):
+        // Fetch Col G strictly AFTER submission to grade accurately and reveal accepted answers on ResultPage
+        await hydrateFromPostSubmitGvizIfNeeded(responseObj, record);
+      }
+
       // Mark as synchronized online in local IndexedDB vault
       record.is_offline_pending = false;
       record.is_server_certified = true;
@@ -1039,8 +1212,8 @@ export async function submitExamPayload(
       } catch {}
 
       return {
-        ...responseObj,
         ...gasRes,
+        ...responseObj,
         submission_id: submissionId,
         submission_type: submissionType,
         is_offline_pending: false,
@@ -1053,6 +1226,7 @@ export async function submitExamPayload(
     console.warn('Network error while posting to GAS API with retry, offline IndexedDB backup active:', err);
   }
 
+  await hydrateFromPostSubmitGvizIfNeeded(responseObj, record);
   return responseObj;
 }
 
@@ -2310,7 +2484,7 @@ export async function uploadImageToServer(dataUrlOrFile: string, filename?: stri
   try {
     const res = await fetch(getApiUrl('/api/upload-image'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ image: dataUrlOrFile, filename })
     });
     if (res.ok) {

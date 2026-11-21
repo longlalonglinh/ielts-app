@@ -39,7 +39,6 @@ export function extractSpreadsheetId(input?: string | null): string | null {
  * Retrieve currently configured Google Spreadsheet ID
  */
 export function getStoredSpreadsheetId(): string {
-  if (typeof window === 'undefined') return '';
   const fromStorage = safeLocalStorage.getItem('ielts_spreadsheet_id') || '';
   const fromStorageClean = extractSpreadsheetId(fromStorage);
   if (fromStorageClean) return fromStorageClean;
@@ -62,7 +61,6 @@ export function getStoredSpreadsheetId(): string {
  * Store Google Spreadsheet ID for future queries
  */
 export function setStoredSpreadsheetId(idOrUrl: string): void {
-  if (typeof window === 'undefined') return;
   const cleanId = extractSpreadsheetId(idOrUrl);
   if (cleanId) {
     safeLocalStorage.setItem('ielts_spreadsheet_id', cleanId);
@@ -226,10 +224,24 @@ export async function fetchExamViaGviz(
 
     const examRow = examTable.rows[0].c;
     const title = examRow[1]?.v ? String(examRow[1].v) : `IELTS Exam - ${cleanCode}`;
-    const testType = (examRow[2]?.v === 'PRACTICE' ? 'PRACTICE' : 'TEST') as 'TEST' | 'PRACTICE';
-    const rawDuration = examRow[3]?.v;
-    const parsedDuration = typeof rawDuration === 'number' ? rawDuration : Number(rawDuration);
-    const durationMins = (!isNaN(parsedDuration) && parsedDuration > 0) ? parsedDuration : 120;
+    const rawCol2 = examRow[2]?.v;
+    const rawCol3 = examRow[3]?.v;
+    const isPositiveNum = (v: unknown): number | null => {
+      if (v === undefined || v === null) return null;
+      if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? v : null;
+      const s = String(v).trim();
+      if (!s || !/^\d+(\.\d+)?$/.test(s)) return null;
+      const n = Number(s);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    };
+    const num2 = isPositiveNum(rawCol2);
+    const num3 = isPositiveNum(rawCol3);
+    const testType = (
+      num2 !== null && num3 === null
+        ? (String(rawCol3 || 'TEST').trim().toUpperCase() === 'PRACTICE' ? 'PRACTICE' : 'TEST')
+        : (String(rawCol2 || 'TEST').trim().toUpperCase() === 'PRACTICE' ? 'PRACTICE' : 'TEST')
+    ) as 'TEST' | 'PRACTICE';
+    const durationMins = num2 !== null && num3 === null ? num2 : (num3 !== null ? num3 : 120);
     const audioUrl = examRow[4]?.v ? String(examRow[4].v).trim() : '';
     const readingPassage = examRow[5]?.v ? String(examRow[5].v).trim() : '';
     const writingTask1Prompt = examRow[6]?.v ? String(examRow[6].v).trim() : '';
@@ -400,3 +412,72 @@ export async function fetchExamViaGviz(
     };
   }
 }
+
+/**
+ * Post-Submission Answer Key Lookup via GViz (Static Hosting Fallback ONLY).
+ *
+ * Security Model:
+ * - During the examination, fetchExamViaGviz() omits Column G (CORRECT_ANSWER) so
+ *   answers are never transmitted while a candidate is taking the test.
+ * - ONLY AFTER the candidate clicks Submit on static-only hosting (e.g., GitHub Pages)
+ *   where neither the Node.js backend nor a readable GAS JSON grading response provided
+ *   answer keys, this helper fetches Column G (CORRECT_ANSWER) and Column H (MAX_SCORE)
+ *   to compute accurate scores and display official accepted answers on ResultPage.
+ */
+export async function fetchAnswerKeyViaGviz(
+  spreadsheetId: string,
+  examCode: string
+): Promise<{
+  success: boolean;
+  answerKeys: Record<string, { correct_answer: string; max_score: number }>;
+  error?: string;
+}> {
+  const cleanCode = (examCode || '').trim().toUpperCase();
+  const cleanId = extractSpreadsheetId(spreadsheetId);
+
+  if (!cleanId || !cleanCode) {
+    return {
+      success: false,
+      answerKeys: {},
+      error: 'Missing Spreadsheet ID or exam code.'
+    };
+  }
+
+  try {
+    const table = await querySheetGviz(
+      cleanId,
+      'QUESTIONS',
+      `SELECT A, B, G, H WHERE UPPER(A) = '${cleanCode}'`,
+      6000
+    );
+
+    const answerKeys: Record<string, { correct_answer: string; max_score: number }> = {};
+    if (table?.rows && Array.isArray(table.rows)) {
+      table.rows.forEach((rowObj: any, index: number) => {
+        const c = rowObj?.c;
+        if (!c) return;
+        const qId = String(c[1]?.v || `Q${index + 1}`).trim();
+        const rawCorrect = c[2]?.v !== undefined && c[2]?.v !== null ? String(c[2].v).trim() : '';
+        const maxScore = Number(c[3]?.v) || 1;
+        if (qId && rawCorrect) {
+          answerKeys[qId] = {
+            correct_answer: rawCorrect,
+            max_score: maxScore
+          };
+        }
+      });
+    }
+
+    return {
+      success: Object.keys(answerKeys).length > 0,
+      answerKeys
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      answerKeys: {},
+      error: err?.message || 'Failed to fetch post-submission answer key via GViz.'
+    };
+  }
+}
+

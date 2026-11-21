@@ -90,12 +90,11 @@ function setupInitialSheets() {
     sheetSubmissions.setFrozenRows(1);
   }
 
-  // Tab 4: CHEATLOGS (7 standard columns A-G)
+  // Tab 4: CHEATLOGS (6 standard columns A-F matching production sheet)
   var sheetCheatlogs = ss.getSheetByName('CHEATLOGS') || ss.insertSheet('CHEATLOGS');
   if (sheetCheatlogs.getLastRow() === 0) {
     sheetCheatlogs.appendRow([
-      'LOG_ID', 'SUBMISSION_ID', 'SBD', 'EXAM_CODE',
-      'VIOLATION_TYPE', 'VIOLATION_COUNT', 'TIMESTAMP'
+      'LOG_ID', 'SBD', 'EXAM_CODE', 'VIOLATION_TYPE', 'VIOLATION_COUNT', 'TIMESTAMP'
     ]);
     sheetCheatlogs.getRange("1:1").setFontWeight("bold").setBackground("#e2e8f0");
     sheetCheatlogs.setFrozenRows(1);
@@ -354,8 +353,7 @@ function repairSheetsHeaders_(ss) {
       name: 'CHEATLOGS',
       bg: '#e2e8f0',
       headers: [
-        'LOG_ID', 'SUBMISSION_ID', 'SBD', 'EXAM_CODE',
-        'VIOLATION_TYPE', 'VIOLATION_COUNT', 'TIMESTAMP'
+        'LOG_ID', 'SBD', 'EXAM_CODE', 'VIOLATION_TYPE', 'VIOLATION_COUNT', 'TIMESTAMP'
       ]
     },
     {
@@ -722,11 +720,12 @@ function doGet(e) {
           var cCode = String(rE[0] || '').trim().toUpperCase();
           if (cCode) {
             var jk = metaColsJK[exI] || ['', ''];
+            var parsedMeta = parseExamTypeAndDuration_(rE[2], rE[3], 60);
             examsList.push({
               exam_code: cCode,
               title: rE[1] || ('Exam ' + cCode),
-              test_type: rE[2] || 'Academic',
-              duration_mins: Number(rE[3]) || 60,
+              test_type: parsedMeta.test_type,
+              duration_mins: parsedMeta.duration_mins,
               has_audio: Boolean(rE[4]),
               audio_title: jk[0] || '',
               created_at: jk[1] || ''
@@ -806,11 +805,12 @@ function doGet(e) {
             var isCol8Img = rawCol8.indexOf('http') === 0 || rawCol8.indexOf('data:image') === 0 || rawCol8.indexOf('/') === 0 || rawCol8.indexOf('drive.google') !== -1;
             var resolvedTask1Img = isCol8Img ? rawCol8 : (rawCol9.indexOf('http') === 0 || rawCol9.indexOf('data:image') === 0 || rawCol9.indexOf('/') === 0 ? rawCol9 : '');
 
+            var parsedSingleMeta = parseExamTypeAndDuration_(dataE[j][2], dataE[j][3], 60);
             examMeta = {
               exam_code: String(dataE[j][0]).trim().toUpperCase(),
               title: dataE[j][1] || ('IELTS Examination - ' + examCode),
-              test_type: dataE[j][2] || 'Academic',
-              duration_mins: Number(dataE[j][3]) || 60,
+              test_type: parsedSingleMeta.test_type,
+              duration_mins: parsedSingleMeta.duration_mins,
               audio_url: normalizeAudioUrl(String(dataE[j][4] || '')),
               audio_title: isCol8Img ? rawCol9 : '',
               reading_passage: dataE[j][5] || '',
@@ -914,22 +914,30 @@ function doGet(e) {
       var cFilterSbd = (params.sbd || '').toString().trim().toUpperCase();
       var cLimit = Number(params.limit) || 0;
 
-      var dataC = sheetC.getRange(2, 1, lastCRow - 1, 7).getValues();
+      var cheatSchema = detectCheatLogsSchema_(sheetC);
+      var dataC = sheetC.getRange(2, 1, lastCRow - 1, cheatSchema.colCount).getValues();
       var cheatlogs = [];
       for (var cl = 0; cl < dataC.length; cl++) {
         var rc = dataC[cl];
         if (!rc[0]) continue;
-        if (cFilterExam && String(rc[3] || '').trim().toUpperCase() !== cFilterExam) continue;
-        if (cFilterSbd && String(rc[2] || '').trim().toUpperCase() !== cFilterSbd) continue;
+        var rowSubId = cheatSchema.hasSubmissionId ? rc[1] : '';
+        var rowSbd = cheatSchema.hasSubmissionId ? rc[2] : rc[1];
+        var rowExamCode = cheatSchema.hasSubmissionId ? rc[3] : rc[2];
+        var rowVType = cheatSchema.hasSubmissionId ? rc[4] : rc[3];
+        var rowVCount = cheatSchema.hasSubmissionId ? rc[5] : rc[4];
+        var rowTs = cheatSchema.hasSubmissionId ? rc[6] : rc[5];
+
+        if (cFilterExam && String(rowExamCode || '').trim().toUpperCase() !== cFilterExam) continue;
+        if (cFilterSbd && String(rowSbd || '').trim().toUpperCase() !== cFilterSbd) continue;
 
         cheatlogs.push({
           log_id: rc[0],
-          submission_id: rc[1],
-          sbd: rc[2],
-          exam_code: rc[3],
-          violation_type: rc[4],
-          violation_count: rc[5],
-          timestamp: rc[6]
+          submission_id: rowSubId,
+          sbd: rowSbd,
+          exam_code: rowExamCode,
+          violation_type: rowVType,
+          violation_count: rowVCount,
+          timestamp: rowTs
         });
       }
 
@@ -973,7 +981,7 @@ function doGet(e) {
         records.push({
           student_id: stId,
           student_name: String(rSP[1] || ''),
-          deck_id: String(rSP[2] || ''),
+          deck_id: normalizeDeckIdCell_(rSP[2]),
           deck_title: String(rSP[3] || ''),
           cards_mastered: Number(rSP[4]) || 0,
           total_cards: Number(rSP[5]) || 0,
@@ -1101,52 +1109,126 @@ function doPost(e) {
         }
       }
 
-      var listeningRaw = payload.listening_raw !== undefined ? payload.listening_raw : (payload.listening_raw_score || 0);
-      var readingRaw = payload.reading_raw !== undefined ? payload.reading_raw : (payload.reading_raw_score || 0);
-      var listeningBand = payload.listening_band || 0;
-      var readingBand = payload.reading_band || 0;
+      var listeningRaw = payload.listening_raw !== undefined ? Number(payload.listening_raw) : Number(payload.listening_raw_score || 0);
+      var readingRaw = payload.reading_raw !== undefined ? Number(payload.reading_raw) : Number(payload.reading_raw_score || 0);
+      var listeningMax = Number(payload.listening_max_score || 0);
+      var readingMax = Number(payload.reading_max_score || 0);
+      var listeningBand = Number(payload.listening_band || 0);
+      var readingBand = Number(payload.reading_band || 0);
+      var overallBand = payload.overall_band !== undefined && payload.overall_band !== null ? Number(payload.overall_band) : 0;
+      var detailedResults = {};
+      var questionResults = [];
 
-      // Server-side scoring check if bands not supplied by client
-      if ((!listeningBand || !readingBand) && examCode) {
+      // Authoritative GAS-side grading against QUESTIONS Column G (keeps Col G hidden during exam)
+      if (examCode) {
         var sheetQ = getFlexibleSheet(ss, ['QUESTIONS', 'Questions', 'questions']);
-        var correctAnswersMap = {};
+        var questionMetaList = [];
         if (sheetQ && sheetQ.getLastRow() > 1) {
           var qData = sheetQ.getRange(2, 1, sheetQ.getLastRow() - 1, 8).getValues();
           for (var qi = 0; qi < qData.length; qi++) {
             if (String(qData[qi][0] || '').trim().toUpperCase() === examCode) {
-              correctAnswersMap[String(qData[qi][1])] = {
-                section: String(qData[qi][2] || '').toLowerCase(),
-                correct: String(qData[qi][6] || '').trim().toUpperCase(),
+              questionMetaList.push({
+                question_id: String(qData[qi][1] || '').trim(),
+                section: String(qData[qi][2] || 'reading').toLowerCase().trim(),
+                question_type: String(qData[qi][4] || '').toLowerCase().trim(),
+                correct_raw: String(qData[qi][6] || '').trim(),
                 max_score: Number(qData[qi][7]) || 1
-              };
+              });
             }
           }
         }
 
-        if (!listeningBand && Object.keys(correctAnswersMap).length > 0) {
-          var lRaw = 0; var lMax = 0;
-          for (var lKey in listeningAnswers) {
-            var lVal = String(listeningAnswers[lKey] || '').trim().toUpperCase();
-            if (correctAnswersMap[lKey] && correctAnswersMap[lKey].section === 'listening') {
-              lMax += correctAnswersMap[lKey].max_score;
-              if (lVal === correctAnswersMap[lKey].correct) lRaw += correctAnswersMap[lKey].max_score;
-            }
-          }
-          listeningRaw = lRaw;
-          listeningBand = convertRawToIeltsBand(listeningRaw, lMax || 40);
-        }
+        if (questionMetaList.length > 0) {
+          var mergedUserAnswers = {};
+          var rawAllAnswers = payload.answers || payload.user_answers || {};
+          for (var ak in rawAllAnswers) mergedUserAnswers[ak] = rawAllAnswers[ak];
+          for (var lk in listeningAnswers) mergedUserAnswers[lk] = listeningAnswers[lk];
+          for (var rk in readingAnswers) mergedUserAnswers[rk] = readingAnswers[rk];
 
-        if (!readingBand && Object.keys(correctAnswersMap).length > 0) {
-          var rRaw = 0; var rMax = 0;
-          for (var rKey in readingAnswers) {
-            var rVal = String(readingAnswers[rKey] || '').trim().toUpperCase();
-            if (correctAnswersMap[rKey] && correctAnswersMap[rKey].section === 'reading') {
-              rMax += correctAnswersMap[rKey].max_score;
-              if (rVal === correctAnswersMap[rKey].correct) rRaw += correctAnswersMap[rKey].max_score;
+          var normalizeAnsGas_ = function(str) {
+            return String(str || '')
+              .toLowerCase()
+              .replace(/^(a|an|the)\\s+/i, '')
+              .replace(/[-_\\/\\\\]+/g, '')
+              .replace(/[.,#!$%^&*;:{}=~()]/g, '')
+              .replace(/\\s+/g, ' ')
+              .trim();
+          };
+          var expandAbbrevGas_ = function(norm) {
+            if (norm === 't') return 'true';
+            if (norm === 'f') return 'false';
+            if (norm === 'ng') return 'not given';
+            if (norm === 'y') return 'yes';
+            if (norm === 'n') return 'no';
+            return norm;
+          };
+
+          var lRawCalc = 0; var lMaxCalc = 0;
+          var rRawCalc = 0; var rMaxCalc = 0;
+
+          for (var qIdx = 0; qIdx < questionMetaList.length; qIdx++) {
+            var qm = questionMetaList[qIdx];
+            if (!qm.question_id) continue;
+            var rawUserVal = mergedUserAnswers[qm.question_id];
+            if (rawUserVal === undefined || rawUserVal === null) rawUserVal = '';
+            var userStr = String(rawUserVal).trim();
+
+            var acceptableList = qm.correct_raw
+              ? qm.correct_raw.split(/[|\\/]/).map(function(s) { return s.trim(); }).filter(Boolean)
+              : [];
+
+            var isCorrectItem = false;
+            if (userStr && acceptableList.length > 0) {
+              var normU = expandAbbrevGas_(normalizeAnsGas_(userStr));
+              for (var ai = 0; ai < acceptableList.length; ai++) {
+                var normC = expandAbbrevGas_(normalizeAnsGas_(acceptableList[ai]));
+                if (normU && normU === normC) {
+                  isCorrectItem = true;
+                  break;
+                }
+              }
             }
+
+            var earned = isCorrectItem ? qm.max_score : 0;
+            if (qm.section === 'listening') {
+              lMaxCalc += qm.max_score;
+              lRawCalc += earned;
+            } else {
+              rMaxCalc += qm.max_score;
+              rRawCalc += earned;
+            }
+
+            var itemResult = {
+              question_id: qm.question_id,
+              section: qm.section,
+              user_answer: userStr,
+              correct_answer: qm.correct_raw,
+              acceptable_answers: acceptableList,
+              is_correct: isCorrectItem,
+              max_score: qm.max_score,
+              earned_score: earned
+            };
+            detailedResults[qm.question_id] = itemResult;
+            questionResults.push(itemResult);
           }
-          readingRaw = rRaw;
-          readingBand = convertRawToIeltsBand(readingRaw, rMax || 40);
+
+          if (lMaxCalc > 0) {
+            listeningRaw = lRawCalc;
+            listeningMax = lMaxCalc;
+            listeningBand = convertRawToIeltsBand(listeningRaw, lMaxCalc);
+          }
+          if (rMaxCalc > 0) {
+            readingRaw = rRawCalc;
+            readingMax = rMaxCalc;
+            readingBand = convertRawToIeltsBand(readingRaw, rMaxCalc);
+          }
+          if (lMaxCalc > 0 && rMaxCalc > 0) {
+            overallBand = Math.round(((listeningBand + readingBand) / 2) * 2) / 2;
+          } else if (rMaxCalc > 0) {
+            overallBand = readingBand;
+          } else if (lMaxCalc > 0) {
+            overallBand = listeningBand;
+          }
         }
       }
 
@@ -1175,7 +1257,7 @@ function doPost(e) {
         answersJson,
         writingScoresJson,
         writingBand,
-        payload.overall_band || 0,
+        overallBand || payload.overall_band || 0,
         status,
         submittedAt,
         violationsCount
@@ -1188,26 +1270,27 @@ function doPost(e) {
         batchAppendRows_(sheetSubmissions, [subRowData], 18);
       }
 
-      // Batch append cheat logs in ONE setValues() call
+      // Batch append cheat logs in ONE setValues() call (auto-adapts to 6-col or 7-col header)
       if (cheatLogs && cheatLogs.length > 0 && existingSubRowIdx === -1) {
         var sheetCheatlogs = ensureSheetWithHeader_(ss, 'CHEATLOGS', [
-          'LOG_ID', 'SUBMISSION_ID', 'SBD', 'EXAM_CODE',
-          'VIOLATION_TYPE', 'VIOLATION_COUNT', 'TIMESTAMP'
+          'LOG_ID', 'SBD', 'EXAM_CODE', 'VIOLATION_TYPE', 'VIOLATION_COUNT', 'TIMESTAMP'
         ], "#e2e8f0");
+        var cheatSchemaSub = detectCheatLogsSchema_(sheetCheatlogs);
         var cheatRows = [];
         for (var c = 0; c < cheatLogs.length; c++) {
           var log = cheatLogs[c] || {};
-          cheatRows.push([
-            log.log_id || ('LOG_' + Date.now() + '_' + c),
-            submissionId,
-            sanitizeCell_(sbd, 100, true),
-            examCode,
-            log.violation_type || 'ONBLUR',
-            log.violation_count || 1,
-            log.timestamp || submittedAt
-          ]);
+          var cLogId = log.log_id || ('LOG_' + Date.now() + '_' + c);
+          var cSbd = sanitizeCell_(sbd, 100, true);
+          var cVType = log.violation_type || 'ONBLUR';
+          var cVCount = log.violation_count || 1;
+          var cTs = log.timestamp || submittedAt;
+          if (cheatSchemaSub.hasSubmissionId) {
+            cheatRows.push([cLogId, submissionId, cSbd, examCode, cVType, cVCount, cTs]);
+          } else {
+            cheatRows.push([cLogId, cSbd, examCode, cVType, cVCount, cTs]);
+          }
         }
-        batchAppendRows_(sheetCheatlogs, cheatRows, 7);
+        batchAppendRows_(sheetCheatlogs, cheatRows, cheatSchemaSub.colCount);
       }
 
       response = {
@@ -1217,9 +1300,16 @@ function doPost(e) {
         sbd: sbd,
         exam_code: examCode,
         listening_raw: listeningRaw,
+        listening_raw_score: listeningRaw,
+        listening_max_score: listeningMax,
         listening_band: listeningBand,
         reading_raw: readingRaw,
+        reading_raw_score: readingRaw,
+        reading_max_score: readingMax,
         reading_band: readingBand,
+        overall_band: overallBand,
+        detailed_results: detailedResults,
+        question_results: questionResults,
         writing_status: status,
         submitted_at: submittedAt,
         deduplicated: existingSubRowIdx > 0
@@ -1556,12 +1646,12 @@ function doPost(e) {
       };
     }
 
-    // 5C. LOG CHEAT / PROCTORING EVENT (Batch append to 7-column CHEATLOGS tab)
+    // 5C. LOG CHEAT / PROCTORING EVENT (Schema-aware 6-column / 7-column CHEATLOGS batch append)
     else if (action === 'logcheat' || action === 'savecheatlog') {
       var sheetCheatlogs = ensureSheetWithHeader_(ss, 'CHEATLOGS', [
-        'LOG_ID', 'SUBMISSION_ID', 'SBD', 'EXAM_CODE',
-        'VIOLATION_TYPE', 'VIOLATION_COUNT', 'TIMESTAMP'
+        'LOG_ID', 'SBD', 'EXAM_CODE', 'VIOLATION_TYPE', 'VIOLATION_COUNT', 'TIMESTAMP'
       ], "#e2e8f0");
+      var cheatSchemaLog = detectCheatLogsSchema_(sheetCheatlogs);
 
       var cheatLogId = String(payload.log_id || ('LOG_' + Date.now())).trim();
       var cheatSubId = String(payload.submission_id || '').trim();
@@ -1571,15 +1661,11 @@ function doPost(e) {
       var cheatCount = Number(payload.violation_count || payload.violations_count || 1);
       var cheatTimestamp = payload.timestamp || Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd HH:mm:ss");
 
-      batchAppendRows_(sheetCheatlogs, [[
-        cheatLogId,
-        cheatSubId,
-        cheatSbd,
-        cheatExamCode,
-        cheatViolation,
-        cheatCount,
-        cheatTimestamp
-      ]], 7);
+      var cheatRow = cheatSchemaLog.hasSubmissionId
+        ? [cheatLogId, cheatSubId, cheatSbd, cheatExamCode, cheatViolation, cheatCount, cheatTimestamp]
+        : [cheatLogId, cheatSbd, cheatExamCode, cheatViolation, cheatCount, cheatTimestamp];
+
+      batchAppendRows_(sheetCheatlogs, [cheatRow], cheatSchemaLog.colCount);
 
       response = {
         status: 'success',
@@ -1589,7 +1675,7 @@ function doPost(e) {
       };
     }
 
-    // 6. SYNC STUDENT PROGRESS (Batch Upsert by composite key STUDENT_ID + DECK_ID)
+    // 6. SYNC STUDENT PROGRESS (Batch Upsert by composite key STUDENT_ID + DECK_ID with plain-text Date guard)
     else if (action === 'syncstudentprogress') {
       var sheetSP = ensureSheetWithHeader_(ss, 'STUDENT_PROGRESS', PROGRESS_HEADERS, "#ede9fe");
       var records = payload.progress_records || payload.records || [];
@@ -1599,23 +1685,34 @@ function doPost(e) {
 
       var spLastRow = sheetSP.getLastRow();
       var existingRows = spLastRow > 1 ? sheetSP.getRange(2, 1, spLastRow - 1, PROGRESS_HEADERS.length).getValues() : [];
+      var dedupedRows = [];
       var keyToIdx = {};
       for (var ei = 0; ei < existingRows.length; ei++) {
-        var ek = String(existingRows[ei][0] || '').trim().toUpperCase() + '::' + String(existingRows[ei][2] || '').trim().toUpperCase();
-        if (ek !== '::') keyToIdx[ek] = ei;
+        var normStId = String(existingRows[ei][0] || '').replace(/^'/, '').trim();
+        var normDeckId = normalizeDeckIdCell_(existingRows[ei][2]);
+        var ek = normStId.toUpperCase() + '::' + normDeckId.toUpperCase();
+        if (ek === '::') continue;
+        existingRows[ei][0] = forcePlainTextCell_(sanitizeCell_(normStId, 100, true));
+        existingRows[ei][2] = forcePlainTextCell_(sanitizeCell_(normDeckId, 100, true));
+        if (keyToIdx[ek] !== undefined) {
+          dedupedRows[keyToIdx[ek]] = existingRows[ei];
+        } else {
+          keyToIdx[ek] = dedupedRows.length;
+          dedupedRows.push(existingRows[ei]);
+        }
       }
 
       var nowProgressTime = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd HH:mm:ss");
       for (var ri = 0; ri < records.length; ri++) {
         var rec = records[ri];
         if (!rec) continue;
-        var stId = String(rec.student_id || 'GUEST').trim();
-        var dkId = String(rec.deck_id || 'DEFAULT').trim();
+        var stId = String(rec.student_id || 'GUEST').replace(/^'/, '').trim();
+        var dkId = normalizeDeckIdCell_(rec.deck_id || 'DEFAULT');
         var compKey = stId.toUpperCase() + '::' + dkId.toUpperCase();
         var rowArr = [
-          sanitizeCell_(stId, 100, true),
+          forcePlainTextCell_(sanitizeCell_(stId, 100, true)),
           sanitizeCell_(rec.student_name || '', 200, true),
-          sanitizeCell_(dkId, 100, true),
+          forcePlainTextCell_(sanitizeCell_(dkId, 100, true)),
           sanitizeCell_(rec.deck_title || '', 300, true),
           Number(rec.cards_mastered) || 0,
           Number(rec.total_cards) || 0,
@@ -1628,15 +1725,21 @@ function doPost(e) {
         ];
 
         if (keyToIdx[compKey] !== undefined) {
-          existingRows[keyToIdx[compKey]] = rowArr;
+          dedupedRows[keyToIdx[compKey]] = rowArr;
         } else {
-          keyToIdx[compKey] = existingRows.length;
-          existingRows.push(rowArr);
+          keyToIdx[compKey] = dedupedRows.length;
+          dedupedRows.push(rowArr);
         }
       }
 
-      if (existingRows.length > 0) {
-        sheetSP.getRange(2, 1, existingRows.length, PROGRESS_HEADERS.length).setValues(existingRows);
+      if (dedupedRows.length > 0) {
+        // Force plain-text number format on STUDENT_ID (Col A) and DECK_ID (Col C) so Sheets never coerces IDs into Dates
+        sheetSP.getRange(2, 1, dedupedRows.length, 1).setNumberFormat('@');
+        sheetSP.getRange(2, 3, dedupedRows.length, 1).setNumberFormat('@');
+        sheetSP.getRange(2, 1, dedupedRows.length, PROGRESS_HEADERS.length).setValues(dedupedRows);
+        if (spLastRow - 1 > dedupedRows.length) {
+          sheetSP.getRange(2 + dedupedRows.length, 1, (spLastRow - 1) - dedupedRows.length, PROGRESS_HEADERS.length).clearContent();
+        }
       }
 
       response = {
@@ -1663,6 +1766,54 @@ function doPost(e) {
       } catch (relErr) {}
     }
   }
+}
+
+function parseExamTypeAndDuration_(col2, col3, fallbackMins) {
+  var s2 = String(col2 === undefined || col2 === null ? '' : col2).trim();
+  var s3 = String(col3 === undefined || col3 === null ? '' : col3).trim();
+  var n2 = /^\\d+(\\.\\d+)?$/.test(s2) && Number(s2) > 0 ? Number(s2) : null;
+  var n3 = /^\\d+(\\.\\d+)?$/.test(s3) && Number(s3) > 0 ? Number(s3) : null;
+  if (n2 !== null && n3 === null) {
+    return {
+      test_type: s3.toUpperCase() === 'PRACTICE' ? 'PRACTICE' : (s3 || 'TEST'),
+      duration_mins: n2
+    };
+  }
+  return {
+    test_type: s2.toUpperCase() === 'PRACTICE' ? 'PRACTICE' : (s2 || 'Academic'),
+    duration_mins: n3 !== null ? n3 : (fallbackMins || 60)
+  };
+}
+
+function detectCheatLogsSchema_(sheet) {
+  try {
+    var colCount = Math.max(sheet.getLastColumn(), 6);
+    var headerRow = sheet.getRange(1, 1, 1, Math.min(colCount, 7)).getValues()[0];
+    var col1 = String(headerRow[1] || '').trim().toUpperCase();
+    if (col1 === 'SUBMISSION_ID') {
+      return { hasSubmissionId: true, colCount: 7 };
+    }
+  } catch (e) {}
+  return { hasSubmissionId: false, colCount: 6 };
+}
+
+function normalizeDeckIdCell_(val) {
+  if (val === undefined || val === null) return '';
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return Utilities.formatDate(val, "GMT+7", "yyyy-MM-dd");
+  }
+  return String(val).replace(/^'/, '').trim();
+}
+
+function forcePlainTextCell_(val) {
+  var str = String(val === undefined || val === null ? '' : val).trim();
+  if (!str) return '';
+  if (str.charAt(0) === "'") return str;
+  // Prefix apostrophe so Google Sheets preserves date-like / numeric IDs as pure strings
+  if (/^\\d{4}[-\\/]\\d{1,2}[-\\/]\\d{1,2}$/.test(str) || /^\\d{1,2}[-\\/]\\d{1,2}([-\\/]\\d{2,4})?$/.test(str) || /^\\d+$/.test(str)) {
+    return "'" + str;
+  }
+  return str;
 }
 
 function parseJsonSafe(str) {

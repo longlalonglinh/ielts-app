@@ -168,7 +168,15 @@ export const ResultPage: React.FC<ResultPageProps> = ({
     }
   };
 
-  const detailedResults = result.detailed_results || {};
+  const detailedResults: Record<string, any> = { ...(result.detailed_results || {}) };
+  const rawQuestionResults = (result as any).question_results;
+  if (Array.isArray(rawQuestionResults)) {
+    rawQuestionResults.forEach((item: any) => {
+      if (item && item.question_id && !detailedResults[item.question_id]) {
+        detailedResults[item.question_id] = item;
+      }
+    });
+  }
 
   // Overall Band calculation fallback if not already provided (respects One Skill Retake: Writing has no estimated overall before teacher grading)
   const overallBand = isWritingRetake 
@@ -595,7 +603,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                     const studentAns = userAnswers[q.question_id] || (qRes ? qRes.user_answer : '') || '(No answer)';
                     const correctAnswers = qRes?.acceptable_answers?.length 
                       ? qRes.acceptable_answers.join(' / ')
-                      : q.correct_answer || 'N/A';
+                      : qRes?.correct_answer || q.correct_answer || 'N/A';
 
                     return (
                       <div

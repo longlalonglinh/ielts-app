@@ -60,13 +60,11 @@ import {
   clearSessionTimers,
   fetchServerConfig,
   saveServerConfig,
-  checkServerHealth,
-  isAdminAuthenticated,
-  verifyAdminPassword,
-  loginAdminWithShortcut,
-  verifyStoredAdminSession,
-  clearAdminToken
+  checkServerHealth
 } from './services/api';
+import { useAdminSession } from './hooks/useAdminSession';
+import { useExamMetrics } from './hooks/useExamMetrics';
+import { normalizeExamPayload } from './services/examProviders';
 import { applyCandidateExamShuffle } from './utils/examShuffle';
 import { setStoredSpreadsheetId } from './services/gvizService';
 import { gradeExamAnswers } from './services/answerScoring';
@@ -110,11 +108,18 @@ export default function App() {
   });
   const [adminTab, setAdminTab] = useState<'dashboard' | 'grading' | 'upload' | 'preview' | 'gas_setup' | 'custom_practice'>('dashboard');
 
-  // Admin Session Authentication State
-  const [adminAuthed, setAdminAuthed] = useState<boolean>(() => isAdminAuthenticated());
-  const [adminPasswordInput, setAdminPasswordInput] = useState('');
-  const [adminAuthError, setAdminAuthError] = useState<string | null>(null);
-  const [isVerifyingAdmin, setIsVerifyingAdmin] = useState(false);
+  // Admin Session Authentication State (encapsulated in useAdminSession hook)
+  const {
+    adminAuthed,
+    adminPasswordInput,
+    setAdminPasswordInput,
+    adminAuthError,
+    setAdminAuthError,
+    isVerifyingAdmin,
+    handleAdminLoginSubmit,
+    handleAdminLock,
+    handleSwitchToAdminWithCredentials
+  } = useAdminSession(setActiveView);
 
   // Configurable Server Proctoring Policy State
   const [proctoringPolicy, setProctoringPolicy] = useState<{
@@ -151,10 +156,9 @@ export default function App() {
   const [isServerConnected, setIsServerConnected] = useState<boolean | null>(null);
   const [gasConfigSyncState, setGasConfigSyncState] = useState<'idle' | 'saving' | 'synced' | 'error'>('idle');
 
-  // Automatically detect Central Server, verify Admin session & sync GAS URL / Spreadsheet ID / Proctoring Policy on mount
+  // Automatically detect Central Server & sync GAS URL / Spreadsheet ID / Proctoring Policy on mount
   useEffect(() => {
     checkServerHealth().then(ok => setIsServerConnected(ok)).catch(() => setIsServerConnected(false));
-    verifyStoredAdminSession().then(valid => setAdminAuthed(valid)).catch(() => {});
     fetchServerConfig().then(cfg => {
       if (!cfg) return;
       if (cfg.gas_url && cfg.gas_url.trim() && !cfg.gas_url.includes('mock_ielts_exam_system_gas_url')) {
@@ -178,40 +182,6 @@ export default function App() {
       }
     }).catch(() => {});
   }, []);
-
-  const handleAdminLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adminPasswordInput.trim() || isVerifyingAdmin) return;
-    setIsVerifyingAdmin(true);
-    setAdminAuthError(null);
-    const res = await verifyAdminPassword(adminPasswordInput.trim());
-    setIsVerifyingAdmin(false);
-    if (res.success) {
-      setAdminAuthed(true);
-      setAdminPasswordInput('');
-    } else {
-      setAdminAuthError(res.error || 'Incorrect Admin password.');
-    }
-  };
-
-  const handleAdminLock = () => {
-    clearAdminToken();
-    setAdminAuthed(false);
-    setAdminPasswordInput('');
-    setAdminAuthError(null);
-    setActiveView('student');
-  };
-
-  const handleSwitchToAdminWithCredentials = async (sbdInput?: string, codeInput?: string) => {
-    if (sbdInput && codeInput) {
-      const res = await loginAdminWithShortcut(sbdInput, codeInput);
-      if (res.success) {
-        setAdminAuthed(true);
-        setAdminAuthError(null);
-      }
-    }
-    setActiveView('admin');
-  };
 
   // Diagnostics Modal State
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
@@ -237,15 +207,17 @@ export default function App() {
   const [retakeMode, setRetakeMode] = useState<boolean>(false);
   const [targetSkill, setTargetSkill] = useState<'listening' | 'reading' | 'writing' | undefined>(undefined);
 
-  // Dynamic skill presence flags (aware of One Skill Retake & single skill exams)
-  const isRetake = Boolean(retakeMode || examData.retakeMode || examData.exam_type === 'one_skill' || (examData.skills && examData.skills.length === 1));
-  const activeTargetSkill: 'listening' | 'reading' | 'writing' | undefined = targetSkill || examData.targetSkill || 
-    (examData.skills && examData.skills.length === 1 ? (examData.skills[0] as 'listening' | 'reading' | 'writing') : undefined) ||
-    ((examData.exam_code || '').toUpperCase().startsWith('WT') ? 'writing' : undefined);
-
-  const hasListening = isRetake ? activeTargetSkill === 'listening' : ((examData.listening_questions?.length ?? 0) > 0);
-  const hasReading = isRetake ? activeTargetSkill === 'reading' : (((examData.reading_questions?.length ?? 0) > 0) || ((examData.passages?.length ?? 0) > 0));
-  const hasWriting = isRetake ? activeTargetSkill === 'writing' : Boolean(examData.writing_task1_prompt || examData.writing_task2_prompt);
+  // Memoized exam structure metrics (prevents per-render recalculation of passages & skill flags)
+  const {
+    isRetake,
+    activeTargetSkill,
+    hasListening,
+    hasReading,
+    hasWriting,
+    readingQuestionsCount,
+    allReadingQuestionIds,
+    defaultInitialModule
+  } = useExamMetrics(examData, retakeMode, targetSkill);
 
   // Submit confirmation dialog state
   const [isConfirmSubmitOpen, setIsConfirmSubmitOpen] = useState<boolean>(false);
@@ -334,20 +306,7 @@ export default function App() {
     };
   }, [activeView, isLoggedIn, testMode, currentModule]);
 
-  // Reading questions count & ids helper
-  const readingQuestionsCount = (examData.passages && examData.passages.length > 0)
-    ? examData.passages.reduce((acc, p) => acc + (p.questions?.length || 0), 0)
-    : (examData.reading_questions?.length ?? 0);
-
-  const allReadingQuestionIds = (examData.passages && examData.passages.length > 0)
-    ? examData.passages.flatMap(p => (p.questions || []).map(q => q.question_id))
-    : (examData.reading_questions || []).map(q => q.question_id);
-
-  const defaultInitialModule: 'listening' | 'reading' | 'writing' = hasListening 
-    ? 'listening' 
-    : hasReading 
-    ? 'reading' 
-    : 'writing';
+  // (Derived readingQuestionsCount, allReadingQuestionIds, defaultInitialModule computed via useExamMetrics above)
 
   // Switch tabs safely based on TEST vs PRACTICE mode
   const handleSwitchTab = (targetModule: 'listening' | 'reading' | 'writing') => {
@@ -441,23 +400,7 @@ export default function App() {
   };
   
   const handleSetExamData = (data: ExamData) => {
-    const sanitizeQs = (qs: any[], prefix: string) => {
-      const seen = new Set<string>();
-      return qs.map((q, idx) => {
-        let qid = q.question_id || `${prefix}${idx + 1}`;
-        if (seen.has(qid)) {
-          qid = `${qid}_dup_${idx}`;
-        }
-        seen.add(qid);
-        return { ...q, question_id: qid };
-      });
-    };
-    
-    setExamData({
-      ...data,
-      listening_questions: sanitizeQs(data.listening_questions || [], 'l'),
-      reading_questions: sanitizeQs(data.reading_questions || [], 'r'),
-    });
+    setExamData(normalizeExamPayload(data));
   };
 
   const handleLaunchStudentExam = (exam: ExamData) => {

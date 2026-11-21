@@ -187,15 +187,61 @@ function sanitizeSheetCell(val: any, maxLen: number = MAX_SHEET_CELL_CHARS, prot
   return str;
 }
 
-function parseExamRows(rows: any[][]): any[] {
+function parsePositiveDuration(val: unknown): number | null {
+  if (val === undefined || val === null) return null;
+  if (typeof val === 'number') {
+    return Number.isFinite(val) && val > 0 ? val : null;
+  }
+  const str = String(val).trim();
+  if (!str || !/^\d+(\.\d+)?$/.test(str)) return null;
+  const num = Number(str);
+  return Number.isFinite(num) && num > 0 ? num : null;
+}
+
+export function resolveExamTypeAndDuration(
+  col2: unknown,
+  col3: unknown,
+  fallbackDuration = 120
+): { test_type: 'TEST' | 'PRACTICE'; duration_mins: number } {
+  const num2 = parsePositiveDuration(col2);
+  const num3 = parsePositiveDuration(col3);
+
+  // Auto-detect swapped legacy rows: [EXAM_CODE, TITLE, 30, 'PRACTICE'] vs [EXAM_CODE, TITLE, 'TEST', 120]
+  if (num2 !== null && num3 === null) {
+    const rawType = String(col3 || 'TEST').trim().toUpperCase();
+    return {
+      test_type: rawType === 'PRACTICE' ? 'PRACTICE' : 'TEST',
+      duration_mins: num2
+    };
+  }
+
+  const rawType = String(col2 || 'TEST').trim().toUpperCase();
+  return {
+    test_type: rawType === 'PRACTICE' ? 'PRACTICE' : 'TEST',
+    duration_mins: num3 !== null ? num3 : fallbackDuration
+  };
+}
+
+export function resolveSubmissionWriteChannel(
+  serviceAccountConfigured: boolean,
+  spreadsheetId: string | undefined | null,
+  gasUrl: string | undefined | null
+): 'sheets_api' | 'gas_fallback' | 'local_only' {
+  if (serviceAccountConfigured && Boolean((spreadsheetId || '').trim())) {
+    return 'sheets_api';
+  }
+  const cleanGasUrl = (gasUrl || '').trim();
+  if (cleanGasUrl && !cleanGasUrl.includes('AKfycbx_mock') && !cleanGasUrl.includes('mock_ielts_exam_system_gas_url')) {
+    return 'gas_fallback';
+  }
+  return 'local_only';
+}
+
+export function parseExamRows(rows: any[][]): any[] {
   return rows.map((row) => {
     const examCode = String(row[0] || '').trim().toUpperCase();
     const title = String(row[1] || `IELTS Examination - ${examCode}`).trim();
-    const testType = String(row[2] || 'TEST').trim().toUpperCase() === 'PRACTICE' ? 'PRACTICE' : 'TEST';
-
-    const rawDur = row[3];
-    const parsedDur = typeof rawDur === 'number' ? rawDur : Number(rawDur);
-    const durationMins = !isNaN(parsedDur) && parsedDur > 0 ? parsedDur : 120;
+    const { test_type: testType, duration_mins: durationMins } = resolveExamTypeAndDuration(row[2], row[3], 120);
 
     const audioUrl = String(row[4] || '').trim();
     const readingPassage = String(row[5] || '').trim();

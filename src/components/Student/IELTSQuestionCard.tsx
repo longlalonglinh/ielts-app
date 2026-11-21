@@ -78,6 +78,16 @@ export const IELTSQuestionCard: React.FC<IELTSQuestionCardProps> = ({
   ) {
     qType = IELTSQuestionType.SUMMARY_COMPLETION_BOX;
   }
+  // Defensive fallback: if Sheet Col E fell back to MULTIPLE_CHOICE with no options
+  // but question_text contains a blank placeholder (_____, [...], [blank_X]), render as gap-fill input
+  if (
+    qType === IELTSQuestionType.MULTIPLE_CHOICE &&
+    (!question.options || question.options.length === 0) &&
+    (!question.display_options || question.display_options.length === 0) &&
+    /(_{3,}|\.{3,}|\[\.+\]|\[\s*_+\s*\]|\[blank_\d+\])/i.test(question.question_text || '')
+  ) {
+    qType = IELTSQuestionType.FILL_IN_THE_BLANK;
+  }
 
   // Check if answer is filled
   const isFilled = Boolean(userAnswer && userAnswer.trim().length > 0);

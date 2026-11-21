@@ -29,8 +29,6 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build Vite App
-        env:
-          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
         run: bun run build
 
       - name: Upload Pages artifact

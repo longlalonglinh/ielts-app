@@ -213,7 +213,9 @@ export function isAnswerCorrect(
         .replace(/\borganize\b/g, 'organise')
         .replace(/\borganized\b/g, 'organised')
         .replace(/\brecognize\b/g, 'recognise')
-        .replace(/\brecognized\b/g, 'recognised');
+        .replace(/\brecognized\b/g, 'recognised')
+        .replace(/\bindustrialize\b/g, 'industrialise')
+        .replace(/\bindustrialized\b/g, 'industrialised');
     };
     if (canonicalizeUKUS(normUser) === canonicalizeUKUS(normOption)) {
       return true;

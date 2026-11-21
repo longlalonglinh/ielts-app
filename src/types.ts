@@ -71,7 +71,8 @@ export type QuestionType =
 
 export function canonicalizeQuestionType(rawType: string | undefined | null): IELTSQuestionType {
   if (!rawType) return IELTSQuestionType.MULTIPLE_CHOICE;
-  const upper = rawType.toUpperCase().replace(/[-\s]+/g, '_');
+  const upper = rawType.trim().toUpperCase().replace(/[-\s]+/g, '_');
+  if (!upper) return IELTSQuestionType.MULTIPLE_CHOICE;
 
   if (upper in IELTSQuestionType) {
     return IELTSQuestionType[upper as keyof typeof IELTSQuestionType];
@@ -125,7 +126,15 @@ export function canonicalizeQuestionType(rawType: string | undefined | null): IE
   if (upper.includes('SHORT_ANSWER')) {
     return IELTSQuestionType.SHORT_ANSWER;
   }
-  if (upper.includes('FILL') || upper.includes('BLANK') || upper.includes('SENTENCE_COMPLETION')) {
+  if (
+    upper.includes('FILL') ||
+    upper.includes('BLANK') ||
+    upper.includes('GAP') ||
+    upper.includes('SENTENCE_COMPLETION') ||
+    upper.includes('NOTE_COMPLETION') ||
+    upper.includes('FORM_COMPLETION') ||
+    upper.includes('COMPLETION')
+  ) {
     return IELTSQuestionType.FILL_IN_THE_BLANK;
   }
 
@@ -393,8 +402,21 @@ export interface SubmissionResponse {
     section: 'listening' | 'reading';
     user_answer: string;
     is_correct: boolean;
-    score_awarded: number;
-    acceptable_answers: string[];
+    score_awarded?: number;
+    earned_score?: number;
+    max_score?: number;
+    correct_answer?: string;
+    acceptable_answers?: string[];
+  }>;
+  question_results?: Array<{
+    question_id: string;
+    section: 'listening' | 'reading';
+    user_answer: string;
+    correct_answer?: string;
+    acceptable_answers?: string[];
+    is_correct: boolean;
+    max_score?: number;
+    earned_score?: number;
   }>;
   writing_status: 'PENDING_TEACHER' | 'GRADED';
   submitted_at?: string;
