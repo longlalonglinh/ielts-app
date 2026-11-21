@@ -44470,5 +44470,932 @@
     "status": "draft",
     "is_draft": true,
     "updated_at": "2026-11-15T17:47:09.892Z"
-  }
+  },
+  {
+  "exam_code": "READING_SILK_01",
+  "title": "IELTS Reading: The Development of the Silk Industry (23 Questions)",
+  "test_type": "PRACTICE",
+  "exam_type": "one_skill",
+  "skills": [
+    "reading"
+  ],
+  "duration_mins": 30,
+  "passage_title": "The development of the silk industry",
+  "passage_text": "The development of the silk industry\nSilk, a natural fibre produced by a particular worm called a silkworm, has been used in clothing for many centuries.\n\nWhen silk was first discovered in China over 4,500 years ago, it was reserved exclusively for the use of the emperor, his close relations and the very highest of his dignitaries. Within the palace, the emperor is believed to have worn a robe of white silk; outside, he, his principal wife, and the heir to the throne wore yellow, the colour of the earth.\n\nGradually silk came into more general use, and the various classes of Chinese society began wearing tunics of silk. As well as being used for clothing and decoration, silk was quite quickly put to industrial use, and rapidly became one of the principal elements of the Chinese economy. It was used in the production of musical instruments, as string for fishing, and even as the world's first luxury paper. Eventually even the common people were able to wear garments of silk.\n\nDuring the Han dynasty (206 BC-220 AD), silk ceased to be a mere fabric and became a form of currency. Farmers paid their taxes in grain and silk, and silk was used to pay civil servants and to reward subjects for outstanding services. Values were calculated in lengths of silk as they had previously been calculated in weight of gold. Before long, silk became a currency used in trade with foreign countries, which continued into the Tang dynasty (616-907 AD). It is possible that this added importance was the result of a major increase in production. Silk also found its way so thoroughly into the Chinese language that 230 of the 5,000 most common characters of Mandarin' have 'silk' as their key component.\n\nSilk became a precious commodity, highly sought after by other countries from an early date, and it is believed that the silk trade actually existed before the Silk Road+ was officially opened in the second century BC. An Egyptian mummy with a silk thread in her hair, dating from 1070 BC, has been discovered in the village of Deir el Medina near the Valley of the Kings, and is probably the earliest evidence of the silk trade. During the second century BC, the Chinese emperor Han Wu Di's ambassadors travelled as far west as Persia and Mesopotamis, bearing gifts including silks. A range of important finds of Chinese silks have also been made along the Silk Road. One of the most dramatic of these finds was some Tang silk discovered in 1900. It is believed that around 1015 AD Buddhist monks, possibly alarmed by the threat of invasion by Tibetan people, had sealed more than ten thousand manuscripts and silk paintings, silk banners and textiles in caves near Dunhuang, a trading station on the Silk Road in north-west China.\n\nSome historians believe the first Europeans to set eyes upon the fabulous fabric were the Roman legions of Marcus Licinius Crassus, Governor of Syria. According to certain accounts of the period, at an important battle near the Euphrates River in 53 BC, the Roman soldiers were so startled by the bright silken banners of the enemy that they fled in panic. Yet, within decades Chinese silks were widely worn by the rich and noble families of Rome. The Roman Emperor Heliogabalus (218-222 AD) wore nothing but silk. By 380 AD, the Roman historian Marcellinnus Ammianus reported that. The use of silk, which was one confined to the nobility, has now spread to all classes without distinction - even to the lowest. The desire for silk continued to increase over the centuries. Despite this demand, the price of silk remained very high.\n\nIn spite of their secrecy about production methods, the Chinese eventually lost their monopoly on silk production. Knowledge of silk production methods reached Korea around 200 BC, when waves of Chinese immigrants arrived there. Shortly after 300 AD, it travelled westward, and the cultivation of the silkworm was established in India.\n\nAround 550 AD silk production reached the Middle East. Records indicate that two monks from Constantinople (modern-day Istanbul), capital of the Byzantine Empire, appeared at their emperor's court with silkworm eggs which they had obtained secretly, and hidden in their hollow bamboo walking sticks. Under their supervision the eggs hatched into worms, and the worms spun silk threads. Byzantium was in the silk business at last. The Byzantine church and state created imperial workshops, monopolising production and keeping the secret to themselves. This allowed a silk industry to be established, undercutting the market for ordinary-grade Chinese silk. However, high quality silk textiles, woven in China especially for the Middle Eastern market, continued to achieve high prices in the West, and trade along the Silk Road continued as before. By the sixth century the Persians, too, had mastered the art of silk weaving, developing their own rich patterns and techniques. But it wasn't until the 13th century that Italy began silk production, with the introduction of 2,000 skilled silk weavers from Constantinople. Eventually, silk production became widespread throughout Europe.\n\nWorld silk production has approximately doubled during the last 30 years in spite of man-made fibres replacing certain uses of silk. Before this period, China and Japan were the two main producers, together manufacturing more than 50 per cent of world production each year. After the late 1970s, however, China dramatically increased its silk production, and once again became the world's leading producer.",
+  "reading_passage": "The development of the silk industry\nSilk, a natural fibre produced by a particular worm called a silkworm, has been used in clothing for many centuries.\n\nWhen silk was first discovered in China over 4,500 years ago, it was reserved exclusively for the use of the emperor, his close relations and the very highest of his dignitaries. Within the palace, the emperor is believed to have worn a robe of white silk; outside, he, his principal wife, and the heir to the throne wore yellow, the colour of the earth.\n\nGradually silk came into more general use, and the various classes of Chinese society began wearing tunics of silk. As well as being used for clothing and decoration, silk was quite quickly put to industrial use, and rapidly became one of the principal elements of the Chinese economy. It was used in the production of musical instruments, as string for fishing, and even as the world's first luxury paper. Eventually even the common people were able to wear garments of silk.\n\nDuring the Han dynasty (206 BC-220 AD), silk ceased to be a mere fabric and became a form of currency. Farmers paid their taxes in grain and silk, and silk was used to pay civil servants and to reward subjects for outstanding services. Values were calculated in lengths of silk as they had previously been calculated in weight of gold. Before long, silk became a currency used in trade with foreign countries, which continued into the Tang dynasty (616-907 AD). It is possible that this added importance was the result of a major increase in production. Silk also found its way so thoroughly into the Chinese language that 230 of the 5,000 most common characters of Mandarin' have 'silk' as their key component.\n\nSilk became a precious commodity, highly sought after by other countries from an early date, and it is believed that the silk trade actually existed before the Silk Road+ was officially opened in the second century BC. An Egyptian mummy with a silk thread in her hair, dating from 1070 BC, has been discovered in the village of Deir el Medina near the Valley of the Kings, and is probably the earliest evidence of the silk trade. During the second century BC, the Chinese emperor Han Wu Di's ambassadors travelled as far west as Persia and Mesopotamis, bearing gifts including silks. A range of important finds of Chinese silks have also been made along the Silk Road. One of the most dramatic of these finds was some Tang silk discovered in 1900. It is believed that around 1015 AD Buddhist monks, possibly alarmed by the threat of invasion by Tibetan people, had sealed more than ten thousand manuscripts and silk paintings, silk banners and textiles in caves near Dunhuang, a trading station on the Silk Road in north-west China.\n\nSome historians believe the first Europeans to set eyes upon the fabulous fabric were the Roman legions of Marcus Licinius Crassus, Governor of Syria. According to certain accounts of the period, at an important battle near the Euphrates River in 53 BC, the Roman soldiers were so startled by the bright silken banners of the enemy that they fled in panic. Yet, within decades Chinese silks were widely worn by the rich and noble families of Rome. The Roman Emperor Heliogabalus (218-222 AD) wore nothing but silk. By 380 AD, the Roman historian Marcellinnus Ammianus reported that. The use of silk, which was one confined to the nobility, has now spread to all classes without distinction - even to the lowest. The desire for silk continued to increase over the centuries. Despite this demand, the price of silk remained very high.\n\nIn spite of their secrecy about production methods, the Chinese eventually lost their monopoly on silk production. Knowledge of silk production methods reached Korea around 200 BC, when waves of Chinese immigrants arrived there. Shortly after 300 AD, it travelled westward, and the cultivation of the silkworm was established in India.\n\nAround 550 AD silk production reached the Middle East. Records indicate that two monks from Constantinople (modern-day Istanbul), capital of the Byzantine Empire, appeared at their emperor's court with silkworm eggs which they had obtained secretly, and hidden in their hollow bamboo walking sticks. Under their supervision the eggs hatched into worms, and the worms spun silk threads. Byzantium was in the silk business at last. The Byzantine church and state created imperial workshops, monopolising production and keeping the secret to themselves. This allowed a silk industry to be established, undercutting the market for ordinary-grade Chinese silk. However, high quality silk textiles, woven in China especially for the Middle Eastern market, continued to achieve high prices in the West, and trade along the Silk Road continued as before. By the sixth century the Persians, too, had mastered the art of silk weaving, developing their own rich patterns and techniques. But it wasn't until the 13th century that Italy began silk production, with the introduction of 2,000 skilled silk weavers from Constantinople. Eventually, silk production became widespread throughout Europe.\n\nWorld silk production has approximately doubled during the last 30 years in spite of man-made fibres replacing certain uses of silk. Before this period, China and Japan were the two main producers, together manufacturing more than 50 per cent of world production each year. After the late 1970s, however, China dramatically increased its silk production, and once again became the world's leading producer.",
+  "passages": [
+    {
+      "passage_index": 1,
+      "title": "The development of the silk industry",
+      "text": "The development of the silk industry\nSilk, a natural fibre produced by a particular worm called a silkworm, has been used in clothing for many centuries.\n\nWhen silk was first discovered in China over 4,500 years ago, it was reserved exclusively for the use of the emperor, his close relations and the very highest of his dignitaries. Within the palace, the emperor is believed to have worn a robe of white silk; outside, he, his principal wife, and the heir to the throne wore yellow, the colour of the earth.\n\nGradually silk came into more general use, and the various classes of Chinese society began wearing tunics of silk. As well as being used for clothing and decoration, silk was quite quickly put to industrial use, and rapidly became one of the principal elements of the Chinese economy. It was used in the production of musical instruments, as string for fishing, and even as the world's first luxury paper. Eventually even the common people were able to wear garments of silk.\n\nDuring the Han dynasty (206 BC-220 AD), silk ceased to be a mere fabric and became a form of currency. Farmers paid their taxes in grain and silk, and silk was used to pay civil servants and to reward subjects for outstanding services. Values were calculated in lengths of silk as they had previously been calculated in weight of gold. Before long, silk became a currency used in trade with foreign countries, which continued into the Tang dynasty (616-907 AD). It is possible that this added importance was the result of a major increase in production. Silk also found its way so thoroughly into the Chinese language that 230 of the 5,000 most common characters of Mandarin' have 'silk' as their key component.\n\nSilk became a precious commodity, highly sought after by other countries from an early date, and it is believed that the silk trade actually existed before the Silk Road+ was officially opened in the second century BC. An Egyptian mummy with a silk thread in her hair, dating from 1070 BC, has been discovered in the village of Deir el Medina near the Valley of the Kings, and is probably the earliest evidence of the silk trade. During the second century BC, the Chinese emperor Han Wu Di's ambassadors travelled as far west as Persia and Mesopotamis, bearing gifts including silks. A range of important finds of Chinese silks have also been made along the Silk Road. One of the most dramatic of these finds was some Tang silk discovered in 1900. It is believed that around 1015 AD Buddhist monks, possibly alarmed by the threat of invasion by Tibetan people, had sealed more than ten thousand manuscripts and silk paintings, silk banners and textiles in caves near Dunhuang, a trading station on the Silk Road in north-west China.\n\nSome historians believe the first Europeans to set eyes upon the fabulous fabric were the Roman legions of Marcus Licinius Crassus, Governor of Syria. According to certain accounts of the period, at an important battle near the Euphrates River in 53 BC, the Roman soldiers were so startled by the bright silken banners of the enemy that they fled in panic. Yet, within decades Chinese silks were widely worn by the rich and noble families of Rome. The Roman Emperor Heliogabalus (218-222 AD) wore nothing but silk. By 380 AD, the Roman historian Marcellinnus Ammianus reported that. The use of silk, which was one confined to the nobility, has now spread to all classes without distinction - even to the lowest. The desire for silk continued to increase over the centuries. Despite this demand, the price of silk remained very high.\n\nIn spite of their secrecy about production methods, the Chinese eventually lost their monopoly on silk production. Knowledge of silk production methods reached Korea around 200 BC, when waves of Chinese immigrants arrived there. Shortly after 300 AD, it travelled westward, and the cultivation of the silkworm was established in India.\n\nAround 550 AD silk production reached the Middle East. Records indicate that two monks from Constantinople (modern-day Istanbul), capital of the Byzantine Empire, appeared at their emperor's court with silkworm eggs which they had obtained secretly, and hidden in their hollow bamboo walking sticks. Under their supervision the eggs hatched into worms, and the worms spun silk threads. Byzantium was in the silk business at last. The Byzantine church and state created imperial workshops, monopolising production and keeping the secret to themselves. This allowed a silk industry to be established, undercutting the market for ordinary-grade Chinese silk. However, high quality silk textiles, woven in China especially for the Middle Eastern market, continued to achieve high prices in the West, and trade along the Silk Road continued as before. By the sixth century the Persians, too, had mastered the art of silk weaving, developing their own rich patterns and techniques. But it wasn't until the 13th century that Italy began silk production, with the introduction of 2,000 skilled silk weavers from Constantinople. Eventually, silk production became widespread throughout Europe.\n\nWorld silk production has approximately doubled during the last 30 years in spite of man-made fibres replacing certain uses of silk. Before this period, China and Japan were the two main producers, together manufacturing more than 50 per cent of world production each year. After the late 1970s, however, China dramatically increased its silk production, and once again became the world's leading producer.",
+      "questions": [
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R1",
+          "question_number": 1,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 1–7: Complete the notes below. Choose ONE WORD ONLY from the passage for each answer.] Early Uses — Clothing: At first, silk was only available to Chinese of high rank. Inside the palace, the emperor wore _____ silk indoors.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "white",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R2",
+          "question_number": 2,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 1–7: ONE WORD ONLY] Early Uses — In industry: Silk items included parts of musical instruments, fishing strings and _____.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "paper",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R3",
+          "question_number": 3,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 1–7: ONE WORD ONLY] Early Uses — Currency: Silk was used as payment of _____ as well as for wages and rewards.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "taxes",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R4",
+          "question_number": 4,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 1–7: ONE WORD ONLY] Early Uses — Currency: Silk replaced _____ as a unit of value.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "gold",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R5",
+          "question_number": 5,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 1–7: ONE WORD ONLY] Early Uses — Currency: Silk was soon used as payment in _____ trade.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "foreign",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R6",
+          "question_number": 6,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 1–7: ONE WORD ONLY] Evidence of silk trade (1070 BC, Egypt): The hair of a _____ contained silk.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "mummy",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R7",
+          "question_number": 7,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 1–7: ONE WORD ONLY] Evidence of silk trade (1015 AD, north-west China): Silk objects were hidden inside _____.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "caves",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R8",
+          "question_number": 8,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] Their first sight of silk created fear among Roman soldiers.",
+          "question_type": "true_false_not_given",
+          "options": [
+            "TRUE",
+            "FALSE",
+            "NOT GIVEN"
+          ],
+          "correct_answer": "TRUE",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R9",
+          "question_number": 9,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] The quality of Chinese silk imported by the early Romans varied widely.",
+          "question_type": "true_false_not_given",
+          "options": [
+            "TRUE",
+            "FALSE",
+            "NOT GIVEN"
+          ],
+          "correct_answer": "NOT GIVEN",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R10",
+          "question_number": 10,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] The Byzantine emperor first acquired silkworm eggs from the Chinese emperor.",
+          "question_type": "true_false_not_given",
+          "options": [
+            "TRUE",
+            "FALSE",
+            "NOT GIVEN"
+          ],
+          "correct_answer": "FALSE",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R11",
+          "question_number": 11,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] The price of high-grade Chinese silk fell due to competition from Middle-Eastern producers.",
+          "question_type": "true_false_not_given",
+          "options": [
+            "TRUE",
+            "FALSE",
+            "NOT GIVEN"
+          ],
+          "correct_answer": "FALSE",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R12",
+          "question_number": 12,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] Silk was produced in the Middle East several centuries before it was produced in Europe.",
+          "question_type": "true_false_not_given",
+          "options": [
+            "TRUE",
+            "FALSE",
+            "NOT GIVEN"
+          ],
+          "correct_answer": "TRUE",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R13",
+          "question_number": 13,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] Global silk production has declined in recent years.",
+          "question_type": "true_false_not_given",
+          "options": [
+            "TRUE",
+            "FALSE",
+            "NOT GIVEN"
+          ],
+          "correct_answer": "FALSE",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R14",
+          "question_number": 14,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Extended Part A — Standalone Gap-Filling: ONE WORD ONLY] Despite trying to keep their techniques confidential, the Chinese eventually lost their _____ over silk manufacturing.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "monopoly",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R15",
+          "question_number": 15,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Extended Part A — Standalone Gap-Filling: ONE WORD ONLY] Around 550 AD, two monks secretly brought silkworm eggs to the Byzantine Empire by concealing them inside _____ bamboo walking sticks.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "hollow",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R16",
+          "question_number": 16,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Extended Part A — Standalone Gap-Filling: ONE WORD ONLY] By the sixth century, artisans in Persia had mastered silk _____ and developed distinctive patterns of their own.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "weaving",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R17",
+          "question_number": 17,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Extended Part A — Standalone Gap-Filling: ONE WORD ONLY] Even though synthetic materials have replaced silk in some applications, global silk output has roughly _____ over the past three decades.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "doubled",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R18",
+          "question_number": 18,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Extended Part B — Synonym Identification: ONE WORD ONLY] Find an adverb in Paragraph 1 that means \"solely / only for a particular group\": _____",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "exclusively",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R19",
+          "question_number": 19,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Extended Part B — Synonym Identification: ONE WORD ONLY] Find a noun in Paragraph 4 that means \"a valuable traded product or good\": _____",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "commodity",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R20",
+          "question_number": 20,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Extended Part B — Synonym Identification: ONE WORD ONLY] Find an adjective in Paragraph 5 that means \"suddenly shocked or frightened\": _____",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "startled",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R21",
+          "question_number": 21,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Extended Part C — Word Form Transformation: ONE WORD ONLY] Replace [put to industrial use] with a single past-participle verb derived from \"industry\": Silk was quickly _____ across China.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "industrialised",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R22",
+          "question_number": 22,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Extended Part C — Word Form Transformation: ONE WORD ONLY] Replace [In spite of their secrecy] using a simple adverb derived from \"secret\": Although they acted _____, silk-making knowledge eventually spread abroad.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "secretly",
+          "max_score": 1
+        },
+        {
+          "exam_code": "READING_SILK_01",
+          "question_id": "R23",
+          "question_number": 23,
+          "passage_index": 1,
+          "section": "reading",
+          "question_text": "[Extended Part C — Word Form Transformation: ONE WORD ONLY] Replace [without distinction] with a single simple adverb meaning \"in the same way / to the same degree\": Silk use spread _____ across all social classes.",
+          "question_type": "fill_in_blank",
+          "options": [],
+          "correct_answer": "equally",
+          "max_score": 1
+        }
+      ]
+    }
+  ],
+  "listening_questions": [],
+  "reading_questions": [
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R1",
+      "question_number": 1,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: Complete the notes below. Choose ONE WORD ONLY from the passage for each answer.] Early Uses — Clothing: At first, silk was only available to Chinese of high rank. Inside the palace, the emperor wore _____ silk indoors.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "white",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R2",
+      "question_number": 2,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: ONE WORD ONLY] Early Uses — In industry: Silk items included parts of musical instruments, fishing strings and _____.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "paper",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R3",
+      "question_number": 3,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: ONE WORD ONLY] Early Uses — Currency: Silk was used as payment of _____ as well as for wages and rewards.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "taxes",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R4",
+      "question_number": 4,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: ONE WORD ONLY] Early Uses — Currency: Silk replaced _____ as a unit of value.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "gold",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R5",
+      "question_number": 5,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: ONE WORD ONLY] Early Uses — Currency: Silk was soon used as payment in _____ trade.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "foreign",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R6",
+      "question_number": 6,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: ONE WORD ONLY] Evidence of silk trade (1070 BC, Egypt): The hair of a _____ contained silk.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "mummy",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R7",
+      "question_number": 7,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: ONE WORD ONLY] Evidence of silk trade (1015 AD, north-west China): Silk objects were hidden inside _____.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "caves",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R8",
+      "question_number": 8,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] Their first sight of silk created fear among Roman soldiers.",
+      "question_type": "true_false_not_given",
+      "options": [
+        "TRUE",
+        "FALSE",
+        "NOT GIVEN"
+      ],
+      "correct_answer": "TRUE",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R9",
+      "question_number": 9,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] The quality of Chinese silk imported by the early Romans varied widely.",
+      "question_type": "true_false_not_given",
+      "options": [
+        "TRUE",
+        "FALSE",
+        "NOT GIVEN"
+      ],
+      "correct_answer": "NOT GIVEN",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R10",
+      "question_number": 10,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] The Byzantine emperor first acquired silkworm eggs from the Chinese emperor.",
+      "question_type": "true_false_not_given",
+      "options": [
+        "TRUE",
+        "FALSE",
+        "NOT GIVEN"
+      ],
+      "correct_answer": "FALSE",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R11",
+      "question_number": 11,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] The price of high-grade Chinese silk fell due to competition from Middle-Eastern producers.",
+      "question_type": "true_false_not_given",
+      "options": [
+        "TRUE",
+        "FALSE",
+        "NOT GIVEN"
+      ],
+      "correct_answer": "FALSE",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R12",
+      "question_number": 12,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] Silk was produced in the Middle East several centuries before it was produced in Europe.",
+      "question_type": "true_false_not_given",
+      "options": [
+        "TRUE",
+        "FALSE",
+        "NOT GIVEN"
+      ],
+      "correct_answer": "TRUE",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R13",
+      "question_number": 13,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] Global silk production has declined in recent years.",
+      "question_type": "true_false_not_given",
+      "options": [
+        "TRUE",
+        "FALSE",
+        "NOT GIVEN"
+      ],
+      "correct_answer": "FALSE",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R14",
+      "question_number": 14,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part A — Standalone Gap-Filling: ONE WORD ONLY] Despite trying to keep their techniques confidential, the Chinese eventually lost their _____ over silk manufacturing.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "monopoly",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R15",
+      "question_number": 15,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part A — Standalone Gap-Filling: ONE WORD ONLY] Around 550 AD, two monks secretly brought silkworm eggs to the Byzantine Empire by concealing them inside _____ bamboo walking sticks.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "hollow",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R16",
+      "question_number": 16,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part A — Standalone Gap-Filling: ONE WORD ONLY] By the sixth century, artisans in Persia had mastered silk _____ and developed distinctive patterns of their own.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "weaving",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R17",
+      "question_number": 17,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part A — Standalone Gap-Filling: ONE WORD ONLY] Even though synthetic materials have replaced silk in some applications, global silk output has roughly _____ over the past three decades.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "doubled",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R18",
+      "question_number": 18,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part B — Synonym Identification: ONE WORD ONLY] Find an adverb in Paragraph 1 that means \"solely / only for a particular group\": _____",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "exclusively",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R19",
+      "question_number": 19,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part B — Synonym Identification: ONE WORD ONLY] Find a noun in Paragraph 4 that means \"a valuable traded product or good\": _____",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "commodity",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R20",
+      "question_number": 20,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part B — Synonym Identification: ONE WORD ONLY] Find an adjective in Paragraph 5 that means \"suddenly shocked or frightened\": _____",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "startled",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R21",
+      "question_number": 21,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part C — Word Form Transformation: ONE WORD ONLY] Replace [put to industrial use] with a single past-participle verb derived from \"industry\": Silk was quickly _____ across China.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "industrialised",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R22",
+      "question_number": 22,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part C — Word Form Transformation: ONE WORD ONLY] Replace [In spite of their secrecy] using a simple adverb derived from \"secret\": Although they acted _____, silk-making knowledge eventually spread abroad.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "secretly",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R23",
+      "question_number": 23,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part C — Word Form Transformation: ONE WORD ONLY] Replace [without distinction] with a single simple adverb meaning \"in the same way / to the same degree\": Silk use spread _____ across all social classes.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "equally",
+      "max_score": 1
+    }
+  ],
+  "questions": [
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R1",
+      "question_number": 1,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: Complete the notes below. Choose ONE WORD ONLY from the passage for each answer.] Early Uses — Clothing: At first, silk was only available to Chinese of high rank. Inside the palace, the emperor wore _____ silk indoors.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "white",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R2",
+      "question_number": 2,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: ONE WORD ONLY] Early Uses — In industry: Silk items included parts of musical instruments, fishing strings and _____.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "paper",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R3",
+      "question_number": 3,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: ONE WORD ONLY] Early Uses — Currency: Silk was used as payment of _____ as well as for wages and rewards.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "taxes",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R4",
+      "question_number": 4,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: ONE WORD ONLY] Early Uses — Currency: Silk replaced _____ as a unit of value.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "gold",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R5",
+      "question_number": 5,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: ONE WORD ONLY] Early Uses — Currency: Silk was soon used as payment in _____ trade.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "foreign",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R6",
+      "question_number": 6,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: ONE WORD ONLY] Evidence of silk trade (1070 BC, Egypt): The hair of a _____ contained silk.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "mummy",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R7",
+      "question_number": 7,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 1–7: ONE WORD ONLY] Evidence of silk trade (1015 AD, north-west China): Silk objects were hidden inside _____.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "caves",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R8",
+      "question_number": 8,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] Their first sight of silk created fear among Roman soldiers.",
+      "question_type": "true_false_not_given",
+      "options": [
+        "TRUE",
+        "FALSE",
+        "NOT GIVEN"
+      ],
+      "correct_answer": "TRUE",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R9",
+      "question_number": 9,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] The quality of Chinese silk imported by the early Romans varied widely.",
+      "question_type": "true_false_not_given",
+      "options": [
+        "TRUE",
+        "FALSE",
+        "NOT GIVEN"
+      ],
+      "correct_answer": "NOT GIVEN",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R10",
+      "question_number": 10,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] The Byzantine emperor first acquired silkworm eggs from the Chinese emperor.",
+      "question_type": "true_false_not_given",
+      "options": [
+        "TRUE",
+        "FALSE",
+        "NOT GIVEN"
+      ],
+      "correct_answer": "FALSE",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R11",
+      "question_number": 11,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] The price of high-grade Chinese silk fell due to competition from Middle-Eastern producers.",
+      "question_type": "true_false_not_given",
+      "options": [
+        "TRUE",
+        "FALSE",
+        "NOT GIVEN"
+      ],
+      "correct_answer": "FALSE",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R12",
+      "question_number": 12,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] Silk was produced in the Middle East several centuries before it was produced in Europe.",
+      "question_type": "true_false_not_given",
+      "options": [
+        "TRUE",
+        "FALSE",
+        "NOT GIVEN"
+      ],
+      "correct_answer": "TRUE",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R13",
+      "question_number": 13,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Questions 8–13: TRUE / FALSE / NOT GIVEN] Global silk production has declined in recent years.",
+      "question_type": "true_false_not_given",
+      "options": [
+        "TRUE",
+        "FALSE",
+        "NOT GIVEN"
+      ],
+      "correct_answer": "FALSE",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R14",
+      "question_number": 14,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part A — Standalone Gap-Filling: ONE WORD ONLY] Despite trying to keep their techniques confidential, the Chinese eventually lost their _____ over silk manufacturing.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "monopoly",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R15",
+      "question_number": 15,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part A — Standalone Gap-Filling: ONE WORD ONLY] Around 550 AD, two monks secretly brought silkworm eggs to the Byzantine Empire by concealing them inside _____ bamboo walking sticks.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "hollow",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R16",
+      "question_number": 16,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part A — Standalone Gap-Filling: ONE WORD ONLY] By the sixth century, artisans in Persia had mastered silk _____ and developed distinctive patterns of their own.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "weaving",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R17",
+      "question_number": 17,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part A — Standalone Gap-Filling: ONE WORD ONLY] Even though synthetic materials have replaced silk in some applications, global silk output has roughly _____ over the past three decades.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "doubled",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R18",
+      "question_number": 18,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part B — Synonym Identification: ONE WORD ONLY] Find an adverb in Paragraph 1 that means \"solely / only for a particular group\": _____",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "exclusively",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R19",
+      "question_number": 19,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part B — Synonym Identification: ONE WORD ONLY] Find a noun in Paragraph 4 that means \"a valuable traded product or good\": _____",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "commodity",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R20",
+      "question_number": 20,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part B — Synonym Identification: ONE WORD ONLY] Find an adjective in Paragraph 5 that means \"suddenly shocked or frightened\": _____",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "startled",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R21",
+      "question_number": 21,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part C — Word Form Transformation: ONE WORD ONLY] Replace [put to industrial use] with a single past-participle verb derived from \"industry\": Silk was quickly _____ across China.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "industrialised",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R22",
+      "question_number": 22,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part C — Word Form Transformation: ONE WORD ONLY] Replace [In spite of their secrecy] using a simple adverb derived from \"secret\": Although they acted _____, silk-making knowledge eventually spread abroad.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "secretly",
+      "max_score": 1
+    },
+    {
+      "exam_code": "READING_SILK_01",
+      "question_id": "R23",
+      "question_number": 23,
+      "passage_index": 1,
+      "section": "reading",
+      "question_text": "[Extended Part C — Word Form Transformation: ONE WORD ONLY] Replace [without distinction] with a single simple adverb meaning \"in the same way / to the same degree\": Silk use spread _____ across all social classes.",
+      "question_type": "fill_in_blank",
+      "options": [],
+      "correct_answer": "equally",
+      "max_score": 1
+    }
+  ]
+}
 ]
